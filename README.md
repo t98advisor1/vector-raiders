@@ -114,7 +114,7 @@ npm run deploy
 
 두 번째·세 번째 명령은 배포 서버에서 쓸 교사 비밀번호와 시작 비밀번호를 묻습니다. 설정하지 않으면 교사 화면에 들어가거나 수업 탐험을 시작할 수 없습니다.
 
-배포하면 `https://vector-raiders.<계정>.workers.dev` 주소가 생깁니다. Durable Objects(SQLite 저장)를 쓰며, 한 반 규모라면 무료 플랜 한도 안에서 쓸 수 있을 것으로 예상합니다. 다만 실제 요금과 한도는 Cloudflare 요금 안내에서 확인해 주세요.
+배포하면 `https://go.<계정의 workers.dev 하위 도메인>.workers.dev` 주소가 생깁니다(앞부분 `go`는 `wrangler.toml`의 `name`). 하위 도메인은 Cloudflare 대시보드의 Workers & Pages → Account details → Subdomain에서 바꿀 수 있습니다. Durable Objects(SQLite 저장)를 쓰며, 한 반 규모라면 무료 플랜 한도 안에서 쓸 수 있을 것으로 예상합니다. 다만 실제 요금과 한도는 Cloudflare 요금 안내에서 확인해 주세요.
 
 학생 한 명이 처음 불러오는 양은 약 1.5MB입니다(지형 모델과 three.js 1.2MB, 내 캐릭터 0.25MB). 친구 캐릭터가 화면에 나타나면 캐릭터 종류(12가지)마다 약 0.25MB씩 더 받습니다. 한 번 받은 모델은 다시 받지 않습니다.
 
