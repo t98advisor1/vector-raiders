@@ -73,9 +73,18 @@ form input, .expr input {
 /* 게임 화면 */
 .game { height: 100vh; display: flex; flex-direction: column; background: #2a2018; }
 .world-wrap { position: relative; flex: 1; min-height: 0; }
-#world { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+#world { display: block; width: 100%; height: 100%; outline: none; touch-action: none;
+  /* 캔버스 색 보정: 채도와 대비를 살짝 올려 유적의 색이 또렷하게 나온다 */
+  filter: saturate(1.14) contrast(1.06); }
+/* 가장자리 비네트: 시선이 화면 한가운데로 모이게 한다 */
+.vignette { position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(8, 5, 18, 0.38) 100%);
+  mix-blend-mode: multiply; }
 .hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; flex-wrap: wrap; }
-.hud-card { background: rgba(17, 24, 39, 0.78); color: #fff; border-radius: 12px; padding: 6px 12px; display: flex; gap: 12px; align-items: center; font-weight: 600; }
+/* 네온 글로우 HUD */
+.hud-card { background: rgba(17, 24, 39, 0.78); color: #fff; border-radius: 12px; padding: 6px 12px; display: flex; gap: 12px; align-items: center; font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.35), 0 0 14px rgba(94, 234, 212, 0.18), 0 4px 14px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(94, 234, 212, 0.25); text-shadow: 0 0 8px rgba(94, 234, 212, 0.3); }
 .hud-card b { color: #fde68a; }
 .hud-btn { pointer-events: auto; border: 0; background: rgba(255, 255, 255, 0.15); color: #fff; font-size: 1.05rem; border-radius: 8px; padding: 2px 8px; cursor: pointer; }
 .hud-relics span { font-size: 1.3rem; filter: grayscale(1) opacity(0.4); transition: filter 0.4s; }
@@ -90,6 +99,39 @@ form input, .expr input {
 .hud-rank .sc { font-variant-numeric: tabular-nums; color: #fde68a; }
 .hud-rank li.mine { color: #5eead4; }
 .hud-rank li.gap { opacity: 0.6; justify-content: center; }
+
+/* 팀전 */
+.team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; flex: none;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5); vertical-align: middle; }
+.team-chip { --team: #64748b; background: var(--team) !important; color: #fff !important; font-weight: 800 !important; }
+.hud-teams { display: grid; gap: 2px; margin: 0; padding: 8px 12px; list-style: none; min-width: 200px; font-size: 0.92rem; }
+.hud-teams[hidden] { display: none; }
+.hud-teams li { display: flex; gap: 8px; align-items: center; }
+.hud-teams .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-teams .sc { font-variant-numeric: tabular-nums; color: #fde68a; }
+.hud-teams li.mine { color: #5eead4; }
+
+/* 미니맵 */
+.minimap { position: absolute; left: 10px; bottom: 10px; z-index: 20; background: rgba(12, 10, 24, 0.88);
+  border: 1px solid rgba(94, 234, 212, 0.4); border-radius: 14px; padding: 8px 10px 6px;
+  box-shadow: 0 0 18px rgba(94, 234, 212, 0.25), 0 8px 24px rgba(0, 0, 0, 0.45); }
+.minimap-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: #a7f3d0; font-size: 0.85rem; margin-bottom: 4px; }
+.minimap-head b { text-shadow: 0 0 8px rgba(94, 234, 212, 0.5); }
+.minimap canvas { display: block; width: min(52vw, 406px); height: auto; }
+
+/* 개념 학습 카드 */
+.concept-card { border: 2px solid #c9b287; background: linear-gradient(160deg, #fffdf4, #f6ecd2); border-radius: 18px; padding: 18px 20px; }
+.concept-head { display: flex; align-items: center; gap: 10px; }
+.concept-head h2 { font-size: 1.4rem; }
+.concept-badge { background: var(--teal); color: #fff; font-weight: 800; font-size: 0.85rem; border-radius: 999px; padding: 3px 12px; }
+.concept-tagline { font-size: 1.1rem; font-weight: 600; color: #3f3222; margin: 10px 0 12px; }
+.concept-body { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.concept-fig { flex: none; background: #fff; border: 1.5px solid var(--line); border-radius: 12px; }
+.concept-points { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 1.02rem; }
+.concept-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.link-card-btn { border: 0; background: none; font: inherit; font-size: 0.85rem; color: var(--teal); text-decoration: underline; cursor: pointer; padding: 0; }
+.summary-actions { margin-top: 12px; display: flex; justify-content: center; }
+.teacher-link { color: inherit; }
 
 /* 누군가 유물을 발견했을 때 뜨는 팝업 */
 .popups { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 40; pointer-events: none; width: min(480px, calc(100% - 32px)); }
@@ -213,6 +255,39 @@ mjx-container { font-size: 108% !important; }
 .mark.none { color: #c7bfae; }
 .warn-cell { background: var(--bad-soft); font-weight: 700; }
 
+/* 교사 화면: 팀 랭킹 · 문제·정답 일람표 */
+.team-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+.team-bar[hidden] { display: none; }
+.team-card { --team: #64748b; flex: 1 1 200px; display: flex; gap: 10px; align-items: center;
+  background: var(--paper); border: 2px solid var(--team); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+.team-card .team-badge { width: 34px; height: 34px; border-radius: 50%; background: var(--team); color: #fff;
+  display: grid; place-items: center; font-weight: 900; flex: none; }
+.team-card small { display: block; color: var(--muted); }
+.team-card .team-score { margin-left: auto; font-size: 1.2rem; color: var(--team); }
+.answer-sheet-table .as-no { white-space: nowrap; text-align: left; font-weight: 700; }
+.answer-sheet-table .as-text { text-align: left; white-space: normal; min-width: 260px; }
+.answer-sheet-table .as-answer { white-space: nowrap; font-weight: 700; color: var(--teal); }
+
+/* 탐험 끝 오답 정리: A4 인쇄. 화면에서는 print-area를 보이지 않게 하고, 인쇄할 때만 페이지를 채운다 */
+#print-area { display: none; }
+@media print {
+  @page { size: A4; margin: 18mm 16mm; }
+  body.student > *:not(#print-area), body.student #modal, body.student .toast, body.student #minimap { display: none !important; }
+  #print-area { display: block !important; color: #111; font-size: 10.5pt; line-height: 1.6; }
+  .pr-head { border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 14px; }
+  .pr-head h1 { font-size: 16pt; }
+  .pr-head p { margin: 2px 0 0; color: #444; }
+  .pr-item { break-inside: avoid; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px dashed #bbb; }
+  .pr-item h3 { font-size: 11.5pt; margin: 0 0 4px; }
+  .pr-item h3 small { font-weight: 400; color: #555; }
+  .pr-item .pr-status { float: right; font-size: 9.5pt; font-weight: 700; color: #0f766e; }
+  .pr-text { margin: 4px 0; }
+  .pr-wrongs { color: #b91c1c; margin: 4px 0; }
+  .pr-answer { margin: 4px 0; font-weight: 600; }
+  .pr-hint { margin: 4px 0 0; color: #333; }
+  mjx-container { font-size: 100% !important; }
+}
+
 /* 좁은 화면 */
 @media (max-width: 820px) {
   .shelf { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -256,7 +331,7 @@ mjx-container { font-size: 108% !important; }
 .game-title .t1 { color: #5eead4; }
 .touch-btn { pointer-events: auto; margin-top: clamp(16px, 3vh, 28px); font: 800 clamp(18px, 2.6vw, 26px)/1 Pretendard, "Malgun Gothic", sans-serif; letter-spacing: 0.06em; color: #2a1700; background: linear-gradient(#ffd166, #f59e0b); border: 0; border-radius: 999px; padding: 16px 34px; box-shadow: 0 6px 0 #b45309, 0 0 30px rgba(245, 158, 11, 0.6); cursor: pointer; animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.05); box-shadow: 0 6px 0 #b45309, 0 0 46px rgba(245, 158, 11, 0.85); } }
-.credit { margin-top: auto; background: rgba(0, 0, 0, 0.5); padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; }
+.credit { margin-top: auto; background: rgba(0, 0, 0, 0.5); padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; pointer-events: auto; }
 
 .menu { position: absolute; inset: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(16px, 4vh, 40px); padding: 24px 16px; background: radial-gradient(ellipse at center, rgba(11, 10, 26, 0.2), rgba(11, 10, 26, 0.85)); }
 .menu-title { font-family: "Black Han Sans", "Malgun Gothic", sans-serif; font-weight: 400; font-size: clamp(40px, 7vw, 84px); color: #e0f7ff; text-shadow: 0 0 18px rgba(94, 234, 212, 0.8), 0 6px 0 #1e3a8a; }

@@ -14,6 +14,9 @@ const MAX_STUDENTS = 40;
 const MAX_TRIES = 20;
 const UNLOCK_RATIO = 0.7;
 const SCORE = { solve: 100, firstTry: 50, jump: 20 };
+// 팀전: 학생이 들어올 때마다 가장 사람이 적은 팀에 한 명씩 나눠 담는다.
+const TEAMS = ["A", "B", "C", "D"];
+const TEAM_NAMES = { A: "A팀", B: "B팀", C: "C팀", D: "D팀" };
 const LAB_NAMES = { l1: "삼각형법", l2: "평행사변형법", l3: "실수배", l4: "길 찾기", l5: "길 찾기 2" };
 const STAGE_NAMES = { lobby: "대기", play: "탐험 시작", done: "탐험 끝" };
 const problemName = (pid) => `문제 ${pid.slice(1)}`;
@@ -206,7 +209,7 @@ export class Room extends DurableObject {
           return ws.close(4002, "full");
         }
         // n: 지도 위 캐릭터 번호(색). 위치 메시지를 짧게 하려고 cid 대신 쓴다.
-        st = { n: Object.keys(this.data.students).length, name, joinedAt: Date.now(), lab: [], probs: {} };
+        st = { n: Object.keys(this.data.students).length, name, team: this.pickTeam(), joinedAt: Date.now(), lab: [], probs: {} };
         this.data.students[cid] = st;
       } else {
         st.name = name;
@@ -295,6 +298,12 @@ export class Room extends DurableObject {
       return;
     }
 
+    if (msg.type === "review") {
+      // 탐험이 끝난 뒤 오답 정리용으로 정답표를 내려 준다. 수업 중에는 정답이 학생에게 가지 않는다.
+      if (this.data.stage !== "done" && !(this.practice && st.escapedAt)) return;
+      return this.send(ws, { type: "review", answers: ANSWER_TEXT });
+    }
+
     if (msg.type === "hint" && PROBLEM_IDS.includes(msg.pid)) {
       // 힌트를 본 기록. 힌트를 보고 맞히면 첫 시도 보너스는 주지 않는다.
       const p = (st.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
@@ -333,6 +342,29 @@ export class Room extends DurableObject {
       if (result.ok) this.broadcast({ type: "found", n: st.n, name: st.name, pid: msg.pid }); // 모두에게 "누가 유물을 발견했어요" 팝업
       this.scheduleBroadcast();
     }
+  }
+
+  // 팀전: 팀별로 점수(문제 해결 + 첫 시도 보너스 + 벡터 점프)를 합산한다.
+  pickTeam() {
+    const count = {};
+    for (const st of Object.values(this.data.students)) count[st.team] = (count[st.team] ?? 0) + 1;
+    return TEAMS.reduce((best, t) => ((count[best] ?? 0) <= (count[t] ?? 0) ? best : t));
+  }
+
+  teamScores() {
+    const rows = this.ranking();
+    return TEAMS.map((team) => {
+      const members = rows.filter((r) => this.data.students[r.cid].team === team);
+      return {
+        team, name: TEAM_NAMES[team], members: members.length,
+        score: members.reduce((s, r) => s + r.score, 0),
+        solved: members.reduce((s, r) => s + r.solved, 0),
+        escaped: members.some((r) => r.escapedAt),
+      };
+    })
+      .filter((t) => t.members > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((t, i) => ({ ...t, rank: i + 1 }));
   }
 
   needCount() {
@@ -417,8 +449,9 @@ export class Room extends DurableObject {
       online: this.onlineCids().size,
       energy: total ? labDone / (total * LAB_LEVELS.length) : 0,
       relics,
-      players: students.map((st) => [st.n, st.name]),
-      ranking: this.ranking().map(({ n, name, score, solved, escapedAt }) => ({ n, name, score, solved, escaped: !!escapedAt })),
+      players: students.map((st) => [st.n, st.name, st.team ?? null]),
+      ranking: this.ranking().map(({ n, name, score, solved, escapedAt, cid }) => ({ n, name, score, solved, escaped: !!escapedAt, team: this.data.students[cid].team ?? null })),
+      teams: this.teamScores(),
     };
   }
 
@@ -427,7 +460,7 @@ export class Room extends DurableObject {
     const students = this.ranking().map((r) => {
       const st = this.data.students[r.cid];
       return {
-        cid: r.cid, name: st.name, online: online.has(r.cid), lab: st.lab.length, probs: st.probs,
+        cid: r.cid, name: st.name, online: online.has(r.cid), lab: st.lab.length, probs: st.probs, team: st.team ?? null,
         joinedAt: st.joinedAt, escapedAt: st.escapedAt ?? null, rank: r.rank, score: r.score,
         room: this.pos.get(r.cid)?.room ?? null,
       };
@@ -447,7 +480,7 @@ export class Room extends DurableObject {
       const topWrong = Object.entries(wrongCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
       stats[pid] = { tried, solved, first, topWrong };
     }
-    return { type: "dashboard", stage: this.data.stage, labLevels: LAB_LEVELS.length, students, stats };
+    return { type: "dashboard", stage: this.data.stage, labLevels: LAB_LEVELS.length, students, stats, teams: this.teamScores() };
   }
 
   // 여러 학생이 동시에 제출해도 0.2초에 한 번만 모두에게 보낸다.
