@@ -1,6 +1,8 @@
 name = "vector-raiders"
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
+workers_dev = true    # https://vector-raiders.<계정>.workers.dev 주소로 연다
+preview_urls = false  # 버전마다 따로 생기는 미리보기 주소는 쓰지 않는다
 
 [assets]
 directory = "./public"
