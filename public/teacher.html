@@ -18,7 +18,8 @@
 <body class="teacher">
   <header class="topbar">
     <div class="brand">🏺 벡터 유적 탈출 · 교사 집계</div>
-    <div class="meta"><span id="stage-chip" class="chip"></span><span id="conn-chip" class="chip soft">연결 전</span></div>
+    <div class="meta"><span id="stage-chip" class="chip"></span><span id="conn-chip" class="chip soft">연결 전</span>
+      <button id="print-sheet-btn" class="chip soft print-sheet-btn" type="button">📄 교사용 문제·정답·해설 PDF 다운로드</button></div>
   </header>
 
   <section id="setup" class="panel setup">
@@ -59,6 +60,9 @@
       <div class="table-wrap"><table id="roster" class="table"></table></div>
     </div>
   </section>
+
+  <!-- 교사용 문제·정답·해설 인쇄 레이아웃. 화면에는 보이지 않고 인쇄할 때만 나와요 -->
+  <div id="teacher-print-sheet" hidden></div>
 
   <script type="module" src="/js/teacher.js"></script>
 </body>

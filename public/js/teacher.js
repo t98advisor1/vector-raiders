@@ -1,8 +1,9 @@
 import { connect } from "./net.js";
 import { fmt, watchMath } from "./mathtext.js";
 import { PROBLEMS } from "./problems.js";
+import { LAB_LEVELS } from "./lab.js";
 import { renderClassBar } from "./classbar.js";
-import { ROOMS } from "./game.js";
+import { ROOMS, BRIDGES, roomAt } from "./game.js";
 
 const $ = (s) => document.querySelector(s);
 let net = null, last = null, answers = null;
@@ -30,6 +31,51 @@ $("#reset").onclick = () => {
 };
 
 $("#csv").onclick = () => { if (last) downloadCsv(last); };
+
+// 교사용 문제·정답·해설 PDF: 인쇄 창에 'PDF로 저장'하면 파일로 내려받는다.
+$("#print-sheet-btn").onclick = () => {
+  if (!answers) return alert("먼저 접속한 뒤에 출력할 수 있어요. 비밀번호를 입력하고 들어가 주세요.");
+  printSheet();
+};
+
+function printSheet() {
+  const rows = PROBLEMS.map((p, i) => {
+    const s = last?.stats?.[p.id];
+    const wrong = s?.topWrong?.length ? s.topWrong.map(([w, n]) => `${w} (${n}명)`).join(", ") : "아직 응답 없음";
+    return `
+      <section class="tp-item">
+        <h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.level} · 교과서 ${p.source}</small></h3>
+        <p class="tp-text"><b>지문:</b> ${fmt(p.text)}</p>
+        <p class="tp-answer"><b>정답:</b> ${fmt(answers[p.id] ?? "–")}</p>
+        <p class="tp-solution"><b>상세 풀이:</b> ${fmt(p.hint)}</p>
+        <p class="tp-wrong"><b>오답 분석:</b> ${wrong}</p>
+      </section>`;
+  }).join("");
+  // 벡터 실험실(장애물) 지도 팁: 어느 방의 어떤 위험지대가 어떤 실험으로 열리는지
+  const HAZ = { "~": "물", "^": "절벽", "!": "용암" };
+  const labTips = Object.values(BRIDGES).map((br) => {
+    const lv = LAB_LEVELS.find((l) => l.id === br.lab);
+    return `<li><b>${br.title}</b> — ${ROOMS[roomAt(br.cx)].name}의 ${HAZ[br.hazard] ?? "위험지대"} 구간. 벡터 실험실 '${lv?.title ?? br.lab}' 단계를 완료하면 길이 생겨요.</li>`;
+  }).join("");
+  const sheet = $("#teacher-print-sheet");
+  sheet.innerHTML = `
+    <header class="tp-head">
+      <h1>벡터 유적 탈출 · 교사용 문제·정답·해설</h1>
+      <p>${new Date().toLocaleDateString("ko-KR")} · 참여 학생 ${last?.students?.length ?? 0}명 · 접속 주소 ${location.origin}</p>
+    </header>
+    <section class="tp-labs">
+      <h2>🗺️ 벡터 실험실 지도 팁</h2>
+      <ul>${labTips}</ul>
+      <p class="tp-tip">모든 문은 그 방의 열쇠 조각(문제)을 반의 70%가 풀면 열리고, 유물 7개는 반 전체 협동으로 깨워요.</p>
+    </section>
+    ${rows}`;
+  sheet.hidden = false;
+  // 수식(MathJax) 조판이 끈 뒤 인쇄 창을 연다
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { sheet.hidden = true; }, 300);
+  }, 600);
+}
 
 function start(password) {
   net?.close();
@@ -165,7 +211,7 @@ function renderDash(d) {
   const roster = $("#roster");
   roster.replaceChildren();
   const rh = document.createElement("tr");
-  for (const h of ["순위", "이름", "점수", "맞힌 문제", "접속", "들어온 시각", "탈출 시각", "위치", "벡터 점프"]) rh.appendChild(cell("th", h));
+  for (const h of ["순위", "이름", "점수", "맞힌 문제", "접속", "들어온 시각", "탈출 시각", "위치", "벡터 점프", "관리"]) rh.appendChild(cell("th", h));
   PROBLEMS.forEach((p, i) => {
     const th = cell("th", `${i + 1}`);
     th.title = `${i + 1}. ${p.relic}`;
@@ -175,7 +221,7 @@ function renderDash(d) {
   if (!d.students.length) {
     const tr = document.createElement("tr");
     const td = cell("td", "아직 수업에 참여한 학생이 없어요. 학생들에게 접속 주소를 알려 주세요.", "empty");
-    td.colSpan = 9 + PROBLEMS.length;
+    td.colSpan = 10 + PROBLEMS.length;
     tr.appendChild(td);
     roster.appendChild(tr);
   }
@@ -208,8 +254,17 @@ function renderDash(d) {
       const [mark, cls] = probMark(st.probs[p.id]);
       tr.appendChild(cell("td", mark, `mark ${cls}`));
     }
+    // 교사용 강퇴: 누르면 확인 뒤 그 학생을 유적에서 내보낸다
+    const kickTd = cell("td", "", "kick-cell");
+    const kickBtn = cell("button", "강퇴", "btn danger kick-btn");
+    kickBtn.type = "button";
+    kickBtn.onclick = () => {
+      if (confirm(`${st.name} 학생을 유적에서 내보낼까요?`)) net?.send({ type: "kick", n: st.n });
+    };
+    kickTd.appendChild(kickBtn);
+    tr.appendChild(kickTd);
     roster.appendChild(tr);
-    if (expanded.has(st.cid)) roster.appendChild(detailRow(st, 9 + PROBLEMS.length));
+    if (expanded.has(st.cid)) roster.appendChild(detailRow(st, 10 + PROBLEMS.length));
   }
 }
 

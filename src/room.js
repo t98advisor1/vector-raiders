@@ -197,6 +197,8 @@ export class Room extends DurableObject {
         this.send(ws, { type: "error", message: "이름을 입력해 주세요." });
         return ws.close(4001, "bad hello");
       }
+      // 학생이 고른 팀(A~D). 고르지 않았거나 잘못된 값이면 자동 배정한다.
+      const chosenTeam = TEAMS.includes(msg.team) ? msg.team : null;
       // 연습 유적은 처음 들어온 학생 한 명의 것이다.
       if (this.practice) {
         this.data.owner ??= cid;
@@ -209,10 +211,13 @@ export class Room extends DurableObject {
           return ws.close(4002, "full");
         }
         // n: 지도 위 캐릭터 번호(색). 위치 메시지를 짧게 하려고 cid 대신 쓴다.
-        st = { n: Object.keys(this.data.students).length, name, team: this.pickTeam(), joinedAt: Date.now(), lab: [], probs: {} };
+        // 강퇴된 번호가 나중에 다시 쓰이지 않게, 기존 번호 최댓값 다음부터 준다.
+        const nextN = Object.values(this.data.students).reduce((m, s) => Math.max(m, s.n + 1), 0);
+        st = { n: nextN, name, team: chosenTeam ?? this.pickTeam(), joinedAt: Date.now(), lab: [], probs: {} };
         this.data.students[cid] = st;
       } else {
         st.name = name;
+        if (chosenTeam) st.team = chosenTeam; // 다시 들어올 때 팀을 다시 고렀으면 그 팀으로
       }
       // 같은 학생이 다른 탭으로 다시 들어오면 이전 연결을 닫는다.
       for (const other of this.ctx.getWebSockets()) {
@@ -239,6 +244,25 @@ export class Room extends DurableObject {
       this.data.stage = msg.stage;
       await this.save();
       this.log({ type: "진행 단계", name: "교사", detail: STAGE_NAMES[msg.stage] });
+      this.scheduleBroadcast();
+    }
+    if (msg.type === "kick") {
+      // 교사가 학생 한 명을 내보낸다. 대상에게 안내를 보내고 연결을 끊은 뒤 명단에서 지운다.
+      const entry = Object.entries(this.data.students).find(([, st]) => st.n === msg.n);
+      if (!entry) return;
+      const [cid, st] = entry;
+      for (const other of this.ctx.getWebSockets()) {
+        const a = other.deserializeAttachment();
+        if (a?.role === "student" && a.cid === cid) {
+          this.send(other, { type: "kicked", reason: "선생님에 의해 퇴장되었습니다." });
+          try { other.close(4007, "kicked"); } catch {}
+        }
+      }
+      delete this.data.students[cid];
+      this.pos.delete(cid);
+      this.lastPos.delete(cid);
+      await this.save();
+      this.log({ type: "강퇴", name: st.name });
       this.scheduleBroadcast();
     }
     if (msg.type === "reset") {
@@ -302,6 +326,13 @@ export class Room extends DurableObject {
       // 탐험이 끝난 뒤 오답 정리용으로 정답표를 내려 준다. 수업 중에는 정답이 학생에게 가지 않는다.
       if (this.data.stage !== "done" && !(this.practice && st.escapedAt)) return;
       return this.send(ws, { type: "review", answers: ANSWER_TEXT });
+    }
+
+    if (msg.type === "chat") {
+      // 학생 간 실시간 채팅: 개행·제어 문자를 지우고 100자로 제한한 뒤 반 전체에 흘린다.
+      const text = typeof msg.text === "string" ? msg.text.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 100) : "";
+      if (!text) return;
+      return this.broadcast({ type: "chat", from: st.n, name: st.name, team: st.team ?? null, text });
     }
 
     if (msg.type === "hint" && PROBLEM_IDS.includes(msg.pid)) {

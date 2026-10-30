@@ -76,6 +76,16 @@
       <h2 id="sheet-title"></h2>
       <p id="sheet-lead" class="muted"></p>
       <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
+      <div class="team-pick" role="group" aria-label="팀 선택">
+        <span class="team-pick-label">내 팀 고르기</span>
+        <div class="team-pick-row">
+          <button type="button" class="team-opt on" data-team="">🎲 자동 배정</button>
+          <button type="button" class="team-opt" data-team="A">🔵 A팀</button>
+          <button type="button" class="team-opt" data-team="B">🟠 B팀</button>
+          <button type="button" class="team-opt" data-team="C">🟢 C팀</button>
+          <button type="button" class="team-opt" data-team="D">🟣 D팀</button>
+        </div>
+      </div>
       <div class="sheet-buttons">
         <button id="sheet-back" class="btn" type="button">← 뒤로</button>
         <button class="btn primary big" type="submit">탐험 시작</button>
@@ -131,6 +141,27 @@
         <canvas id="map-canvas" aria-label="유적 전체 미니맵. 내 위치와 팀원, 보물상자가 표시돼요."></canvas>
       </div>
       <div id="vignette" class="vignette" aria-hidden="true"></div>
+      <!-- 학생 간 실시간 채팅 -->
+      <button id="chat-toggle" class="chat-toggle" type="button" aria-label="채팅 열기">💬<b id="chat-unread" class="chat-unread" hidden></b></button>
+      <div id="chat-panel" class="chat-panel" hidden>
+        <div class="chat-head"><b>💬 채팅</b><button id="chat-close" class="hud-btn" type="button" aria-label="채팅 닫기">✕</button></div>
+        <div id="chat-log" class="chat-log" aria-live="polite"></div>
+        <form id="chat-form" class="chat-form" autocomplete="off">
+          <input id="chat-input" maxlength="100" placeholder="메시지를 입력하세요 (100자)" aria-label="채팅 메시지">
+          <button class="btn" type="submit">보내기</button>
+        </form>
+      </div>
+      <!-- 터치 기기용 가상 조작판: 왼쪽 D-패드, 오른쪽 점프·열기 버튼 -->
+      <div id="touch-dpad" class="touch-dpad" hidden>
+        <button id="dpad-up" class="dpad-btn dpad-up" type="button" aria-label="위로 이동">⬆️</button>
+        <button id="dpad-left" class="dpad-btn dpad-left" type="button" aria-label="왼쪽으로 이동">⬅️</button>
+        <button id="dpad-down" class="dpad-btn dpad-down" type="button" aria-label="아래로 이동">⬇️</button>
+        <button id="dpad-right" class="dpad-btn dpad-right" type="button" aria-label="오른쪽으로 이동">➡️</button>
+      </div>
+      <div id="touch-actions" class="touch-actions" hidden>
+        <button id="touch-jump" class="touch-btn-round" type="button" aria-label="점프">🦘<small>점프</small></button>
+        <button id="touch-act" class="touch-btn-round" type="button" aria-label="열기 또는 조사">✋<small>열기</small></button>
+      </div>
       <div id="loading" class="loading" hidden>🏺 유적을 불러오는 중…</div>
       <div class="help">WASD·방향키 이동 · <kbd>E</kbd> 또는 클릭: 열기 · <kbd>M</kbd> 소리</div>
     </div>
