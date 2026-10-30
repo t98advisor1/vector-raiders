@@ -2,7 +2,7 @@
 // 학생 진행 상황을 저장하고, 반 전체 협동 현황(벡터 점프 에너지, 유물)과 친구들 위치를 모두에게 알린다.
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
-import { checkAnswer, PROBLEM_IDS } from "./answers.js";
+import { checkAnswer, PROBLEM_IDS, ANSWER_TEXT } from "./answers.js";
 import { SheetLog } from "./sheets.js";
 
 const STAGES = ["lobby", "play", "done"];
@@ -21,7 +21,8 @@ const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // 마지막 활동 뒤 24시간이 지
 const TTL_REFRESH_MS = 60 * 60 * 1000; // 삭제 예약은 한 시간에 한 번만 뒤로 미룬다
 const MAX_MESSAGE = 2048;
 
-const freshData = () => ({ createdAt: Date.now(), stage: "lobby", students: {}, unlocked: [] });
+// mode: "class"(반 전체가 함께하는 수업 유적) 또는 "practice"(학생 한 명의 연습 유적, 바로 탐험 시작)
+const freshData = (mode = "class") => ({ mode, createdAt: Date.now(), stage: mode === "practice" ? "play" : "lobby", students: {}, unlocked: [] });
 
 // 비밀번호 비교: 길이가 같으면 글자마다 모두 비교한다.
 function samePassword(a, b) {
@@ -54,7 +55,9 @@ export class Room extends DurableObject {
     });
   }
 
-  async fetch() {
+  async fetch(request) {
+    // 연습 유적인지는 진입점(worker.js)이 알려 준다. 처음 열릴 때만 정해진다.
+    this.mode ??= request.headers.get("X-Room-Mode") === "practice" ? "practice" : "class";
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].serializeAttachment({ role: null });
@@ -82,13 +85,14 @@ export class Room extends DurableObject {
   }
 
   async webSocketMessage(ws, raw) {
-    this.data ??= freshData(); // 기록이 지워진 뒤 처음 들어오면 새 유적을 연다
+    this.data ??= freshData(this.mode); // 기록이 지워진 뒤 처음 들어오면 새 유적을 연다
     if (typeof raw !== "string" || raw.length > MAX_MESSAGE) return;
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     const who = ws.deserializeAttachment() ?? { role: null };
 
     if (msg.type === "hello") return this.onHello(ws, msg);
+    if (msg.type === "start") return this.onStartCode(ws, msg);
     if (who.role === "teacher") return this.onTeacher(ws, msg);
     if (who.role === "student") return this.onStudent(ws, who.cid, msg);
   }
@@ -114,7 +118,7 @@ export class Room extends DurableObject {
     const stillHere = this.ctx.getWebSockets().some((o) => o !== ws && o.readyState === 1 && o.deserializeAttachment()?.cid === a.cid);
     if (stillHere) return;
     st.lastSeenAt = Date.now();
-    this.sheet.event({ type: "퇴장", name: st.name });
+    this.log({ type: "퇴장", name: st.name });
   }
 
   dropPosition(ws) {
@@ -147,8 +151,27 @@ export class Room extends DurableObject {
     }, POS_TICK_MS);
   }
 
+  get practice() { return this.data?.mode === "practice"; }
+
+  // 수업·연습 기록 중 수업 기록만 구글 시트로 보낸다.
+  log(row) { if (!this.practice) this.sheet.event(row); }
+
+  // 학생 시작 화면의 '선생님: 탐험 시작' 버튼. 비밀번호는 비밀 값 START_CODES(쉼표로 여러 개).
+  async onStartCode(ws, msg) {
+    if (this.practice) return;
+    const codes = String(this.env.START_CODES ?? "").split(",").map((c) => c.trim()).filter(Boolean);
+    if (!codes.length) return this.send(ws, { type: "error", message: "서버에 시작 비밀번호(START_CODES)가 설정되지 않았어요." });
+    if (!codes.some((c) => samePassword(String(msg.code ?? ""), c))) return this.send(ws, { type: "error", message: "시작 비밀번호가 맞지 않아요." });
+    this.data.stage = "play";
+    await this.save();
+    this.log({ type: "진행 단계", name: "선생님(시작 비밀번호)", detail: STAGE_NAMES.play });
+    this.send(ws, { type: "started" });
+    this.scheduleBroadcast();
+  }
+
   async onHello(ws, msg) {
     if (msg.role === "teacher") {
+      if (this.practice) return ws.close(4003, "practice room");
       const password = this.env.TEACHER_PASSWORD;
       if (!password) {
         this.send(ws, { type: "error", message: "서버에 교사 비밀번호(TEACHER_PASSWORD)가 설정되지 않았어요. README를 참고해 주세요." });
@@ -159,7 +182,7 @@ export class Room extends DurableObject {
         return ws.close(4003, "forbidden");
       }
       ws.serializeAttachment({ role: "teacher" });
-      this.send(ws, { type: "joined", role: "teacher" });
+      this.send(ws, { type: "joined", role: "teacher", answers: ANSWER_TEXT });
       this.send(ws, this.dashboard());
       this.send(ws, this.classState());
       return;
@@ -170,6 +193,11 @@ export class Room extends DurableObject {
       if (!cid || !name) {
         this.send(ws, { type: "error", message: "이름을 입력해 주세요." });
         return ws.close(4001, "bad hello");
+      }
+      // 연습 유적은 처음 들어온 학생 한 명의 것이다.
+      if (this.practice) {
+        this.data.owner ??= cid;
+        if (this.data.owner !== cid) return ws.close(4003, "not your practice room");
       }
       let st = this.data.students[cid];
       if (!st) {
@@ -193,7 +221,7 @@ export class Room extends DurableObject {
       ws.serializeAttachment({ role: "student", cid });
       st.lastSeenAt = Date.now();
       await this.save();
-      this.sheet.event({ type: "입장", name });
+      this.log({ type: "입장", name });
       this.send(ws, { type: "joined", role: "student", name, n: st.n, pos: this.lastPos.get(cid) ?? null });
       this.send(ws, { type: "me", me: st });
       this.send(ws, this.classState());
@@ -207,7 +235,7 @@ export class Room extends DurableObject {
     if (msg.type === "stage" && STAGES.includes(msg.stage)) {
       this.data.stage = msg.stage;
       await this.save();
-      this.sheet.event({ type: "진행 단계", name: "교사", detail: STAGE_NAMES[msg.stage] });
+      this.log({ type: "진행 단계", name: "교사", detail: STAGE_NAMES[msg.stage] });
       this.scheduleBroadcast();
     }
     if (msg.type === "reset") {
@@ -250,10 +278,20 @@ export class Room extends DurableObject {
         st.lab.push(msg.level);
         st.lastAt = Date.now();
         await this.save();
-        this.sheet.event({ type: "벡터 점프", name: st.name, detail: LAB_NAMES[msg.level] });
+        this.log({ type: "벡터 점프", name: st.name, detail: LAB_NAMES[msg.level] });
         this.scheduleBroadcast();
       }
       this.send(ws, { type: "me", me: st });
+      return;
+    }
+
+    if (msg.type === "restart" && this.practice) {
+      // 연습 모드 '처음부터 다시': 내 기록만 지우고 이름은 남긴다.
+      Object.assign(st, { lab: [], probs: {}, lastAt: undefined, escapedAt: undefined });
+      this.data.unlocked = [];
+      this.lastPos.delete(cid);
+      await this.save();
+      this.send(ws, { type: "restarted" });
       return;
     }
 
@@ -263,7 +301,7 @@ export class Room extends DurableObject {
       if (!p.hinted && !p.solved) {
         p.hinted = true;
         await this.save();
-        this.sheet.event({ type: "힌트", name: st.name, problem: problemName(msg.pid) });
+        this.log({ type: "힌트", name: st.name, problem: problemName(msg.pid) });
         this.scheduleBroadcast();
       }
       return;
@@ -288,8 +326,8 @@ export class Room extends DurableObject {
         p.wrongs.push(result.display);
       }
       await this.save();
-      this.sheet.event({ type: result.ok ? "정답" : "오답", name: st.name, problem: problemName(msg.pid), answer: result.display, result: result.ok ? "O" : "X", tries: p.tries });
-      if (result.ok && st.escapedAt === p.solvedAt) this.sheet.event({ type: "탈출", name: st.name, detail: "열쇠 조각 7개를 모두 모았어요" });
+      this.log({ type: result.ok ? "정답" : "오답", name: st.name, problem: problemName(msg.pid), answer: result.display, result: result.ok ? "O" : "X", tries: p.tries });
+      if (result.ok && st.escapedAt === p.solvedAt) this.log({ type: "탈출", name: st.name, detail: "열쇠 조각 7개를 모두 모았어요" });
       this.send(ws, { type: "result", pid: msg.pid, ok: result.ok, tries: p.tries });
       this.send(ws, { type: "me", me: st });
       if (result.ok) this.broadcast({ type: "found", n: st.n, name: st.name, pid: msg.pid }); // 모두에게 "누가 유물을 발견했어요" 팝업

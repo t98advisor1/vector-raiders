@@ -3,20 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>유적 탈출 교사 화면</title>
+  <title>유적 탈출 교사 집계</title>
   <link rel="stylesheet" href="/css/style.css">
+  <script>
+    // 수식은 MathJax로 조판한다. \vv{a}: 벡터 a, \VV{AB}: 벡터 AB
+    window.MathJax = {
+      tex: { inlineMath: [["\\(", "\\)"]], macros: { vv: ["\\overrightarrow{#1}", 1], VV: ["\\overrightarrow{\\mathrm{#1}}", 1] } },
+      chtml: { fontURL: "/vendor/mathjax/output/chtml/fonts/woff-v2" },
+      startup: { typeset: false },
+    };
+  </script>
+  <script defer src="/vendor/mathjax/tex-chtml.js"></script>
 </head>
 <body class="teacher">
   <header class="topbar">
-    <div class="brand">🏺 벡터 유적 탈출 · 교사</div>
-    <div class="meta"><span id="conn-chip" class="chip soft">연결 전</span></div>
+    <div class="brand">🏺 벡터 유적 탈출 · 교사 집계</div>
+    <div class="meta"><span id="stage-chip" class="chip"></span><span id="conn-chip" class="chip soft">연결 전</span></div>
   </header>
 
   <section id="setup" class="panel setup">
     <h2>교사 로그인</h2>
-    <p>학생들은 방 코드 없이 이름만 적고 같은 유적에 들어와요. 결과는 교사 비밀번호를 넣어야 볼 수 있어요.</p>
+    <p>수업에 참여한 학생들의 기록을 모아 보는 화면이에요. 혼자 연습한 기록은 여기에 나오지 않아요.</p>
     <form id="login" class="row" autocomplete="off">
-      <input id="password" type="password" placeholder="교사 비밀번호" aria-label="교사 비밀번호" required>
+      <input id="password" type="password" inputmode="numeric" placeholder="교사 비밀번호" aria-label="교사 비밀번호" required>
       <button class="btn primary big" type="submit">들어가기</button>
     </form>
     <p id="setup-error" class="error" role="alert"></p>
@@ -25,29 +34,23 @@
   <section id="dash" class="dash" hidden>
     <div class="panel code-panel">
       <div>
-        <small>학생 접속 주소 (이름만 적고 들어와요)</small>
+        <small>학생 접속 주소 · 학생은 이름을 적고 '수업 참여하기'를 눌러요</small>
         <div id="join-url" class="join-url big"></div>
+        <small>탐험 시작: 학생 화면의 '🔑 선생님: 수업 탐험 시작'에서 시작 비밀번호를 입력해요.</small>
       </div>
-      <div class="stage-buttons" role="group" aria-label="진행 단계">
-        <button class="btn" data-stage="lobby" type="button">대기</button>
-        <button class="btn" data-stage="play" type="button">▶ 탐험 시작</button>
-        <button class="btn" data-stage="done" type="button">■ 탐험 끝</button>
+      <div class="stage-buttons">
+        <button id="csv" class="btn" type="button">CSV 내려받기</button>
         <button id="reset" class="btn danger" type="button">새 수업 시작 (기록 지우기)</button>
       </div>
     </div>
     <div id="class-bar" class="class-bar"></div>
     <div class="panel">
-      <div class="panel-head">
-        <h2>문제별 현황</h2>
-      </div>
-      <div class="table-wrap"><table id="stats" class="table"></table></div>
+      <div class="panel-head"><h2>문제별 집계</h2></div>
+      <div id="problems" class="problem-grid"></div>
     </div>
     <div class="panel">
-      <div class="panel-head">
-        <h2>학생별 현황</h2>
-        <button id="csv" class="btn" type="button">CSV 내려받기</button>
-      </div>
-      <p class="legend-line">★ 첫 시도 정답 · ✓ 정답 · ✗n 오답 n번 · 💡 힌트 봄 · – 미응시</p>
+      <div class="panel-head"><h2>학생별 집계</h2></div>
+      <p class="legend-line">★ 첫 시도 정답 · ✓ 정답 · ✗n 오답 n번 · 💡 힌트 봄 · – 미응시 · 이름을 누르면 문제별 답을 볼 수 있어요</p>
       <div class="table-wrap"><table id="roster" class="table"></table></div>
     </div>
   </section>

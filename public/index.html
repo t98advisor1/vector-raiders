@@ -25,9 +25,13 @@
       <p class="lead">상자를 열고 벡터로 길을 만들어 잊힌 유적을 탈출하세요. 마지막 유물 제단은 반 친구들과 함께 깨워요!</p>
       <form id="join-form" autocomplete="off">
         <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
-        <button class="btn primary big" type="submit">탐험 시작</button>
+        <div class="mode-buttons">
+          <button class="btn big mode-btn" type="submit" value="practice">🎯 혼자 연습하기<small>언제든 혼자 · 기록은 나만 봐요</small></button>
+          <button class="btn primary big mode-btn" type="submit" value="class">🏫 수업 참여하기<small>반 친구들과 함께 · 선생님이 시작해요</small></button>
+        </div>
         <p id="join-error" class="error" role="alert"></p>
       </form>
+      <button id="start-btn" class="link-btn" type="button">🔑 선생님: 수업 탐험 시작</button>
     </div>
   </section>
 
@@ -37,6 +41,7 @@
       <div class="meta">
         <span id="stage-chip" class="chip"></span>
         <span id="online-chip" class="chip soft"></span>
+        <span id="mode-chip" class="chip soft"></span>
         <span id="me-chip" class="chip soft"></span>
       </div>
     </header>
@@ -49,6 +54,7 @@
           <span id="hud-keys" title="열쇠 조각 (푼 문제)"></span>
           <span id="hud-jumps" title="벡터 점프 (건넌 장애물)"></span>
           <button id="sound-btn" class="hud-btn" type="button" aria-label="소리 끄기 (M)">🔊</button>
+          <button id="restart-btn" class="hud-btn" type="button" hidden>↺ 처음부터</button>
         </div>
         <div class="hud-right">
           <div class="hud-card hud-relics" id="hud-relics" title="우리 반 유물"></div>

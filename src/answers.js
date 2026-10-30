@@ -2,15 +2,18 @@
 // 문제 내용과 확인 도구는 public/js/problems.js에 있고, id로 연결된다.
 import { evaluate } from "./mathexpr.js";
 
+// text: 교사 집계 화면에 보여 줄 정답 (MathJax 표기)
 export const ANSWERS = {
-  p1: { type: "set", value: ["AO", "OD", "FE"] },
-  p2: { type: "num", value: 4 },
-  p3: { type: "num", value: 1 / 2 },
-  p4: { type: "num", value: 1 },
-  p5: { type: "num", value: 2 },
-  p6: { type: "num", value: -4 },
-  p7: { type: "num", value: Math.PI / 2 },
+  p1: { type: "set", value: ["AO", "OD", "FE"], text: "$\\VV{AO}$, $\\VV{OD}$, $\\VV{FE}$" },
+  p2: { type: "num", value: 4, text: "$4$" },
+  p3: { type: "num", value: 1 / 2, text: "$\\dfrac{1}{2}$" },
+  p4: { type: "num", value: 1, text: "$m=1$" },
+  p5: { type: "num", value: 2, text: "$m=2$" },
+  p6: { type: "num", value: -4, text: "$m=-4$" },
+  p7: { type: "num", value: Math.PI / 2, text: "$\\dfrac{\\pi}{2}$" },
 };
+
+export const ANSWER_TEXT = Object.fromEntries(Object.entries(ANSWERS).map(([pid, a]) => [pid, a.text]));
 
 export const PROBLEM_IDS = Object.keys(ANSWERS);
 

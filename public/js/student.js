@@ -41,17 +41,42 @@ $("#join-form").addEventListener("submit", (e) => {
   const name = $("#join-name").value.trim();
   if (!name) return showJoinError("이름을 입력해 주세요.");
   sound.start(); // 버튼을 누른 지금이 소리를 켤 수 있는 때
-  join(name);
+  join(name, e.submitter?.value === "practice" ? "practice" : "class");
 });
+// 새로고침 뒤 자동으로 다시 들어온 경우처럼 버튼을 누르지 않았을 때는 첫 조작에서 소리를 켠다.
+for (const ev of ["pointerdown", "keydown"]) window.addEventListener(ev, () => sound.start(), { once: true });
 
 function showJoinError(text) { $("#join-error").textContent = text; }
 
-function join(name) {
+// mode: "practice"(혼자 연습, 내 유적) 또는 "class"(수업 참여, 반 전체 유적)
+function join(name, mode) {
   S.net?.close();
   S.name = name;
+  S.mode = mode;
   showJoinError("");
-  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name }), onMessage, onStatus);
+  const query = mode === "practice" ? `?mode=practice&cid=${cid}` : "";
+  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name }), onMessage, onStatus, query);
 }
+
+// 연습 모드 '처음부터 다시' 뒤에는 새로고침하고 자동으로 다시 들어온다.
+const autojoin = (() => { try { const v = sessionStorage.getItem("vr-autojoin"); sessionStorage.removeItem("vr-autojoin"); return v; } catch { return null; } })();
+if (autojoin === "practice" && session?.name) join(session.name, "practice");
+
+// 학생 화면의 '선생님: 수업 탐험 시작'. 시작 비밀번호가 맞으면 수업 유적의 탐험이 시작된다.
+function askStart() {
+  const code = prompt("수업 탐험을 시작할 선생님 비밀번호를 입력하세요.");
+  if (!code) return;
+  if (S.net && S.mode === "class") return S.net.send({ type: "start", code: code.trim() });
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  ws.onopen = () => ws.send(JSON.stringify({ type: "start", code: code.trim() }));
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === "started") showJoinError("✅ 수업 탐험을 시작했어요! 학생들은 '수업 참여하기'로 들어오면 돼요.");
+    else if (msg.type === "error") showJoinError(msg.message);
+    ws.close();
+  };
+}
+$("#start-btn").onclick = askStart;
 
 function onStatus(kind, code) {
   $("#conn").hidden = kind !== "retry";
@@ -69,6 +94,8 @@ function onMessage(msg) {
     $("#join").hidden = true;
     $("#game").hidden = false;
     $("#me-chip").textContent = `👤 ${msg.name}`;
+    $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : "🏫 수업 참여";
+    $("#restart-btn").hidden = S.mode !== "practice";
     if (!S.game) startWorld();
     S.game.setMe(msg.n, msg.name);
     if (msg.pos) { S.game.me.x = msg.pos.x; S.game.me.y = msg.pos.y; } // 새로고침해도 하던 자리에서
@@ -90,6 +117,11 @@ function onMessage(msg) {
     S.game?.setOthers(msg.list);
   } else if (msg.type === "result") {
     onResult(msg);
+  } else if (msg.type === "started") {
+    toast("🔑 수업 탐험을 시작했어요!", "ok");
+  } else if (msg.type === "restarted") {
+    try { sessionStorage.setItem("vr-autojoin", "practice"); } catch {}
+    location.reload();
   } else if (msg.type === "found") {
     if (msg.n !== S.game?.me.n) showFound(msg); // 내 발견은 문제 창에서 이미 축하한다
   } else if (msg.type === "error") {
@@ -161,6 +193,7 @@ setInterval(updateHud, 500); // 방 이름은 움직일 때 바뀐다
 
 // 실시간 랭킹: 상위 5명과, 5등 밖이면 내 순위도 함께
 function renderRanking() {
+  if (S.mode === "practice") { $("#hud-rank").replaceChildren(); return; } // 혼자 연습할 때는 랭킹을 보이지 않는다
   const list = S.cls.ranking ?? [];
   const box = $("#hud-rank");
   const key = JSON.stringify(list.map((r) => [r.n, r.score, r.name]));
@@ -230,7 +263,15 @@ function pumpFound() {
 function onStage(stage) {
   const banner = $("#banner");
   banner.hidden = stage === "play";
-  if (stage === "lobby") banner.textContent = "선생님이 탐험을 시작하면 상자를 열 수 있어요. 지금은 주변을 둘러보세요!";
+  if (stage === "lobby") {
+    banner.textContent = "선생님이 탐험을 시작하면 상자를 열 수 있어요. 지금은 주변을 둘러보세요! ";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn";
+    b.textContent = "🔑 선생님: 탐험 시작";
+    b.onclick = askStart;
+    banner.appendChild(b);
+  }
   if (stage === "play") { toast("탐험 시작! 상자를 열어 열쇠 조각을 모으세요.", "ok"); sound.sfx("start"); }
   if (stage === "done") { banner.textContent = "탐험이 끝났어요. 수고했어요!"; showSummary(); }
 }
@@ -293,6 +334,9 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyM" && tag !== "INPUT" && tag !== "TEXTAREA") sound.toggle();
 });
 $("#sound-btn").onclick = () => sound.toggle();
+$("#restart-btn").onclick = () => {
+  if (confirm("연습 기록을 모두 지우고 처음부터 다시 할까요?")) S.net.send({ type: "restart" });
+};
 sound.onChange((muted) => {
   $("#sound-btn").textContent = muted ? "🔇" : "🔊";
   $("#sound-btn").setAttribute("aria-label", muted ? "소리 켜기 (M)" : "소리 끄기 (M)");
