@@ -1,4 +1,4 @@
-name = "vector-raiders"
+name = "go"  # 주소 맨 앞: https://go.<계정 이름>.workers.dev
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
 workers_dev = true    # https://vector-raiders.<계정>.workers.dev 주소로 연다
