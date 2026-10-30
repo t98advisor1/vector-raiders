@@ -2,8 +2,9 @@ import { connect, store } from "./net.js";
 import { fmt, watchMath } from "./mathtext.js";
 import { LAB_LEVELS } from "./lab.js";
 import { PROBLEMS } from "./problems.js";
+import { conceptCard, CONCEPTS } from "./concepts.js";
 import { renderClassBar } from "./classbar.js";
-import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, roomAt } from "./game.js";
+import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, ALTAR, roomAt, W, H, buildGrid, DOOR_COLS, DOOR_ROWS } from "./game.js";
 import { World3D } from "./world3d.js";
 import { sound } from "./sound.js";
 import { createIntro } from "./intro.js";
@@ -11,6 +12,8 @@ import { settings, updateSettings, onSettings } from "./settings.js";
 
 const $ = (s, root = document) => root.querySelector(s);
 const STAGE_NAME = { lobby: "대기 중", play: "탐험 중", done: "탐험 끝" };
+// 팀전: 팀 이름·색은 서버(src/room.js)와 짝을 이룬다.
+const TEAMS = { A: { name: "A팀", color: "#ef4444" }, B: { name: "B팀", color: "#3b82f6" }, C: { name: "C팀", color: "#22c55e" }, D: { name: "D팀", color: "#a855f7" } };
 const CLOSE_REASON = {
   4000: "지난 수업 기록이 정리되었어요. 다시 들어와 주세요.",
   4001: "이름을 확인해 주세요.",
@@ -32,6 +35,11 @@ const solved = (pid) => !!S.me?.probs[pid]?.solved;
 const labDone = (lab) => !!S.me?.lab.includes(lab);
 const doorOpen = (id) => DOORS[id].every(solved);
 const altarLit = () => !!S.cls && PROBLEMS.every((p) => S.cls.relics[p.id]?.unlocked);
+// 팀전: 캐릭터 번호(n) → 팀 이름. 미니맵 마커와 랭킹 뱃지가 쓴다.
+const teamOf = (n) => {
+  const r = (S.cls?.ranking ?? []).find((r) => r.n === n);
+  return r?.team ?? null;
+};
 
 // ---------- 입장 ----------
 watchMath();
@@ -168,6 +176,7 @@ function onMessage(msg) {
     S.game.setMe(msg.n, msg.name);
     if (msg.pos) { S.game.me.x = msg.pos.x; S.game.me.y = msg.pos.y; } // 새로고침해도 하던 자리에서
     S.game.forceSend();
+    $("#minimap").hidden = false; // 유적 전체 지도는 들어오면 펼쳐 둔다
     $("#world").focus();
   } else if (msg.type === "me") {
     const before = S.me;
@@ -192,6 +201,9 @@ function onMessage(msg) {
     location.reload();
   } else if (msg.type === "found") {
     if (msg.n !== S.game?.me.n) showFound(msg); // 내 발견은 문제 창에서 이미 축하한다
+  } else if (msg.type === "review") {
+    reviewAnswers = msg.answers ?? null;
+    toast("📄 정답표를 받았어요. 결과 화면에서 오답 정리를 인쇄할 수 있어요.", "ok");
   } else if (msg.type === "error") {
     if ($("#game").hidden) showJoinError(msg.message);
     else toast(msg.message);
@@ -254,10 +266,57 @@ function updateHud() {
   if (S.cls) {
     $("#stage-chip").textContent = STAGE_NAME[S.cls.stage] ?? "";
     $("#online-chip").textContent = `👥 ${S.cls.online}명 접속`;
+    renderTeamChip();
+    renderTeamRanking();
     renderRanking();
+    drawMinimap();
   }
 }
 setInterval(updateHud, 500); // 방 이름은 움직일 때 바뀐다
+
+// 팀전: 내 팀 뱃지(상단바)와 팀 랭킹(오른쪽 위)
+function renderTeamChip() {
+  const chip = $("#team-chip");
+  if (S.mode === "practice") { chip.hidden = true; return; }
+  const team = teamOf(S.game?.me.n);
+  if (!team || !TEAMS[team]) { chip.hidden = true; return; }
+  chip.hidden = false;
+  chip.classList.add("team-chip");
+  chip.style.setProperty("--team", TEAMS[team].color);
+  chip.textContent = `${TEAMS[team].name}`;
+}
+
+function renderTeamRanking() {
+  const box = $("#hud-teams");
+  if (S.mode === "practice") { box.hidden = true; return; }
+  const list = S.cls.teams ?? [];
+  if (!list.length) { box.hidden = true; return; }
+  const key = JSON.stringify(list.map((t) => [t.team, t.score, t.members]));
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.hidden = false;
+  box.replaceChildren();
+  const title = document.createElement("li");
+  title.className = "rank-title";
+  title.textContent = "🚩 팀 랭킹";
+  box.appendChild(title);
+  for (const t of list) {
+    const li = document.createElement("li");
+    const mine = teamOf(S.game?.me.n) === t.team;
+    if (mine) li.className = "mine";
+    const badge = document.createElement("span");
+    badge.className = "team-dot";
+    badge.style.background = TEAMS[t.team]?.color ?? "#94a3b8";
+    const nm = document.createElement("span");
+    nm.className = "nm";
+    nm.textContent = `${TEAMS[t.team]?.name ?? t.team}팀 · ${t.members}명${t.escaped ? " 🏁" : ""}`;
+    const sc = document.createElement("span");
+    sc.className = "sc";
+    sc.textContent = `${t.score}점`;
+    li.append(badge, nm, sc);
+    box.appendChild(li);
+  }
+}
 
 // 실시간 랭킹: 상위 5명과, 5등 밖이면 내 순위도 함께
 function renderRanking() {
@@ -282,11 +341,19 @@ function renderRanking() {
     const [i, r] = row;
     if (i === mine) li.className = "mine";
     const medal = ["🥇", "🥈", "🥉"][i] ?? `${i + 1}`;
+    const team = TEAMS[r.team];
     for (const [cls, text] of [["pos", medal], ["nm", `${r.name}${r.escaped ? " 🏁" : ""}`], ["sc", `${r.score}점`]]) {
       const s = document.createElement("span");
       s.className = cls;
       s.textContent = text;
       li.appendChild(s);
+    }
+    if (team) {
+      const dot = document.createElement("span");
+      dot.className = "team-dot";
+      dot.title = `${team.name}`;
+      dot.style.background = team.color;
+      li.appendChild(dot);
     }
     box.appendChild(li);
   }
@@ -394,7 +461,18 @@ function closeModal() {
   $("#world")?.focus();
 }
 
-$("#modal-close").onclick = closeModal;
+$( "#modal-close").onclick = closeModal;
+// 문제·실험 창 안의 '📚 개념 카드' 버튼: 그 문제(또는 실험)의 개념 카드를 다시 연다.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".link-card-btn[data-concept]");
+  if (!btn) return;
+  const key = btn.dataset.concept;
+  if (key[0] === "l") {
+    const br = Object.values(BRIDGES).find((b) => b.lab === key);
+    if (br) return showConcept(key, () => openBridgeBody(br), "bridge");
+  }
+  showConcept(key, () => openProblemBody(key), "problem");
+});
 $("#modal").addEventListener("pointerdown", (e) => { if (e.target.id === "modal") closeModal(); });
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && S.modal) closeModal();
@@ -409,6 +487,83 @@ sound.onChange((muted) => {
   $("#sound-btn").textContent = muted ? "🔇" : "🔊";
   $("#sound-btn").setAttribute("aria-label", muted ? "소리 켜기 (M)" : "소리 끄기 (M)");
 });
+
+// ---------- 미니맵: 유적 4개 방 전체를 위에서 본 지도 ----------
+const mapCanvas = $("#map-canvas");
+let mapGrid = null; // 벽·위험지대 그리기용 격자 (한 번만 만든다)
+
+$("#map-btn").onclick = () => { $("#minimap").hidden = !$("#minimap").hidden; if (!$("#minimap").hidden) drawMinimap(); };
+$("#minimap-close").onclick = () => { $("#minimap").hidden = true; };
+
+function drawMinimap() {
+  if ($("#minimap").hidden || !S.game) return;
+  mapGrid ??= buildGrid();
+  const cell = 7; // 지도 한 칸의 픽셀 (지도 크기에 맞춰 화면에 맞춰 축소된다)
+  const c = mapCanvas;
+  const w = W * cell, h = H * cell + 14;
+  if (c.width !== w) { c.width = w; c.height = h; }
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, c.width, c.height);
+
+  // 바탕과 방 구분: 방별 옅은 색 띠
+  const ROOM_FILL = ["rgba(255,226,176,0.20)", "rgba(210,240,192,0.20)", "rgba(207,220,255,0.22)", "rgba(255,220,138,0.25)"];
+  for (let r = 0; r < ROOMS.length; r++) {
+    const x1 = r === 0 ? 1 : ROOMS[r - 1].x1 + 1, x2 = r === ROOMS.length - 1 ? W - 2 : ROOMS[r].x1;
+    ctx.fillStyle = ROOM_FILL[r];
+    ctx.fillRect(x1 * cell, cell, (x2 - x1 + 1) * cell, (H - 2) * cell);
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "bold 9px Pretendard, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(ROOMS[r].name, (x1 + x2 + 1) / 2 * cell, H * cell + 10);
+  }
+  // 벽
+  ctx.fillStyle = "rgba(120,100,70,0.9)";
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const ch = mapGrid[y][x];
+    if (ch === "#") ctx.fillRect(x * cell, y * cell, cell, cell);
+    else if (ch === "~") { ctx.fillStyle = "rgba(59,155,224,0.7)"; ctx.fillRect(x * cell, y * cell, cell, cell); ctx.fillStyle = "rgba(120,100,70,0.9)"; }
+    else if (ch === "^") { ctx.fillStyle = "rgba(60,50,80,0.8)"; ctx.fillRect(x * cell, y * cell, cell, cell); ctx.fillStyle = "rgba(120,100,70,0.9)"; }
+    else if (ch === "!") { ctx.fillStyle = "rgba(255,90,31,0.75)"; ctx.fillRect(x * cell, y * cell, cell, cell); ctx.fillStyle = "rgba(120,100,70,0.9)"; }
+  }
+  // 문 (열렸으면 밝게)
+  for (const [id, col] of Object.entries(DOOR_COLS)) {
+    const open = DOORS[id].every(solved);
+    ctx.fillStyle = open ? "rgba(52,211,153,0.9)" : "rgba(245,158,11,0.95)";
+    for (const r of DOOR_ROWS) ctx.fillRect(col * cell, r * cell, cell, cell);
+  }
+  // 다리 자리 (완료했으면 판자색)
+  for (const br of Object.values(BRIDGES)) {
+    ctx.fillStyle = labDone(br.lab) ? "rgba(160,102,43,0.95)" : "rgba(103,232,249,0.8)";
+    ctx.fillRect((br.cx - 1) * cell, (br.cy - 1) * cell, cell * 2, cell * 2);
+  }
+  // 보물상자·유물 제단
+  ctx.font = `${cell}px serif`;
+  ctx.textAlign = "center";
+  for (const o of OBJECTS) ctx.fillText(o.icon, (o.x + 0.5) * cell, (o.y + 0.9) * cell);
+  ctx.fillText("🏛️", (ALTAR.x + 0.5) * cell, (ALTAR.y + 0.9) * cell);
+
+  // 팀원·나: 팀 색 원 마커. 이름은 작게.
+  const marker = (x, y, color, label, isMe) => {
+    const px = x * cell, py = y * cell;
+    ctx.beginPath();
+    ctx.arc(px, py, isMe ? 5 : 3.6, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = isMe ? 2 : 1;
+    ctx.strokeStyle = isMe ? "#5eead4" : "rgba(255,255,255,0.9)";
+    ctx.stroke();
+    if (isMe || !label) return;
+    ctx.fillStyle = color;
+    ctx.font = "bold 8px Pretendard, sans-serif";
+    ctx.fillText(label, px, py - 6);
+  };
+  for (const [n, o] of S.game.others) {
+    const team = TEAMS[teamOf(n)];
+    marker(o.x + 0.5, o.y + 0.5, team?.color ?? "#94a3b8", S.game.names.get(n) ?? "", false);
+  }
+  const myTeam = TEAMS[teamOf(S.game.me.n)];
+  marker(S.game.me.x, S.game.me.y, myTeam?.color ?? "#5eead4", "", true);
+}
 
 function onInteract(target) {
   const stage = S.cls?.stage;
@@ -425,13 +580,19 @@ function onInteract(target) {
 
 // 장애물: 벡터 실험실 한 단계
 function openBridge(br) {
+  // 실험실 개념 카드(삼각형법·평행사변형법·실수배)를 먼저 보여 주고, 도전하기를 누르면 본체가 나온다.
+  if (CONCEPTS[br.lab]) return showConcept(br.lab, () => openBridgeBody(br), "bridge");
+  return openBridgeBody(br);
+}
+
+function openBridgeBody(br) {
   const idx = LAB_LEVELS.findIndex((l) => l.id === br.lab);
   const lv = LAB_LEVELS[idx];
   const body = openModal();
   sound.sfx("open");
   body.innerHTML = `
     <div class="p-head"><span class="p-icon">✨</span>
-      <div><h2>${br.title}: 벡터 점프</h2><small>벡터 실험 ${idx + 1} · ${lv.title}</small></div></div>
+      <div><h2>${br.title}: 벡터 점프</h2><small>벡터 실험 ${idx + 1} · ${lv.title}${CONCEPTS[br.lab] ? ` · <button class="link-card-btn" type="button" data-concept="${br.lab}">📚 개념 카드</button>` : ""}</small></div></div>
     <p class="goal">${fmt(lv.goal)}</p>
     <div class="board-wrap"></div>
     <div class="status"></div>
@@ -445,8 +606,32 @@ function openBridge(br) {
   });
 }
 
-// 상자: 문제
+// 상자: 문제. 열면 먼저 개념 학습 카드(세션에서 한 번씩), 이어서 문제 본문이 나온다.
 function openProblem(pid) {
+  const mine = S.me?.probs[pid];
+  // 이미 푼 상자를 다시 열 때는 바로 본문으로. 안 푼 상자는 세션에서 처음 열 때만 개념 카드를 먼저 보여 준다.
+  if (!mine?.solved && !conceptSeen.has(pid) && CONCEPTS[pid]) return showConcept(pid, () => openProblemBody(pid), "problem");
+  return openProblemBody(pid);
+}
+
+const conceptSeen = new Set(); // 이 세션에서 개념 카드를 본 문제·실험
+
+// 개념 카드 팝업: 학습을 돕는다. next는 '문제 풀기'를 눌렀을 때 이어서 열 함수.
+function showConcept(key, next, kind) {
+  conceptSeen.add(key);
+  const body = openModal();
+  body.innerHTML = `
+    ${conceptCard(null, key, { fmt })}
+    <div class="concept-actions">
+      <button class="btn" type="button" data-reopen="1">📚 카드 다시 보기</button>
+      <button class="btn primary big" type="button" id="concept-go">${kind === "bridge" ? "도전하기 →" : "문제 풀기 →"}</button>
+    </div>`;
+  sound.sfx("open");
+  $("#concept-go", body).onclick = next;
+  $("[data-reopen]", body).onclick = () => showConcept(key, next, kind);
+}
+
+function openProblemBody(pid) {
   const p = PROBLEMS.find((x) => x.id === pid);
   const obj = OBJECTS.find((o) => o.pid === pid);
   const idx = PROBLEMS.indexOf(p);
@@ -456,7 +641,7 @@ function openProblem(pid) {
   S.waiting = false;
   body.innerHTML = `
     <div class="p-head"><span class="p-icon">${obj.icon}</span>
-      <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}</h2><small>${p.level} · 교과서 ${p.source} · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각</small></div></div>
+      <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}</h2><small>${p.level} · 교과서 ${p.source} · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각${CONCEPTS[pid] ? ` · <button class="link-card-btn" type="button" data-concept="${pid}">📚 개념 카드</button>` : ""}</small></div></div>
     <p class="p-text"></p>
     <div class="tool">
       <div class="tool-help">🔍 ${fmt(p.toolHelp)}</div>
@@ -651,11 +836,14 @@ function showSummary() {
   const body = openModal(false);
   const mine = PROBLEMS.filter((p) => solved(p.id)).length;
   const unlocked = PROBLEMS.filter((p) => S.cls?.relics[p.id]?.unlocked).length;
+  // 오답 정리 인쇄용 정답표: 탐험이 끝나면 서버가 내려 준다(reviewAnswers에 저장).
+  S.net?.send({ type: "review" });
   body.innerHTML = `
     <div class="done">
       <h2>탐험 끝!</h2>
       <p class="big-num">우리 반이 깨운 유물 <b>${unlocked}</b> / ${PROBLEMS.length}</p>
       <p>내가 연 상자 <b>${mine}</b> / ${PROBLEMS.length} · 벡터 점프 ${S.me?.lab.length ?? 0} / ${LAB_LEVELS.length}</p>
+      <div class="summary-actions"><button id="print-btn" class="btn primary" type="button">📄 오답 정리 A4로 인쇄 (PDF)</button></div>
     </div>`;
   const ul = document.createElement("ul");
   ul.className = "mine";
@@ -666,4 +854,39 @@ function showSummary() {
     ul.appendChild(li);
   }
   $(".done", body).appendChild(ul);
+  $("#print-btn", body).onclick = printReview;
+}
+
+// 오답 정리: 내가 틀리거나 못 푼 문제를 문제·내가 낸 오답·정답·풀이로 정리해 A4 인쇄 창에 채운다.
+let reviewAnswers = null; // 서버가 내려 준 정답표 (탐험 끝 이후에만)
+
+function printReview() {
+  const area = $("#print-area");
+  const rows = PROBLEMS.map((p, i) => {
+    const m = S.me?.probs[p.id];
+    const wrongs = m?.wrongs?.length ? m.wrongs.join(", ") : m?.tries ? "형식 오류 없이 오답" : null;
+    const status = m?.solved ? (m.firstTry ? "★ 한 번에 정답" : `✓ 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ ${m.tries}번 시도, 미해결` : "미응시";
+    const need = !m?.solved || !m.firstTry; // 틀리거나 여러 번 시도한 문제만 자세히
+    if (!need) return "";
+    return `
+      <section class="pr-item">
+        <h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.level} · ${p.source}</small> <span class="pr-status">${status}</span></h3>
+        <p class="pr-text">${fmt(p.text)}</p>
+        ${wrongs ? `<p class="pr-wrongs"><b>내가 낸 답:</b> ${wrongs}</p>` : ""}
+        <p class="pr-answer"><b>정답:</b> ${fmt(reviewAnswers?.[p.id] ?? "탐험이 끝나면 공개돼요")}</p>
+        <p class="pr-hint"><b>풀이</b>: ${fmt(p.hint)}</p>
+      </section>`;
+  }).join("");
+  area.innerHTML = `
+    <header class="pr-head">
+      <h1>벡터 유적 탈출 · 나의 오답 정리</h1>
+      <p>${S.name ?? ""} · ${new Date().toLocaleDateString("ko-KR")} · 맞힌 문제 ${PROBLEMS.filter((p) => solved(p.id)).length}/${PROBLEMS.length}</p>
+    </header>
+    ${rows || "<p>틀린 문제가 없어요! 모든 문제를 한 번에 맞혔어요. 🎉</p>"}`;
+  area.hidden = false;
+  // 수식(MathJax) 조판이 끈 뒤 인쇄 창을 연다
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { area.hidden = true; }, 300);
+  }, 600);
 }

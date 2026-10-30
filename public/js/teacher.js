@@ -40,6 +40,7 @@ function start(password) {
       remember(password);
       answers = msg.answers ?? null;
       $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
+      buildAnswerSheet(); // 문제·정답 일람표도 정답을 받은 뒤에 그린다
       $("#setup").hidden = true;
       $("#dash").hidden = false;
     }
@@ -61,6 +62,7 @@ function onMessage(msg) {
   if (msg.type === "dashboard") {
     last = msg;
     $("#stage-chip").textContent = STAGE_NAME[msg.stage] ?? "";
+    renderTeams(msg.teams);
     renderDash(msg);
   } else if (msg.type === "class") {
     renderClassBar($("#class-bar"), msg, { showEnergy: true, showShelf: true });
@@ -100,6 +102,49 @@ function buildProblems() {
     box.appendChild(card);
   });
 }
+
+// 문제·정답 일람표: 7개 문제의 지문과 정답을 한눈에 보는 뷰. 정답표를 받은 뒤 한 번만 그린다.
+function buildAnswerSheet() {
+  const body = $("#answer-sheet");
+  if (!answers) return;
+  const table = document.createElement("table");
+  table.className = "table answer-sheet-table";
+  const head = document.createElement("tr");
+  for (const h of ["번호", "문제 지문", "정답"]) head.appendChild(cell("th", h));
+  table.appendChild(head);
+  PROBLEMS.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    const no = cell("td", `${i + 1}. ${p.icon} ${p.relic}`, "as-no");
+    const text = document.createElement("td");
+    text.className = "as-text";
+    text.innerHTML = fmt(p.text); // 수식은 MathJax로 조판 (watchMath가 처리)
+    const ans = document.createElement("td");
+    ans.className = "as-answer";
+    ans.innerHTML = fmt(answers[p.id] ?? "–");
+    tr.append(no, text, ans);
+    table.appendChild(tr);
+  });
+  body.replaceChildren(table);
+}
+
+// 팀 랭킹 카드: 학생 화면의 팀 랭킹을 교사 화면에도 그대로 보여 준다.
+function renderTeams(teams) {
+  const box = $("#team-bar");
+  box.replaceChildren();
+  if (!teams?.length) { box.hidden = true; return; }
+  box.hidden = false;
+  for (const t of teams) {
+    const card = document.createElement("div");
+    card.className = "team-card";
+    card.style.setProperty("--team", TEAM_COLORS[t.team] ?? "#94a3b8");
+    card.innerHTML = `<span class="team-badge">${t.team}</span>
+      <div><b>${t.name}</b><small>${t.members}명 · 맞힌 문제 ${t.solved}개${t.escaped ? " · 🏁 탈출" : ""}</small></div>
+      <b class="team-score">${t.score}점</b>`;
+    box.appendChild(card);
+  }
+}
+
+const TEAM_COLORS = { A: "#ef4444", B: "#3b82f6", C: "#22c55e", D: "#a855f7" };
 
 function renderDash(d) {
   if (!$("#problems").childElementCount) buildProblems();
@@ -141,6 +186,14 @@ function renderDash(d) {
     const nameTd = cell("td", "", "name");
     const nameBtn = cell("button", `${expanded.has(st.cid) ? "▾" : "▸"} ${st.name}`, "name-btn");
     nameBtn.type = "button";
+    if (st.team) {
+      const dot = document.createElement("span");
+      dot.className = "team-dot";
+      dot.title = `${st.team}팀`;
+      dot.style.background = TEAM_COLORS[st.team] ?? "#94a3b8";
+      nameTd.appendChild(dot);
+    }
+    nameTd.appendChild(nameBtn);
     nameBtn.onclick = () => { expanded.has(st.cid) ? expanded.delete(st.cid) : expanded.add(st.cid); renderDash(last); };
     nameTd.appendChild(nameBtn);
     tr.appendChild(nameTd);
