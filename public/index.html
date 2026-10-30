@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>벡터 유적 탈출</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script>
+    // 수식은 MathJax로 조판한다. \vv{a}: 벡터 a, \VV{AB}: 벡터 AB
+    window.MathJax = {
+      tex: { inlineMath: [["\\(", "\\)"]], macros: { vv: ["\\overrightarrow{#1}", 1], VV: ["\\overrightarrow{\\mathrm{#1}}", 1] } },
+      chtml: { fontURL: "/vendor/mathjax/output/chtml/fonts/woff-v2" },
+      startup: { typeset: false },
+    };
+  </script>
+  <script defer src="/vendor/mathjax/tex-chtml.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/three.module.min.js", "three/addons/": "/vendor/three/addons/" } }
+  </script>
+</head>
+<body class="student">
+  <section id="join" class="join">
+    <div class="join-card">
+      <div class="logo"><span class="logo-icon">🏺</span><div><small>기하 · 벡터의 연산</small><h1>벡터 유적 탈출</h1></div></div>
+      <p class="lead">상자를 열고 벡터로 길을 만들어 잊힌 유적을 탈출하세요. 마지막 유물 제단은 반 친구들과 함께 깨워요!</p>
+      <form id="join-form" autocomplete="off">
+        <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
+        <button class="btn primary big" type="submit">탐험 시작</button>
+        <p id="join-error" class="error" role="alert"></p>
+      </form>
+    </div>
+  </section>
+
+  <section id="game" class="game" hidden>
+    <header class="topbar">
+      <div class="brand">🏺 벡터 유적 탈출</div>
+      <div class="meta">
+        <span id="stage-chip" class="chip"></span>
+        <span id="online-chip" class="chip soft"></span>
+        <span id="me-chip" class="chip soft"></span>
+      </div>
+    </header>
+    <div id="conn" class="conn" hidden>연결이 끊겼어요. 다시 연결하는 중…</div>
+    <div class="world-wrap">
+      <canvas id="world" tabindex="0" aria-label="유적 지도. 방향키나 WASD로 움직이고 E로 열어요."></canvas>
+      <div class="hud">
+        <div class="hud-card">
+          <b id="hud-room"></b>
+          <span id="hud-keys" title="열쇠 조각 (푼 문제)"></span>
+          <span id="hud-jumps" title="벡터 점프 (건넌 장애물)"></span>
+          <button id="sound-btn" class="hud-btn" type="button" aria-label="소리 끄기 (M)">🔊</button>
+        </div>
+        <div class="hud-right">
+          <div class="hud-card hud-relics" id="hud-relics" title="우리 반 유물"></div>
+          <ol id="hud-rank" class="hud-card hud-rank" aria-label="실시간 랭킹"></ol>
+        </div>
+      </div>
+      <div id="popups" class="popups" aria-live="polite"></div>
+      <div id="banner" class="banner" hidden></div>
+      <div id="loading" class="loading" hidden>🏺 유적을 불러오는 중…</div>
+      <div class="help">WASD·방향키 이동 · <kbd>E</kbd> 또는 클릭: 열기 · <kbd>M</kbd> 소리</div>
+    </div>
+  </section>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true">
+      <button id="modal-close" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/student.js"></script>
+</body>
+</html>

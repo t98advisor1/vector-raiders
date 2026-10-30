@@ -1,0 +1,485 @@
+// 유적 3D 화면 (Three.js). 규칙은 game.js가 갖고, 여기서는 그 상태를 그린다.
+// 모델: Kenney Mini Dungeon / Mini Characters (CC0). 지도 한 칸 = 3D 공간 1, 지도 (x, y) → (x, 0, y).
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR } from "./game.js";
+
+const CHARS = ["male-a", "female-a", "male-b", "female-b", "male-c", "female-c", "male-d", "female-d", "male-e", "female-e", "male-f", "female-f"]
+  .map((s) => `/models/chars/character-${s}.glb`);
+const DUNGEON = ["floor", "floor-detail", "wall", "gate", "chest", "pot", "barrel", "coin", "key", "stairs", "banner", "column"];
+const HAZARD = {
+  "~": { color: 0x3b9be0, y: -0.12, opacity: 0.88, emissive: 0x0a2a4a },
+  "^": { color: 0x0b0812, y: -0.9, opacity: 1, emissive: 0x000000 },
+  "!": { color: 0xff5a1f, y: -0.15, opacity: 1, emissive: 0xff3d00 },
+};
+
+const loader = new GLTFLoader();
+const cache = new Map();
+const load = (url) => {
+  if (!cache.has(url)) cache.set(url, loader.loadAsync(url));
+  return cache.get(url);
+};
+
+function shadows(obj, cast = true, receive = true) {
+  obj.traverse((o) => { if (o.isMesh) { o.castShadow = cast; o.receiveShadow = receive; } });
+  return obj;
+}
+
+// 같은 모델을 여러 칸에 놓을 때 한 번에 그린다 (크롬북에서도 가볍게).
+function instanced(template, matrices, colors) {
+  const group = new THREE.Group();
+  template.updateMatrixWorld(true);
+  template.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    const im = new THREE.InstancedMesh(mesh.geometry, mesh.material, matrices.length);
+    const m = new THREE.Matrix4();
+    matrices.forEach((t, i) => {
+      im.setMatrixAt(i, m.multiplyMatrices(t, mesh.matrixWorld));
+      if (colors) im.setColorAt(i, colors[i]);
+    });
+    im.castShadow = true;
+    im.receiveShadow = true;
+    group.add(im);
+  });
+  return group;
+}
+
+function tileMatrix(x, z, { y = 0, rot = 0, sx = 1, sy = 1, sz = 1 } = {}) {
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(x, y, z),
+    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot),
+    new THREE.Vector3(sx, sy, sz),
+  );
+}
+
+// 글자 표지판 (이름표, 안내 말풍선)
+function makeLabel(text, { bg = "rgba(17,24,39,0.8)", fg = "#fff", size = 30, height = 0.32 } = {}) {
+  const c = document.createElement("canvas");
+  const ctx = c.getContext("2d");
+  const font = `bold ${size}px Pretendard, "Malgun Gothic", "Noto Sans KR", sans-serif`;
+  ctx.font = font;
+  const w = Math.ceil(ctx.measureText(text).width) + size;
+  c.width = w;
+  c.height = Math.ceil(size * 1.6);
+  ctx.font = font;
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, c.width, c.height, c.height / 2);
+  ctx.fill();
+  ctx.fillStyle = fg;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, c.width / 2, c.height / 2 + 1);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.scale.set((height * c.width) / c.height, height, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
+function disposeLabel(sprite) {
+  sprite.material.map.dispose();
+  sprite.material.dispose();
+}
+
+export class World3D {
+  // hooks: isDoorOpen(id), isLabDone(lab), isSolved(pid), relics() → [bool × 7], hasState(), onInteract(target)
+  constructor(canvas, game, hooks) {
+    this.cv = canvas;
+    this.game = game;
+    this.h = hooks;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x1c1828);
+    this.scene.fog = new THREE.Fog(0x1c1828, 16, 32);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    this.scene.add(new THREE.HemisphereLight(0xfff4dc, 0x40355a, 1.7));
+    this.sun = new THREE.DirectionalLight(0xffffff, 2.4);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(1024, 1024);
+    Object.assign(this.sun.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: 1, far: 40 });
+    this.sun.shadow.bias = -0.0008;
+    this.scene.add(this.sun, this.sun.target);
+
+    this.mixers = [];
+    this.avatars = new Map(); // n(나는 "me") → 캐릭터
+    this.objects = new Map(); // pid → { root, kind, solved, key, ring, mixer, clip }
+    this.doors = new Map(); // id → { gates: [{mixer, clip}], open }
+    this.bridges = new Map(); // lab → { planks, marker, done }
+    this.hazards = [];
+    this.coins = [];
+    this.prompt = null;
+    this.promptText = "";
+
+    new ResizeObserver(() => this.resize()).observe(canvas);
+    this.resize();
+    canvas.addEventListener("pointerdown", (e) => this.onPointer(e));
+  }
+
+  resize() {
+    const w = this.cv.clientWidth, h = this.cv.clientHeight;
+    if (!w || !h) return;
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  async init() {
+    const models = Object.fromEntries(await Promise.all(DUNGEON.map(async (n) => [n, await load(`/models/dungeon/${n}.glb`)])));
+    this.models = models;
+    this.buildStatic(models);
+    this.buildDoors(models);
+    this.buildObjects(models);
+    this.buildBridges();
+    this.buildAltar(models);
+  }
+
+  start() {
+    const clock = new THREE.Clock();
+    this.renderer.setAnimationLoop(() => {
+      const dt = Math.min(0.05, clock.getDelta());
+      const t = clock.elapsedTime;
+      this.game.update(dt, t * 1000);
+      this.sync(dt, t);
+      this.renderer.render(this.scene, this.camera);
+    });
+  }
+
+  // ---------- 고정된 지형 ----------
+  buildStatic(m) {
+    const grid = this.game.grid;
+    const floors = [], floorColors = [], details = [], detailColors = [], walls = [], banners = [];
+    const tint = ROOMS.map((r) => new THREE.Color(r.tint));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const ch = grid[y][x];
+      if (ch === "#") {
+        walls.push(tileMatrix(x + 0.5, y + 0.5, { sy: y === H - 1 ? 0.25 : 1 })); // 앞줄 벽은 낮게: 방 안이 보이도록
+        if (y === 0 && x % 4 === 2 && grid[1][x] === ".") banners.push(tileMatrix(x + 0.5, 1.5));
+        continue;
+      }
+      if ("~^!".includes(ch) || BRIDGES[ch]) continue;
+      const fancy = ((x * 7 + y * 13) % 9) === 0;
+      (fancy ? details : floors).push(tileMatrix(x + 0.5, y + 0.5));
+      (fancy ? detailColors : floorColors).push(tint[roomAt(x + 0.5)]);
+    }
+    this.scene.add(
+      instanced(m.floor.scene, floors, floorColors),
+      instanced(m["floor-detail"].scene, details, detailColors),
+      instanced(m.wall.scene, walls),
+      instanced(m.banner.scene, banners),
+    );
+
+    // 물·절벽·용암: 다리마다 세로로 긴 띠
+    for (const br of Object.values(BRIDGES)) {
+      const hz = HAZARD[br.hazard];
+      const mat = new THREE.MeshStandardMaterial({
+        color: hz.color, emissive: hz.emissive, emissiveIntensity: br.hazard === "!" ? 1.2 : 0.4,
+        roughness: br.hazard === "~" ? 0.15 : 0.9, transparent: hz.opacity < 1, opacity: hz.opacity,
+      });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(2, H - 2), mat);
+      plane.rotation.x = -Math.PI / 2;
+      plane.position.set(br.cx, hz.y, H / 2);
+      plane.receiveShadow = true;
+      this.scene.add(plane);
+      this.hazards.push({ kind: br.hazard, mat, base: mat.emissiveIntensity });
+      if (br.hazard === "^") {
+        // 절벽 양쪽 벽면
+        for (const side of [-1, 1]) {
+          const cliff = new THREE.Mesh(new THREE.PlaneGeometry(H - 2, 0.9), new THREE.MeshStandardMaterial({ color: 0x3a2f45 }));
+          cliff.rotation.y = side * Math.PI / 2;
+          cliff.position.set(br.cx - side, -0.45, H / 2);
+          this.scene.add(cliff);
+        }
+      }
+    }
+  }
+
+  buildDoors(m) {
+    for (const [id, col] of Object.entries(DOOR_COLS)) {
+      const gates = [];
+      for (const r of DOOR_ROWS) {
+        const g = shadows(m.gate.scene.clone(true));
+        g.position.set(col + 0.5, 0, r + 0.5);
+        g.rotation.y = Math.PI / 2;
+        g.scale.set(1.25, 1.45, 1.25);
+        this.scene.add(g);
+        const mixer = new THREE.AnimationMixer(g);
+        this.mixers.push(mixer);
+        gates.push({ mixer, clip: THREE.AnimationClip.findByName(m.gate.animations, "open") });
+      }
+      this.doors.set(id, { gates, open: false });
+    }
+  }
+
+  buildObjects(m) {
+    const ringGeo = new THREE.RingGeometry(0.42, 0.55, 32);
+    for (const o of OBJECTS) {
+      const src = m[o.model];
+      const root = shadows(src.scene.clone(true));
+      root.position.set(o.x + 0.5, 0, o.y + 0.5);
+      root.scale.setScalar(o.model === "chest" ? 1.5 : 1.25);
+      this.scene.add(root);
+      const key = shadows(m.key.scene.clone(true), true, false);
+      key.scale.setScalar(0.7);
+      key.position.set(o.x + 0.5, 1.15, o.y + 0.5);
+      this.scene.add(key);
+      const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.6, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(o.x + 0.5, 0.02, o.y + 0.5);
+      this.scene.add(ring);
+      const mixer = src.animations.length ? new THREE.AnimationMixer(root) : null;
+      if (mixer) this.mixers.push(mixer);
+      this.objects.set(o.pid, { root, kind: o.model, key, ring, mixer, clip: THREE.AnimationClip.findByName(src.animations, "open"), solved: false, tip: 0 });
+    }
+  }
+
+  buildBridges() {
+    const plankMat = new THREE.MeshStandardMaterial({ color: 0xa0662b, roughness: 0.8 });
+    const plankGeo = new THREE.BoxGeometry(0.28, 0.12, 2.1); // 걷는 방향(x)과 직각으로 놓인 판자
+    const markGeo = new THREE.BoxGeometry(2, 0.04, 2);
+    const gemGeo = new THREE.OctahedronGeometry(0.22);
+    for (const br of Object.values(BRIDGES)) {
+      const planks = new THREE.Group();
+      for (let i = 0; i < 6; i++) {
+        const p = new THREE.Mesh(plankGeo, plankMat);
+        p.position.set(-0.83 + i * 0.33, 0, 0);
+        p.castShadow = p.receiveShadow = true;
+        planks.add(p);
+      }
+      planks.position.set(br.cx, -0.02, br.cy);
+      planks.visible = false;
+      const marker = new THREE.Group();
+      const glow = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.35, depthWrite: false }));
+      const gem = new THREE.Mesh(gemGeo, new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x22d3ee, emissiveIntensity: 1.5 }));
+      gem.position.y = 0.9;
+      marker.add(glow, gem);
+      marker.position.set(br.cx, 0.02, br.cy);
+      this.scene.add(planks, marker);
+      this.bridges.set(br.lab, { planks, marker, glow, gem, done: false, grow: 0 });
+    }
+  }
+
+  buildAltar(m) {
+    const stairs = shadows(m.stairs.scene.clone(true));
+    stairs.position.set(ALTAR.x + 0.5, 0, ALTAR.y + 0.5);
+    this.scene.add(stairs);
+    for (const [dx, dz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) {
+      const c = shadows(m.column.scene.clone(true));
+      c.position.set(ALTAR.x + 0.5 + dx, 0, ALTAR.y + 0.5 + dz);
+      c.scale.set(0.8, 1.3, 0.8);
+      this.scene.add(c);
+    }
+    // 유물 7개: 반 전체가 깨우면 금빛으로 바뀐다
+    this.coinRing = new THREE.Group();
+    this.coinRing.position.set(ALTAR.x + 0.5, 1.7, ALTAR.y + 0.5);
+    for (let i = 0; i < 7; i++) {
+      const coin = m.coin.scene.clone(true);
+      const mats = [];
+      coin.traverse((o) => {
+        if (o.isMesh) { o.material = o.material.clone(); o.material.color.set(0x555566); mats.push(o.material); o.castShadow = true; }
+      });
+      const a = (i / 7) * Math.PI * 2;
+      coin.position.set(Math.cos(a) * 1.25, 0, Math.sin(a) * 1.25);
+      coin.scale.setScalar(1.3);
+      this.coinRing.add(coin);
+      this.coins.push({ coin, mats, lit: false });
+    }
+    this.scene.add(this.coinRing);
+  }
+
+  // ---------- 캐릭터 ----------
+  avatar(key, n) {
+    let av = this.avatars.get(key);
+    if (av) return av;
+    const group = new THREE.Group();
+    group.rotation.y = Math.PI; // 모델은 -z를 보고 있으므로 처음에는 카메라 쪽(+z)을 보게 돌린다
+    av = { group, n, label: null, labelText: "", model: null, mixer: null, actions: null, current: null };
+    this.avatars.set(key, av);
+    this.scene.add(group);
+    load(CHARS[n % CHARS.length]).then((gltf) => {
+      if (this.avatars.get(key) !== av) return; // 그새 나갔으면 버린다
+      const model = shadows(SkeletonUtils.clone(gltf.scene), true, false);
+      model.scale.setScalar(1.45);
+      group.add(model);
+      const mixer = new THREE.AnimationMixer(model);
+      const act = (name) => mixer.clipAction(THREE.AnimationClip.findByName(gltf.animations, name));
+      Object.assign(av, { model, mixer, actions: { idle: act("idle"), walk: act("walk"), yes: act("emote-yes") } });
+      av.actions.idle.play();
+      av.current = "idle";
+    });
+    return av;
+  }
+
+  setAnim(av, name) {
+    if (!av.actions || av.current === name) return;
+    av.actions[name].reset().fadeIn(0.15).play();
+    av.actions[av.current].fadeOut(0.15);
+    av.current = name;
+  }
+
+  placeAvatar(av, x, y, dir, moving, name, isMe) {
+    av.group.position.set(x, 0, y);
+    if (moving) {
+      const target = Math.atan2(-dir[0], -dir[1]); // 모델 정면이 -z
+      let d = target - av.group.rotation.y;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      av.group.rotation.y += d * 0.3;
+    }
+    if (av.current !== "yes") this.setAnim(av, moving ? "walk" : "idle");
+    if (av.labelText !== name) {
+      if (av.label) { av.group.remove(av.label); disposeLabel(av.label); }
+      av.label = makeLabel(name, { bg: isMe ? "rgba(15,118,110,0.92)" : "rgba(17,24,39,0.7)" });
+      av.label.position.y = 1.55;
+      av.group.add(av.label);
+      av.labelText = name;
+    }
+  }
+
+  cheer() {
+    const av = this.avatars.get("me");
+    if (!av?.actions) return;
+    this.setAnim(av, "yes");
+    av.actions.yes.setLoop(THREE.LoopOnce, 1);
+    av.actions.yes.clampWhenFinished = true;
+    setTimeout(() => { if (av.current === "yes") this.setAnim(av, "idle"); }, 1200);
+  }
+
+  // ---------- 매 프레임 ----------
+  sync(dt, t) {
+    const g = this.game;
+    for (const mx of this.mixers) mx.update(dt);
+
+    // 나와 친구들
+    if (g.me.n !== null) {
+      const me = this.avatar("me", g.me.n);
+      this.placeAvatar(me, g.me.x, g.me.y, g.me.dir, g.me.moving, g.me.name, true);
+      me.mixer?.update(dt);
+    }
+    for (const [n, o] of g.others) {
+      const av = this.avatar(n, n);
+      this.placeAvatar(av, o.x, o.y, o.dir, o.moving, g.names.get(n) ?? "", false);
+      av.mixer?.update(dt);
+    }
+    for (const [key, av] of this.avatars) {
+      if (key !== "me" && !g.others.has(key)) {
+        this.scene.remove(av.group);
+        if (av.label) disposeLabel(av.label);
+        this.avatars.delete(key);
+      }
+    }
+
+    // 문
+    for (const [id, door] of this.doors) {
+      const open = this.h.isDoorOpen(id);
+      if (open && !door.open) {
+        for (const gt of door.gates) {
+          const a = gt.mixer.clipAction(gt.clip);
+          a.setLoop(THREE.LoopOnce, 1);
+          a.clampWhenFinished = true;
+          a.reset().play();
+          if (!this.ready) gt.mixer.update(gt.clip.duration); // 처음 불러올 때 이미 열린 문은 바로 연 상태로
+        }
+      }
+      door.open = open;
+    }
+
+    // 상자류
+    for (const [pid, ob] of this.objects) {
+      const solved = this.h.isSolved(pid);
+      if (solved && !ob.solved) {
+        if (ob.mixer && ob.clip) {
+          const a = ob.mixer.clipAction(ob.clip);
+          a.setLoop(THREE.LoopOnce, 1);
+          a.clampWhenFinished = true;
+          a.reset().play();
+          if (!this.ready) ob.mixer.update(ob.clip.duration);
+        }
+        if (this.ready) this.cheer();
+      }
+      ob.solved = solved;
+      ob.key.visible = !solved;
+      ob.ring.visible = !solved;
+      if (!solved) {
+        ob.key.rotation.y = t * 2;
+        ob.key.position.y = 1.15 + Math.sin(t * 2.5) * 0.08;
+        ob.ring.material.opacity = 0.35 + 0.3 * Math.sin(t * 3);
+      } else if (!ob.mixer) {
+        ob.tip = Math.min(1, ob.tip + dt * 3); // 항아리·통은 옆으로 쓰러진다
+        ob.root.rotation.z = ob.tip * (Math.PI / 2.4);
+      }
+    }
+
+    // 다리
+    for (const [lab, b] of this.bridges) {
+      const done = this.h.isLabDone(lab);
+      if (done && !b.done) { b.planks.visible = true; b.grow = this.ready ? 0 : 1; }
+      b.done = done;
+      b.marker.visible = !done;
+      if (done) {
+        b.grow = Math.min(1, b.grow + dt * 2.5);
+        b.planks.scale.set(Math.max(0.01, b.grow), 1, 1);
+      } else {
+        b.glow.material.opacity = 0.2 + 0.2 * Math.sin(t * 3);
+        b.gem.rotation.y = t * 1.5;
+        b.gem.position.y = 0.9 + Math.sin(t * 2) * 0.1;
+      }
+    }
+
+    // 물결·용암 반짝임
+    for (const hz of this.hazards) if (hz.kind !== "^") hz.mat.emissiveIntensity = hz.base * (0.8 + 0.25 * Math.sin(t * (hz.kind === "!" ? 3 : 1.5)));
+
+    // 제단의 유물
+    const relics = this.h.relics();
+    this.coinRing.rotation.y = t * 0.5;
+    this.coins.forEach((c, i) => {
+      c.coin.rotation.y = t * 2 + i;
+      if (relics[i] !== c.lit) {
+        c.lit = relics[i];
+        for (const mat of c.mats) {
+          mat.color.set(c.lit ? 0xffffff : 0x555566);
+          mat.emissive = new THREE.Color(c.lit ? 0x8a5a00 : 0x000000);
+        }
+      }
+    });
+
+    // 안내 말풍선
+    const text = g.focus ? g.promptText(g.focus) : "";
+    if (text !== this.promptText) {
+      if (this.prompt) { this.scene.remove(this.prompt); disposeLabel(this.prompt); this.prompt = null; }
+      if (text) {
+        this.prompt = makeLabel(text, { bg: "rgba(17,24,39,0.9)", fg: "#fde68a", size: 34, height: 0.42 });
+        this.scene.add(this.prompt);
+      }
+      this.promptText = text;
+    }
+    if (this.prompt) this.prompt.position.set(g.focus.x, 2.05 + Math.sin(t * 3) * 0.05, g.focus.y);
+
+    // 카메라: 비스듬히 위에서 나를 따라간다
+    // 지도 밖 빈 공간을 비추지 않게: 화면 절반 폭(바닥 기준)만큼 안쪽에서 멈춘다. 좁은 화면일수록 덜 멈춘다.
+    const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 8.8 * this.camera.aspect;
+    const camX = Math.min(W - halfW, Math.max(Math.min(halfW, W / 2), g.me.x));
+    const want = new THREE.Vector3(camX, 6.4, g.me.y + 5.6);
+    this.camera.position.lerp(want, this.ready ? 1 - Math.pow(0.002, dt) : 1);
+    this.camera.lookAt(this.camera.position.x, 0, this.camera.position.z - 6.1);
+    this.sun.position.set(g.me.x - 5, 12, g.me.y + 6);
+    this.sun.target.position.set(g.me.x, 0, g.me.y);
+    // 서버에서 내 진행 상황을 받은 뒤부터는 상태 변화를 애니메이션으로 보여 준다.
+    if (this.h.hasState()) this.ready = true;
+  }
+
+  onPointer(e) {
+    this.cv.focus();
+    const f = this.game.focus;
+    if (!f || this.game.h.paused()) return;
+    const v = new THREE.Vector3(f.x, 0.6, f.y).project(this.camera);
+    const r = this.cv.getBoundingClientRect();
+    const sx = ((v.x + 1) / 2) * r.width + r.left, sy = ((1 - v.y) / 2) * r.height + r.top;
+    if (Math.hypot(e.clientX - sx, e.clientY - sy) < 110) this.h.onInteract(f);
+  }
+}
