@@ -2,11 +2,10 @@
 // 모델: Kenney Mini Dungeon / Mini Characters (CC0). 지도 한 칸 = 3D 공간 1, 지도 (x, y) → (x, 0, y).
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { loadCharacter, makeCharacter } from "./characters.js";
+import { settings } from "./settings.js";
 import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR } from "./game.js";
 
-const CHARS = ["male-a", "female-a", "male-b", "female-b", "male-c", "female-c", "male-d", "female-d", "male-e", "female-e", "male-f", "female-f"]
-  .map((s) => `/models/chars/character-${s}.glb`);
 const DUNGEON = ["floor", "floor-detail", "wall", "gate", "chest", "pot", "barrel", "coin", "key", "stairs", "banner", "column"];
 const HAZARD = {
   "~": { color: 0x3b9be0, y: -0.12, opacity: 0.88, emissive: 0x0a2a4a },
@@ -91,8 +90,11 @@ export class World3D {
     this.game = game;
     this.h = hooks;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    this.renderer.shadowMap.enabled = true;
+    // 그래픽 '낮음'(메뉴 설정): 화면 해상도·그림자·윤곽선을 줄여 느린 크롬북에서도 부드럽게
+    this.quality = settings.quality;
+    const low = this.quality === "low";
+    this.renderer.setPixelRatio(low ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
+    this.renderer.shadowMap.enabled = !low;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
@@ -106,6 +108,9 @@ export class World3D {
     Object.assign(this.sun.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: 1, far: 40 });
     this.sun.shadow.bias = -0.0008;
     this.scene.add(this.sun, this.sun.target);
+    // 뒤쪽에서 비추는 차가운 빛: 캐릭터와 물체 가장자리가 반짝여 입체감이 산다
+    this.rim = new THREE.DirectionalLight(0xa8d8ff, 1.3);
+    this.scene.add(this.rim, this.rim.target);
 
     this.mixers = [];
     this.avatars = new Map(); // n(나는 "me") → 캐릭터
@@ -302,14 +307,12 @@ export class World3D {
     av = { group, n, label: null, labelText: "", model: null, mixer: null, actions: null, current: null };
     this.avatars.set(key, av);
     this.scene.add(group);
-    load(CHARS[n % CHARS.length]).then((gltf) => {
+    loadCharacter(n).then((gltf) => {
       if (this.avatars.get(key) !== av) return; // 그새 나갔으면 버린다
-      const model = shadows(SkeletonUtils.clone(gltf.scene), true, false);
+      const { model, mixer, action } = makeCharacter(gltf, { outline: this.quality !== "low" });
       model.scale.setScalar(1.45);
       group.add(model);
-      const mixer = new THREE.AnimationMixer(model);
-      const act = (name) => mixer.clipAction(THREE.AnimationClip.findByName(gltf.animations, name));
-      Object.assign(av, { model, mixer, actions: { idle: act("idle"), walk: act("walk"), yes: act("emote-yes") } });
+      Object.assign(av, { model, mixer, actions: { idle: action("idle"), walk: action("walk"), yes: action("emote-yes") } });
       av.actions.idle.play();
       av.current = "idle";
     });
@@ -469,6 +472,8 @@ export class World3D {
     this.camera.lookAt(this.camera.position.x, 0, this.camera.position.z - 6.1);
     this.sun.position.set(g.me.x - 5, 12, g.me.y + 6);
     this.sun.target.position.set(g.me.x, 0, g.me.y);
+    this.rim.position.set(g.me.x + 3, 5, g.me.y - 8);
+    this.rim.target.position.set(g.me.x, 0, g.me.y);
     // 서버에서 내 진행 상황을 받은 뒤부터는 상태 변화를 애니메이션으로 보여 준다.
     if (this.h.hasState()) this.ready = true;
   }

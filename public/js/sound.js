@@ -1,5 +1,8 @@
 // 배경 음악과 효과음을 Web Audio로 직접 만든다. 소리 파일이 없어 저작권·다운로드 걱정이 없다.
-// 브라우저는 사용자가 누르기 전에는 소리를 못 내므로, 입장 버튼을 누를 때 start()를 부른다.
+// 브라우저는 사용자가 누르기 전에는 소리를 못 내므로, 첫 화면의 TOUCH TO START를 누를 때 start()를 부른다.
+// 배경음·효과음 켜기/끄기는 settings.js(메뉴의 '설정')를 따른다.
+import { settings, updateSettings, onSettings } from "./settings.js";
+
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
 const BPM = 136;
@@ -15,17 +18,15 @@ const LEAD = [
 ];
 const MUSIC_VOL = 0.3, DUCK_VOL = 0.1, MASTER_VOL = 0.6;
 
-function remembered() {
-  try { return localStorage.getItem("vr-sound") === "off"; } catch { return false; }
-}
-
 class Sound {
   constructor() {
     this.ctx = null;
-    this.muted = remembered();
+    this.ducked = false;
     this.intensity = 0; // 0~3: 방이 바뀔수록 악기가 늘어난다
-    this.listeners = new Set();
+    onSettings(() => this.applyVolumes());
   }
+
+  get muted() { return !settings.music && !settings.sfx; }
 
   start() {
     if (this.ctx) { this.ctx.resume(); return; }
@@ -34,9 +35,10 @@ class Sound {
     const ctx = (this.ctx = new AC());
     const comp = ctx.createDynamicsCompressor();
     comp.connect(ctx.destination);
-    this.master = this.gain(this.muted ? 0 : MASTER_VOL, comp);
-    this.music = this.gain(MUSIC_VOL, this.master);
-    this.fx = this.gain(0.75, this.master);
+    this.master = this.gain(MASTER_VOL, comp);
+    this.music = this.gain(0, this.master);
+    this.fx = this.gain(0, this.master);
+    this.applyVolumes();
     const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -47,18 +49,17 @@ class Sound {
   }
 
   // ---------- 설정 ----------
-  setMuted(m) {
-    this.muted = m;
-    try { localStorage.setItem("vr-sound", m ? "off" : "on"); } catch {}
-    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : MASTER_VOL, this.ctx.currentTime, 0.05);
-    for (const f of this.listeners) f(m);
+  applyVolumes() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.music.gain.setTargetAtTime(settings.music ? (this.ducked ? DUCK_VOL : MUSIC_VOL) : 0, now, 0.1);
+    this.fx.gain.setTargetAtTime(settings.sfx ? 0.75 : 0, now, 0.05);
   }
-  toggle() { this.setMuted(!this.muted); }
-  onChange(f) { this.listeners.add(f); f(this.muted); }
+  // 🔊 버튼·M 키: 하나라도 켜져 있으면 모두 끄고, 모두 꺼져 있으면 모두 켠다.
+  toggle() { const on = this.muted; updateSettings({ music: on, sfx: on }); }
+  onChange(f) { onSettings(() => f(this.muted)); }
   setIntensity(level) { this.intensity = Math.max(0, Math.min(3, level)); }
-  setDuck(on) {
-    if (this.ctx) this.music.gain.setTargetAtTime(on ? DUCK_VOL : MUSIC_VOL, this.ctx.currentTime, 0.15);
-  }
+  setDuck(on) { this.ducked = on; this.applyVolumes(); }
 
   // ---------- 기본 부품 ----------
   gain(v, to) {
@@ -113,7 +114,7 @@ class Sound {
 
   // ---------- 배경 음악 ----------
   schedule() {
-    if (this.muted) { this.next = this.ctx.currentTime + 0.1; return; } // 꺼져 있으면 쉬었다가 다시 켤 때 이어서
+    if (!settings.music) { this.next = this.ctx.currentTime + 0.1; return; } // 꺼져 있으면 쉬었다가 다시 켤 때 이어서
     while (this.next < this.ctx.currentTime + 0.12) {
       this.playStep(this.step, this.next);
       this.next += STEP;
@@ -147,7 +148,7 @@ class Sound {
 
   // ---------- 효과음 ----------
   sfx(name) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || !settings.sfx) return;
     const t = this.ctx.currentTime + 0.01, out = this.fx;
     const notes = (list, gap, type, dur, peak) => list.forEach((n, k) => this.osc(type, midi(n), t + k * gap, dur, out, { peak }));
     switch (name) {

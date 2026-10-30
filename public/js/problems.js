@@ -1,7 +1,8 @@
 // 유물 퀴즈: 미래엔 기하 Ⅲ-1 '벡터의 연산' 중단원 마무리 문제를 바탕으로 숫자·조건을 바꾼 유사 문제.
 // 정답은 서버(src/answers.js)에만 있다. 여기에는 문제, 힌트, 확인 도구만 둔다.
 // 확인 도구는 관계를 보여 줄 뿐 정답 수치를 직접 보여 주지 않는다.
-// motion: true인 문제는 문장이 타자 소리와 함께 찍히고, 그림이 저절로 움직이는 모션 그래픽으로 시작한다.
+// 모든 문제는 문장이 타자 소리와 함께 찍히고, 그림이 저절로 움직이는 모션 그래픽으로 시작한다(ui.autoplay).
+// 학생이 그림이나 슬라이더를 만지면 자동 재생이 멈추고 직접 조작한다.
 import { Board, C, el, add, sub, mul, dist } from "./svg.js";
 import { fmt } from "./mathtext.js";
 
@@ -23,7 +24,7 @@ export const PROBLEMS = [
     tool: squareTool,
   },
   {
-    id: "p3", relic: "부채꼴 부채", icon: "🪭", level: "표준", source: "중단원 08번 유사", motion: true,
+    id: "p3", relic: "부채꼴 부채", icon: "🪭", level: "표준", source: "중단원 08번 유사",
     text: "반지름의 길이가 $6$이고 중심각의 크기가 $90^\\circ$인 부채꼴 OAB의 호 AB 위의 점 C에 대하여 $\\VV{OA}=\\vv{a}$, $\\VV{OB}=\\vv{b}$, $\\VV{OC}=m\\vv{a}+n\\vv{b}$라 하자. $\\angle\\mathrm{AOC}=30^\\circ$일 때, 두 실수 $m$, $n$에 대하여 $m^2-n^2$의 값을 구하시오.",
     answer: { kind: "expr", label: "m² − n² =" },
     toolHelp: "점 C를 호 위에서 움직이면 $\\VV{OC}$가 $m\\vv{a}$와 $n\\vv{b}$로 나뉘는 모습이 보여요.",
@@ -55,7 +56,7 @@ export const PROBLEMS = [
     tool: cuboidTool,
   },
   {
-    id: "p7", relic: "원형 거울", icon: "🪞", level: "발전", source: "중단원 15번 유사", motion: true,
+    id: "p7", relic: "원형 거울", icon: "🪞", level: "발전", source: "중단원 15번 유사",
     text: "원 $(x-2)^2+(y-2)^2=4$ 위를 움직이는 점 P에 대하여 $\\VV{OQ}=\\dfrac{\\VV{OP}}{|\\VV{OP}|}$를 만족시키는 점 Q가 나타내는 도형의 길이를 구하시오. (단, O는 원점)",
     answer: { kind: "expr", label: "길이 =" },
     toolHelp: "점 P를 끌거나 '한 바퀴 돌리기'를 누르면 Q가 지나간 자리가 남아요.",
@@ -132,6 +133,10 @@ function hexTool(ui) {
       render();
     },
   });
+  if (ui.autoplay) {
+    const path = [tail.slice(), V.A, V.F, V.O, V.E, tail.slice()];
+    autoplay(bd, (t) => { tail = tour(path, t, 0.9, 1.1); render(); });
+  }
   render();
 }
 
@@ -166,6 +171,10 @@ function squareTool(ui) {
       render();
     },
   });
+  if (ui.autoplay) {
+    const path = [tail.slice(), B];
+    autoplay(bd, (t) => { tail = tour(path, t, 1.4, 2.2); snapped = dist(tail, B) < 1e-9; render(); });
+  }
   render();
 }
 
@@ -241,7 +250,8 @@ function parallelTool(ui) {
     const qr = add(mul(-1 - m, a), mul(4, b));
     bd.arrow([0, 0], qr, { color: C.red, width: 4, label: "{q}−{r}", labelSide: 1 });
   };
-  slider(ui.ctrl, { min: -4, max: 4, step: 0.5, value: -2, label: "m" }, render);
+  const input = slider(ui.ctrl, { min: -4, max: 4, step: 0.5, value: -2, label: "m" }, render);
+  if (ui.autoplay) sweep(bd, input, (t) => 4 * Math.sin(t * 0.7));
   info(ui, "보라색 점선 위에 빨간 벡터가 놓이면 두 벡터는 평행해요. 계산으로도 확인해 보세요.");
   render(-2);
 }
@@ -272,7 +282,8 @@ function collinearTool(ui) {
     bd.arrow([0, 0], P, { color: C.sum, width: 2.5, opacity: 0.7 });
     bd.point(P, { color: C.sum, r: 6.5, label: "C", dx: 14, dy: -12 });
   };
-  slider(ui.ctrl, { min: 0, max: 3, step: 0.5, value: 0, label: "m" }, render);
+  const input = slider(ui.ctrl, { min: 0, max: 3, step: 0.5, value: 0, label: "m" }, render);
+  if (ui.autoplay) sweep(bd, input, (t) => 1.5 - 1.5 * Math.cos(t * 0.6));
   info(ui, "회색 점선은 직선 AB예요. C가 이 직선 위에 오는 m을 찾고, 계산으로 확인해 보세요.");
   render(0);
 }
@@ -340,6 +351,7 @@ function cuboidTool(ui) {
   });
   button(ui.ctrl, "처음 각도", () => { yaw = -0.55; pitch = 0.35; render(); });
   info(ui, "그림을 끌어서 돌려 보세요. 빨간 벡터가 [GC]예요.");
+  if (ui.autoplay) autoplay(bd, (t, dt) => { yaw += dt * 0.5; render(); }); // 천천히 돌며 입체를 보여 준다
   render();
 }
 
@@ -394,7 +406,7 @@ function circleTool(ui) {
   render();
 }
 
-// 모션 그래픽: 판을 만지기 전까지 그림이 저절로 움직인다. 창을 닫으면 멈춘다.
+// 모션 그래픽: 판을 만지기 전까지 그림이 저절로 움직인다. 창을 닫으면 멈춘다. 멈추는 함수를 돌려준다.
 function autoplay(bd, step, onStop) {
   let stopped = false, t = 0, last = performance.now();
   const stop = () => {
@@ -412,4 +424,24 @@ function autoplay(bd, step, onStop) {
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
+  return stop;
+}
+
+// 점들을 차례로 옮겨 다닌다: 한 구간을 move초 동안 가고 hold초 머문다. 머무는 동안은 그 점 자체를 돌려준다.
+function tour(points, t, move, hold) {
+  const seg = move + hold, n = points.length - 1;
+  const i = Math.floor(t / seg) % n, u = (t % seg) / move;
+  if (u >= 1) return points[i + 1].slice();
+  const e = u * u * (3 - 2 * u); // 부드럽게 출발·정지
+  return [points[i][0] + (points[i + 1][0] - points[i][0]) * e, points[i][1] + (points[i + 1][1] - points[i][1]) * e];
+}
+
+// 슬라이더 값을 저절로 바꾼다. 슬라이더나 판을 만지면 멈춘다.
+function sweep(bd, input, value) {
+  const step = Number(input.step);
+  const stop = autoplay(bd, (t) => {
+    const v = String(Math.round(value(t) / step) * step);
+    if (v !== input.value) { input.value = v; input.dispatchEvent(new Event("input")); }
+  });
+  for (const ev of ["pointerdown", "keydown"]) input.addEventListener(ev, stop, { once: true });
 }

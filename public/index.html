@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>벡터 유적 탈출</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap">
   <link rel="stylesheet" href="/css/style.css">
   <script>
     // 수식은 MathJax로 조판한다. \vv{a}: 벡터 a, \VV{AB}: 벡터 AB
@@ -19,19 +21,60 @@
   </script>
 </head>
 <body class="student">
-  <section id="join" class="join">
-    <div class="join-card">
-      <div class="logo"><span class="logo-icon">🏺</span><div><small>기하 · 벡터의 연산</small><h1>벡터 유적 탈출</h1></div></div>
-      <p class="lead">상자를 열고 벡터로 길을 만들어 잊힌 유적을 탈출하세요. 마지막 유물 제단은 반 친구들과 함께 깨워요!</p>
-      <form id="join-form" autocomplete="off">
-        <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
-        <div class="mode-buttons">
-          <button class="btn big mode-btn" type="submit" value="practice">🎯 혼자 연습하기<small>언제든 혼자 · 기록은 나만 봐요</small></button>
-          <button class="btn primary big mode-btn" type="submit" value="class">🏫 수업 참여하기<small>반 친구들과 함께 · 선생님이 시작해요</small></button>
-        </div>
-        <p id="join-error" class="error" role="alert"></p>
-      </form>
-      <button id="start-btn" class="link-btn" type="button">🔑 선생님: 수업 탐험 시작</button>
+  <section id="join" class="intro">
+    <canvas id="rain" class="rain" aria-hidden="true"></canvas>
+    <canvas id="stage" class="stage3d" aria-hidden="true"></canvas>
+
+    <!-- 타이틀: TOUCH TO START -->
+    <div id="splash" class="splash">
+      <div class="title-block">
+        <span class="title-tag">기하 방탈출</span>
+        <h1 class="game-title"><span class="t1">벡터</span><span class="t2">유적 탈출</span></h1>
+      </div>
+      <button id="touch" class="touch-btn" type="button">TOUCH TO START</button>
+      <p class="credit">기하 Ⅲ-1 · 벡터의 연산</p>
+    </div>
+
+    <!-- 메뉴: 카드 세 장 -->
+    <div id="menu" class="menu" hidden>
+      <h1 class="menu-title">벡터 유적 탈출</h1>
+      <div class="cards">
+        <button class="mcard practice" type="button" data-mode="practice">
+          <span class="art"><img id="art-practice" alt=""></span>
+          <span class="label"><b>연습 모드</b><small>혼자 언제든 · 기록은 나만 봐요</small></span>
+        </button>
+        <button class="mcard class" type="button" data-mode="class">
+          <span class="art"><img id="art-class" alt=""></span>
+          <span class="label"><b>수업 참가</b><small>선생님이 연 탐험에 반 친구들과 함께</small></span>
+        </button>
+        <button class="mcard settings" type="button" id="open-settings">
+          <span class="art gear" aria-hidden="true">⚙</span>
+          <span class="label"><b>설정</b><small>그래픽 · 배경음</small></span>
+        </button>
+      </div>
+      <p id="join-error" class="error menu-error" role="alert"></p>
+    </div>
+
+    <!-- 이름 적기 -->
+    <form id="join-form" class="sheet" autocomplete="off" hidden>
+      <h2 id="sheet-title"></h2>
+      <p id="sheet-lead" class="muted"></p>
+      <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
+      <div class="sheet-buttons">
+        <button id="sheet-back" class="btn" type="button">← 뒤로</button>
+        <button class="btn primary big" type="submit">탐험 시작</button>
+      </div>
+      <button id="start-btn" class="link-btn" type="button" hidden>🔑 선생님: 수업 탐험 시작</button>
+    </form>
+
+    <!-- 설정 -->
+    <div id="settings-sheet" class="sheet" hidden>
+      <h2>설정</h2>
+      <div class="setting-row"><span>🎵 배경음악</span><button class="toggle" type="button" data-key="music"></button></div>
+      <div class="setting-row"><span>🔔 효과음 · 타자 소리</span><button class="toggle" type="button" data-key="sfx"></button></div>
+      <div class="setting-row"><span>🖥️ 그래픽 품질</span><button class="toggle" type="button" data-key="quality"></button></div>
+      <p class="muted small">크롬북에서 화면이 끊기면 그래픽 품질을 '낮음'으로 바꿔 보세요.</p>
+      <div class="sheet-buttons"><button id="settings-close" class="btn primary" type="button">닫기</button></div>
     </div>
   </section>
 

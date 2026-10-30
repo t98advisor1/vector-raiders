@@ -6,6 +6,8 @@ import { renderClassBar } from "./classbar.js";
 import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, roomAt } from "./game.js";
 import { World3D } from "./world3d.js";
 import { sound } from "./sound.js";
+import { createIntro } from "./intro.js";
+import { settings, updateSettings, onSettings } from "./settings.js";
 
 const $ = (s, root = document) => root.querySelector(s);
 const STAGE_NAME = { lobby: "대기 중", play: "탐험 중", done: "탐험 끝" };
@@ -34,14 +36,77 @@ const altarLit = () => !!S.cls && PROBLEMS.every((p) => S.cls.relics[p.id]?.unlo
 // ---------- 입장 ----------
 watchMath();
 
+// 첫 화면: TOUCH TO START → 카드 메뉴(연습 모드 / 수업 참가 / 설정) → 이름 적기
+const intro = createIntro({ rain: $("#rain"), stage: $("#stage") });
+intro.play();
+intro.cardArt().then((art) => {
+  if (!art) return;
+  $("#art-practice").src = art.practice;
+  $("#art-class").src = art.class;
+});
+
+function showScreen(which) {
+  $("#splash").hidden = which !== "splash";
+  $("#menu").hidden = which === "splash";
+  $("#join-form").hidden = which !== "name";
+  $("#settings-sheet").hidden = which !== "settings";
+  intro.showRunners(which === "splash");
+}
+
+const touch = () => {
+  if ($("#splash").hidden) return;
+  sound.start(); // 첫 화면을 누른 지금이 소리를 켤 수 있는 때
+  sound.sfx("start");
+  showScreen("menu");
+};
+$("#touch").onclick = touch;
+window.addEventListener("keydown", (e) => { if (!$("#join").hidden && (e.key === "Enter" || e.key === " ")) touch(); });
+
+const SHEET = {
+  practice: ["🎯 연습 모드", "혼자 언제든 탐험해요. 기록은 나만 보고, 언제든 처음부터 다시 할 수 있어요."],
+  class: ["🏫 수업 참가", "반 친구들과 같은 유적에 들어가요. 선생님이 탐험을 시작하면 상자가 열려요."],
+};
+document.querySelectorAll(".mcard[data-mode]").forEach((b) => {
+  b.onclick = () => {
+    S.pendingMode = b.dataset.mode;
+    const [title, lead] = SHEET[S.pendingMode];
+    $("#sheet-title").textContent = title;
+    $("#sheet-lead").textContent = lead;
+    $("#start-btn").hidden = S.pendingMode !== "class";
+    sound.sfx("open");
+    showScreen("name");
+    $("#join-name").focus();
+  };
+});
+$("#sheet-back").onclick = () => showScreen("menu");
+$("#open-settings").onclick = () => { sound.sfx("open"); showScreen("settings"); };
+$("#settings-close").onclick = () => showScreen("menu");
+
+const SETTING_TEXT = { music: ["켜짐", "꺼짐"], sfx: ["켜짐", "꺼짐"], quality: ["높음", "낮음"] };
+document.querySelectorAll(".toggle[data-key]").forEach((b) => {
+  b.onclick = () => {
+    const k = b.dataset.key;
+    updateSettings({ [k]: k === "quality" ? (settings.quality === "high" ? "low" : "high") : !settings[k] });
+  };
+});
+onSettings(() => {
+  document.querySelectorAll(".toggle[data-key]").forEach((b) => {
+    const k = b.dataset.key;
+    const on = k === "quality" ? settings.quality === "high" : settings[k];
+    b.textContent = SETTING_TEXT[k][on ? 0 : 1];
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  });
+});
+
 const session = store("vr-session");
 $("#join-name").value = session?.name ?? "";
 $("#join-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = $("#join-name").value.trim();
   if (!name) return showJoinError("이름을 입력해 주세요.");
-  sound.start(); // 버튼을 누른 지금이 소리를 켤 수 있는 때
-  join(name, e.submitter?.value === "practice" ? "practice" : "class");
+  sound.start();
+  join(name, S.pendingMode === "practice" ? "practice" : "class");
 });
 // 새로고침 뒤 자동으로 다시 들어온 경우처럼 버튼을 누르지 않았을 때는 첫 조작에서 소리를 켠다.
 for (const ev of ["pointerdown", "keydown"]) window.addEventListener(ev, () => sound.start(), { once: true });
@@ -60,7 +125,7 @@ function join(name, mode) {
 
 // 연습 모드 '처음부터 다시' 뒤에는 새로고침하고 자동으로 다시 들어온다.
 const autojoin = (() => { try { const v = sessionStorage.getItem("vr-autojoin"); sessionStorage.removeItem("vr-autojoin"); return v; } catch { return null; } })();
-if (autojoin === "practice" && session?.name) join(session.name, "practice");
+if (autojoin === "practice" && session?.name) { showScreen("menu"); join(session.name, "practice"); }
 
 // 학생 화면의 '선생님: 수업 탐험 시작'. 시작 비밀번호가 맞으면 수업 유적의 탐험이 시작된다.
 function askStart() {
@@ -71,7 +136,7 @@ function askStart() {
   ws.onopen = () => ws.send(JSON.stringify({ type: "start", code: code.trim() }));
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
-    if (msg.type === "started") showJoinError("✅ 수업 탐험을 시작했어요! 학생들은 '수업 참여하기'로 들어오면 돼요.");
+    if (msg.type === "started") showJoinError("✅ 수업 탐험을 시작했어요! 학생들은 '수업 참가'로 들어오면 돼요.");
     else if (msg.type === "error") showJoinError(msg.message);
     ws.close();
   };
@@ -84,6 +149,8 @@ function onStatus(kind, code) {
     closeModal();
     $("#game").hidden = true;
     $("#join").hidden = false;
+    intro.play();
+    showScreen("menu");
     showJoinError(CLOSE_REASON[code] ?? "연결이 끊겼어요. 다시 입장해 주세요.");
   }
 }
@@ -92,6 +159,7 @@ function onMessage(msg) {
   if (msg.type === "joined") {
     store("vr-session", { name: msg.name });
     $("#join").hidden = true;
+    intro.pause(); // 첫 화면 연출을 멈춰 크롬북 자원을 게임에 돌린다
     $("#game").hidden = false;
     $("#me-chip").textContent = `👤 ${msg.name}`;
     $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : "🏫 수업 참여";
@@ -388,8 +456,8 @@ function openProblem(pid) {
   S.waiting = false;
   body.innerHTML = `
     <div class="p-head"><span class="p-icon">${obj.icon}</span>
-      <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}${p.motion ? ' <span class="motion-badge">🎬 모션 그래픽</span>' : ""}</h2><small>${p.level} · 교과서 ${p.source} · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각</small></div></div>
-    <p class="p-text">${p.motion ? "" : fmt(p.text)}</p>
+      <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}</h2><small>${p.level} · 교과서 ${p.source} · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각</small></div></div>
+    <p class="p-text"></p>
     <div class="tool">
       <div class="tool-help">🔍 ${fmt(p.toolHelp)}</div>
       <div class="board-wrap"></div>
@@ -399,8 +467,8 @@ function openProblem(pid) {
     <div class="answer"></div>
     <div class="feedback" role="status"></div>
     <div class="hint" hidden></div>`;
-  p.tool({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: !!p.motion });
-  if (p.motion) typeText($(".p-text", body), p.text);
+  p.tool({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: true });
+  typeText($(".p-text", body), p.text); // 모든 문제: 타자 소리와 함께 한 글자씩
   const mine = S.me?.probs[pid];
   if (mine?.solved) lockSolved(body);
   else {
@@ -409,7 +477,7 @@ function openProblem(pid) {
   }
 }
 
-// 모션 그래픽 문제: 문장을 타자 소리와 함께 한 글자씩 찍는다. 수식은 한 덩어리로 나타난다.
+// 문제 문장을 타자 소리와 함께 한 글자씩 찍는다. 수식은 한 덩어리로 나타난다.
 // 문장을 누르면 바로 끝까지 보여 준다.
 function typeText(el, src) {
   const tokens = String(src).match(/\$[^$]+\$|\[[A-Z]{1,3}\]|\{[a-z]\}|\^\d|[\s\S]/gu) ?? [];

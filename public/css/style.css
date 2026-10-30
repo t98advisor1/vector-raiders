@@ -53,20 +53,12 @@ kbd { font: inherit; font-weight: 700; background: #fff; color: var(--ink); bord
 .ghost-btn { font-weight: 500; }
 button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
-/* 입장 */
-.join { min-height: 100vh; display: grid; place-items: center; padding: 16px;
-  background: radial-gradient(circle at 20% 10%, #fde7b0 0, transparent 40%), radial-gradient(circle at 90% 90%, #c7eee6 0, transparent 45%), var(--bg); }
-.join-card { width: min(440px, 100%); background: var(--paper); border-radius: 24px; padding: 28px; box-shadow: var(--shadow); }
-.logo { display: flex; gap: 12px; align-items: center; }
-.logo-icon { font-size: 3rem; }
-.logo h1 { font-size: 1.7rem; letter-spacing: -0.02em; }
-.lead { color: var(--muted); margin: 12px 0 20px; }
+/* 입력칸 (이름 적기, 정답 입력) */
 form label { display: block; font-weight: 600; margin-bottom: 14px; }
 form input, .expr input {
   display: block; width: 100%; margin-top: 6px; font: inherit; font-size: 1.15rem;
   padding: 0.65rem 0.8rem; border: 1.5px solid var(--line); border-radius: 12px; background: #fff;
 }
-form .btn { width: 100%; }
 .error { color: var(--bad); min-height: 1.4em; margin: 10px 0 0; font-weight: 600; }
 
 /* 상단 */
@@ -227,17 +219,11 @@ mjx-container { font-size: 108% !important; }
   .help { display: none; }
 }
 
-/* 모션 그래픽 문제 */
-.motion-badge { font-size: 0.75rem; vertical-align: middle; background: #1f2937; color: #fde68a; border-radius: 999px; padding: 2px 8px; }
+/* 문제 문장 타자 효과 */
 .p-text.typing { cursor: pointer; min-height: 3.2em; }
 .p-text.typing::after { content: "▍"; color: var(--teal); animation: blink 0.8s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* 시작 화면: 연습 / 수업 참여 */
-.mode-buttons { display: grid; gap: 10px; }
-.mode-btn { display: grid; gap: 2px; text-align: center; }
-.mode-btn small { color: inherit; opacity: 0.8; font-size: 0.85rem; font-weight: 500; }
-.link-btn { display: block; margin: 14px auto 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; }
 .banner .btn { margin-left: 8px; padding: 4px 10px; font-size: 0.9rem; }
 .banner { pointer-events: auto; }
 
@@ -258,3 +244,44 @@ mjx-container { font-size: 108% !important; }
 .table tr.detail td { text-align: left; background: #fbf8f1; white-space: normal; }
 .table tr.detail ul { margin: 4px 0; padding-left: 18px; display: grid; gap: 2px; }
 .code-panel small { display: block; }
+
+/* ---------- 첫 화면: 타이틀 → 카드 메뉴 ---------- */
+.intro { position: fixed; inset: 0; background: #0b0a1a; overflow: hidden; color: #fff; }
+.rain, .stage3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage3d { pointer-events: none; }
+.splash { position: absolute; inset: 0; padding: clamp(16px, 5vw, 56px); display: flex; flex-direction: column; align-items: flex-start; pointer-events: none; }
+.title-tag { display: inline-block; background: #f59e0b; color: #2a1700; font-family: "Black Han Sans", "Malgun Gothic", sans-serif; padding: 2px 14px; border-radius: 999px; transform: rotate(-4deg); box-shadow: 0 4px 0 #b45309; font-size: clamp(16px, 2.4vw, 24px); }
+.game-title { font-family: "Black Han Sans", "Malgun Gothic", sans-serif; font-weight: 400; line-height: 0.98; margin: 8px 0 0; font-size: clamp(52px, 9.5vw, 120px); }
+.game-title span { display: block; color: #fff8e1; -webkit-text-stroke: 4px #1e1b4b; paint-order: stroke fill; text-shadow: 0 7px 0 #1e1b4b, 0 0 28px rgba(94, 234, 212, 0.55); }
+.game-title .t1 { color: #5eead4; }
+.touch-btn { pointer-events: auto; margin-top: clamp(16px, 3vh, 28px); font: 800 clamp(18px, 2.6vw, 26px)/1 Pretendard, "Malgun Gothic", sans-serif; letter-spacing: 0.06em; color: #2a1700; background: linear-gradient(#ffd166, #f59e0b); border: 0; border-radius: 999px; padding: 16px 34px; box-shadow: 0 6px 0 #b45309, 0 0 30px rgba(245, 158, 11, 0.6); cursor: pointer; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.05); box-shadow: 0 6px 0 #b45309, 0 0 46px rgba(245, 158, 11, 0.85); } }
+.credit { margin-top: auto; background: rgba(0, 0, 0, 0.5); padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; }
+
+.menu { position: absolute; inset: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(16px, 4vh, 40px); padding: 24px 16px; background: radial-gradient(ellipse at center, rgba(11, 10, 26, 0.2), rgba(11, 10, 26, 0.85)); }
+.menu-title { font-family: "Black Han Sans", "Malgun Gothic", sans-serif; font-weight: 400; font-size: clamp(40px, 7vw, 84px); color: #e0f7ff; text-shadow: 0 0 18px rgba(94, 234, 212, 0.8), 0 6px 0 #1e3a8a; }
+.cards { display: flex; gap: clamp(12px, 2.5vw, 28px); flex-wrap: wrap; justify-content: center; }
+.mcard { width: clamp(200px, 26vw, 290px); aspect-ratio: 3 / 4; border: 6px solid #2d2a40; border-radius: 28px; overflow: hidden; padding: 0; cursor: pointer; display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); background: #fff; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45); transition: transform 0.15s, box-shadow 0.15s; font: inherit; }
+.mcard:hover, .mcard:focus-visible { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55), 0 0 0 4px #5eead4; }
+.mcard .art { display: grid; place-items: center; overflow: hidden; clip-path: polygon(0 0, 100% 0, 100% 84%, 0 100%); min-height: 0; }
+.mcard.practice .art { background: linear-gradient(160deg, #2563eb, #22d3ee); }
+.mcard.class .art { background: linear-gradient(160deg, #f97316, #db2777); }
+.mcard.settings .art { background: linear-gradient(160deg, #7c3aed, #a855f7); }
+.mcard .art img { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
+.mcard .art img:not([src]) { visibility: hidden; }
+.mcard .gear { font-size: clamp(90px, 12vw, 150px); line-height: 1; color: #fff; text-shadow: 0 6px 0 rgba(0, 0, 0, 0.2); }
+.mcard .label { display: grid; gap: 4px; padding: 12px 10px 16px; text-align: center; color: #1e1b4b; background: repeating-conic-gradient(#eef0f7 0% 25%, #fff 0% 50%) 0 0 / 24px 24px; }
+.mcard .label b { font-family: "Black Han Sans", "Malgun Gothic", sans-serif; font-weight: 400; font-size: clamp(24px, 3vw, 34px); }
+.mcard .label small { color: #475569; }
+.menu-error { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.7); padding: 8px 16px; border-radius: 12px; color: #fde68a; min-height: 0; z-index: 10; max-width: calc(100% - 32px); }
+.menu-error:empty { display: none; }
+
+.sheet { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100% - 32px)); background: var(--paper); color: var(--ink); border-radius: 24px; padding: 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); z-index: 5; }
+.sheet h2 { font-family: "Black Han Sans", "Malgun Gothic", sans-serif; font-weight: 400; font-size: 1.9rem; }
+.sheet-buttons { display: flex; gap: 10px; margin-top: 8px; }
+.sheet-buttons .primary { flex: 1; }
+.link-btn { display: block; margin: 14px auto 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; }
+.setting-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); font-weight: 600; }
+.toggle { font: inherit; font-weight: 700; min-width: 76px; border-radius: 999px; border: 2px solid var(--line); background: #f1f5f9; color: var(--muted); padding: 6px 12px; cursor: pointer; }
+.toggle.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+.small { font-size: 0.85rem; }

@@ -92,7 +92,7 @@ function buildProblems() {
     card.className = "pcard";
     card.dataset.pid = p.id;
     card.innerHTML = `
-      <header><span class="p-icon">${p.icon}</span><div><b>${i + 1}. ${p.relic}</b><small>${p.level} · 교과서 ${p.source}${p.motion ? " · 🎬 모션" : ""}</small></div></header>
+      <header><span class="p-icon">${p.icon}</span><div><b>${i + 1}. ${p.relic}</b><small>${p.level} · 교과서 ${p.source}</small></div></header>
       <p class="ptext">${fmt(p.text)}</p>
       <p class="pans">정답: ${fmt(answers?.[p.id] ?? "–")}</p>
       <dl class="pstats"></dl>
