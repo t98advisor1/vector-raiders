@@ -5,10 +5,10 @@
 import { Board, C, el, add, sub, mul, dist } from "./svg.js";
 import { fmt } from "./mathtext.js";
 
-// 2022 개정 교육과정 기하 3단원 벡터 (3-2, 3-3은 문항 세트 준비 중)
+// 2022 개정 교육과정 기하 3단원 벡터 (3-3은 문항 세트 준비 중)
 export const UNITS = [
   { id: "3-1", name: "3-1. 벡터의 연산", desc: "벡터의 덧셈·뺄셈과 실수배, 위치벡터", short: "벡터의 연산", default: true },
-  { id: "3-2", name: "3-2. 벡터의 성분과 내적", desc: "평면벡터의 성분과 두 벡터의 내적, 각의 크기", short: "성분과 내적", soon: true },
+  { id: "3-2", name: "3-2. 벡터의 성분과 내적", desc: "평면벡터의 성분과 두 벡터의 내적, 각의 크기", short: "성분과 내적" },
   { id: "3-3", name: "3-3. 도형의 방정식", desc: "직선의 방정식과 원의 방정식, 평면운동", short: "도형의 방정식", soon: true },
 ];
 

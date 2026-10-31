@@ -11,6 +11,7 @@ const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
 const STAGE_TEXT = { lobby: "⏸ 대기", play: "▶ 탐험 중", done: "■ 탐험 끝" };
 let net = null, last = null, answers = null, isMaster = false;
 const joinedCh = new Set(); // 이 비밀번호로 들어간 채널 (중간관리자는 자기 채널만)
+const setByCh = {}; // 채널 → { set, answers } (채널마다 단원이 다를 수 있다)
 const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)
 const pwByCh = {}; // 채널 번호 → 로그인 비밀번호 (joined 뒤 기억해 두기)
 const dashByCh = {}; // 채널 번호 → 마지막 받은 대시보드 (통합 뷰용)
@@ -228,8 +229,11 @@ function onChannelMessage(ch, msg) {
       conns[ch]?.send({ type: "adminGet" });
     }
     if (!msg.master && msg.period) $(".admin-banner").dataset.period = `📅 ${ch}채널 사용 기간: ${msg.period}`;
-    if (msg.set) loadSet(msg.set); // 이 채널의 문항 세트 (교사에게는 정답·조건까지 온다)
-    answers = msg.answers ?? null;
+    // 채널마다 단원(문항 세트)이 다를 수 있어서 채널별로 기억해 두고, 보고 있는 채널의 세트를 쓴다
+    if (msg.set) setByCh[ch] = { set: msg.set, answers: msg.answers };
+    if (msg.sets) fillSetSelect(msg.sets);
+    if (msg.set && (ch === activeCh || !PROBLEMS.length)) { loadSet(msg.set); fillSetSelect(null, msg.set.id); }
+    if (ch === activeCh || !answers) answers = msg.answers ?? null;
     $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
     buildAnswerSheet(); // 문제·정답 일람표도 정답을 받은 뒤에 그린다
     $("#setup").hidden = true;
@@ -245,6 +249,16 @@ function onChannelMessage(ch, msg) {
     chatLog.push({ at: Date.now(), ch, name: msg.name, team: msg.team, text: msg.text });
     if (chatLog.length > 3000) chatLog.splice(0, chatLog.length - 3000);
     $("#chat-download").textContent = `💬 학생 채팅 기록 다운로드 (${chatLog.length})`;
+  } else if (msg.type === "set") {
+    // 단원을 바꾸거나 새 수업을 시작하면 서버가 새 세트를 보낸다
+    setByCh[ch] = { set: msg.set, answers: msg.answers };
+    if (ch === activeCh) {
+      loadSet(msg.set);
+      answers = msg.answers ?? answers;
+      $("#problems").replaceChildren();
+      buildAnswerSheet();
+      fillSetSelect(null, msg.set.id);
+    }
   } else if (msg.type === "admin") {
     renderAdmin(msg);
   } else if (msg.type === "adminResult") {
@@ -288,6 +302,13 @@ function switchChannel(ch) {
   activeCh = ch;
   try { sessionStorage.setItem("vr-teacher-ch", ch); } catch {}
   net = conns[ch] ?? null;
+  if (setByCh[ch]) {
+    loadSet(setByCh[ch].set);
+    answers = setByCh[ch].answers;
+    fillSetSelect(null, setByCh[ch].set.id);
+    $("#problems").replaceChildren();
+    buildAnswerSheet();
+  }
   buildChannelTabs();
   $("#join-url").textContent = `${location.origin}/?ch=${ch}`;
   last = dashByCh[ch] ?? null;
@@ -623,3 +644,30 @@ function renderAdmin(msg) {
     rows.appendChild(tr);
   }
 }
+
+// ---------- 이 채널의 단원(문항 세트) ----------
+const SET_NAME = { "geo-3-1": "3-1 벡터의 연산", "geo-3-2": "3-2 벡터의 성분과 내적", "geo-3-3": "3-3 도형의 방정식" };
+let setList = [];
+function fillSetSelect(list, current) {
+  if (list) setList = list;
+  const sel = $("#set-select");
+  if (!sel) return;
+  sel.replaceChildren(...setList.map((id) => {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = SET_NAME[id] ?? id;
+    o.selected = id === current;
+    return o;
+  }));
+  sel.dataset.current = current ?? sel.dataset.current ?? "";
+}
+$("#set-select")?.addEventListener("change", (e) => {
+  const id = e.target.value, cur = e.target.dataset.current;
+  if (id === cur) return;
+  const n = last?.students?.length ?? 0;
+  if (!confirm(`${activeCh}채널의 단원을 '${SET_NAME[id] ?? id}'(으)로 바꿀까요?\n학생 ${n}명의 기록이 지워지고 새 수업으로 시작해요. 먼저 CSV를 내려받아 두세요.`)) {
+    e.target.value = cur;
+    return;
+  }
+  net?.send({ type: "setSet", setId: id });
+});
