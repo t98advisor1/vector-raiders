@@ -402,13 +402,13 @@ export class World3D {
     // 유물 7개: 반 전체가 깨우면 금빛으로 바뀐다
     this.coinRing = new THREE.Group();
     this.coinRing.position.set(ALTAR.x + 0.5, 1.7, ALTAR.y + 0.5);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < OBJECTS.length; i++) {
       const coin = m.coin.scene.clone(true);
       const mats = [];
       coin.traverse((o) => {
         if (o.isMesh) { o.material = o.material.clone(); o.material.color.set(0x555566); mats.push(o.material); o.castShadow = true; }
       });
-      const a = (i / 7) * Math.PI * 2;
+      const a = (i / OBJECTS.length) * Math.PI * 2;
       coin.position.set(Math.cos(a) * 1.25, 0, Math.sin(a) * 1.25);
       coin.scale.setScalar(1.3);
       this.coinRing.add(coin);

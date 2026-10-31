@@ -1,223 +1,74 @@
-// 유물 퀴즈: 미래엔 기하 Ⅲ-1 '벡터의 연산' 교과서 예제, 중단원 마무리, 수능 4점 기출 연계 문제.
-// 정답은 서버(src/answers.js)에만 있다. 여기에는 문제, 힌트, 확인 도구만 둔다.
+// 유물 퀴즈: 문항은 서버가 문항 세트(content/sets/*.md)에서 읽어 보내 주고(loadSet), 정답은 서버에만 있다.
+// 여기에는 확인 도구(조작 그림)와, 받은 세트를 화면에서 쓰는 모양으로 바꾸는 일만 둔다.
 // 확인 도구는 관계를 보여 줄 뿐 정답 수치를 직접 보여 주지 않는다.
-// 모든 문제는 문장이 타자 소리와 함께 찍히고, 그림이 저절로 움직이는 모션 그래픽으로 시작한다(ui.autoplay).
-// 학생이 그림이나 슬라이더를 만지면 자동 재생이 멈추고 직접 조작한다.
+// 그림은 저절로 움직이는 모션으로 시작하고(ui.autoplay), 학생이 만지면 멈춘다.
 import { Board, C, el, add, sub, mul, dist } from "./svg.js";
 import { fmt } from "./mathtext.js";
 
-// 2022 개정 교육과정 기하 3단원 벡터 단원 체계 (3-1, 3-2, 3-3)
+// 2022 개정 교육과정 기하 3단원 벡터 (3-2, 3-3은 문항 세트 준비 중)
 export const UNITS = [
   { id: "3-1", name: "3-1. 벡터의 연산", desc: "벡터의 덧셈·뺄셈과 실수배, 위치벡터", short: "벡터의 연산", default: true },
-  { id: "3-2", name: "3-2. 벡터의 성분과 내적", desc: "평면벡터의 성분과 두 벡터의 내적, 각의 크기", short: "성분과 내적" },
-  { id: "3-3", name: "3-3. 도형의 방정식", desc: "직선의 방정식과 원의 방정식, 평면운동", short: "도형의 방정식" },
+  { id: "3-2", name: "3-2. 벡터의 성분과 내적", desc: "평면벡터의 성분과 두 벡터의 내적, 각의 크기", short: "성분과 내적", soon: true },
+  { id: "3-3", name: "3-3. 도형의 방정식", desc: "직선의 방정식과 원의 방정식, 평면운동", short: "도형의 방정식", soon: true },
 ];
 
-// 난이도 3가지: 초심자용(하, 70점) · 기본형(중, 100점) · 심화형(상, 150점, 수능형/2인 협동)
+// 난이도 3가지: 하(70점) · 중(100점) · 상(150점, 교과서 응용·합답형·제시형, 3·4번 방은 2인 협업)
 export const DIFFICULTY = [
-  { key: "low", name: "초심자용", points: 70, desc: "교과서 기초 예제 및 상등 탐색" },
-  { key: "mid", name: "기본형", points: 100, desc: "교과서 중단원 표준 완성" },
-  { key: "high", name: "심화 수능형", points: 150, desc: "수능 4점 기출 ㄱ·ㄴ·ㄷ 및 2인 협동 레이드" },
+  { key: "low", name: "하 · 기본", points: 70, desc: "교과서 예제·기본 문제" },
+  { key: "mid", name: "중 · 표준", points: 100, desc: "교과서 본문·단원 마무리 문제" },
+  { key: "high", name: "상 · 사고력", points: 150, desc: "교과서 응용·합답형·제시형 (3·4번 방은 2인 협업)" },
 ];
 
-export const PROBLEMS = [
-  {
-    id: "p1", relic: "육각 방패", icon: "🛡️", level: "기본", source: "중단원 01번 유사",
-    diffs: {
-      low: {
-        level: "초심자 교과서 예제", points: 70, source: "교과서 예제 1번",
-        text: "오른쪽 그림과 같은 정육각형 ABCDEF에서 세 대각선의 교점을 O라 하자. 벡터 [AB]와 크기와 방향이 모두 같은 벡터를 보기에서 모두 고르시오.",
-        answer: { kind: "multi", options: ["FO", "OC", "ED", "BC", "EF", "BO", "OD"] },
-        hint: "크기와 방향이 같으면 같은 벡터예요. [AB]를 평행이동했을 때 완전히 겹치는 벡터 3개를 골라보세요.",
-      },
-      mid: {
-        level: "중단원 표준", points: 100, source: "중단원 01번 유사",
-        text: "오른쪽 그림과 같은 정육각형 ABCDEF에서 세 대각선 AD, BE, CF의 교점을 O라 할 때, 벡터 [BC]와 같은 벡터를 보기에서 모두 고르시오.",
-        answer: { kind: "multi", options: ["AO", "CO", "DE", "FE", "OD", "EF", "BO"] },
-        hint: "같은 벡터는 크기와 방향이 같아요. [BC]를 평행이동했을 때 시점과 종점이 모두 꼭짓점(또는 O)에 놓이는 경우를 찾아보세요.",
-      },
-      high: {
-        level: "심화 수능 기출", points: 150, source: "수능 기하 4점 기출 합답형",
-        text: "정육각형 ABCDEF에서 세 대각선의 교점을 O라 하자. <보기>에서 옳은 것만을 있는 대로 고른 것은?\n\n[보기]\nㄱ. [AB] + [AF] = [AO]\nㄴ. [AC] + [AE] = 3[AO]\nㄷ. |[AB] + [BC] + [CD]| = |[AD]|",
-        answer: { kind: "choice", options: ["① ㄱ", "② ㄱ, ㄴ", "③ ㄱ, ㄷ", "④ ㄴ, ㄷ", "⑤ ㄱ, ㄴ, ㄷ"], valueKey: ["1", "2", "3", "4", "5"] },
-        hint: "ㄱ: 평행사변형법에 의해 [AB]+[AF]=[AO] (참). ㄴ: [AC]=[AO]+[AB], [AE]=[AO]+[AF]를 대입해 보세요. ㄷ: 연속 벡터의 합은 [AD]가 돼요.",
-      },
-    },
-    text: "오른쪽 그림과 같은 정육각형 ABCDEF에서 세 대각선 AD, BE, CF의 교점을 O라 할 때, 벡터 [BC]와 같은 벡터를 보기에서 모두 고르시오.",
-    answer: { kind: "multi", options: ["AO", "CO", "DE", "FE", "OD", "EF", "BO"] },
-    toolHelp: "빨간 점선 벡터의 시점(동그라미)을 끌어 꼭짓점이나 O에 놓아 보세요. [BC]를 평행이동한 벡터예요.",
-    hint: "같은 벡터는 크기와 방향이 같아요. [BC]를 평행이동했을 때 시점과 종점이 모두 꼭짓점(또는 O)에 놓이는 경우를 찾아보세요.",
-    tool: hexTool,
-  },
-  {
-    id: "p2", relic: "사각 나침반", icon: "🧭", level: "표준", source: "중단원 07번 유사",
-    diffs: {
-      low: {
-        level: "초심자 교과서 예제", points: 70, source: "교과서 예제 2번",
-        text: "한 변의 길이가 4인 정사각형 ABCD에서 변 AB의 중점을 M이라 할 때, 벡터 [MB]의 크기 |[MB]|를 구하시오.",
-        answer: { kind: "expr", label: "|MB| =" },
-        hint: "M은 변 AB의 중점이에요. 한 변의 길이가 4이므로 중점까지의 거리는 절반이에요.",
-      },
-      mid: {
-        level: "중단원 표준", points: 100, source: "중단원 07번 유사",
-        text: "오른쪽 정사각형 ABCD에서 변 AB의 중점을 M, 변 AD의 중점을 N이라 하자. $|\\VV{MN}-\\VV{MB}|=2\\sqrt{5}$일 때, 이 정사각형의 한 변의 길이를 구하시오.",
-        answer: { kind: "expr", label: "한 변의 길이 =" },
-        hint: "$\\VV{MN}-\\VV{MB}=\\VV{MN}+\\VV{BM}=\\VV{BM}+\\VV{MN}$이에요. 이어 붙이면 어떤 벡터가 되는지 보고, 한 변의 길이를 $a$로 놓고 그 크기를 구해 보세요.",
-      },
-      high: {
-        level: "심화 2인 협동 레이드", points: 150, source: "수능 기하 4점 변형 · 2인 협동", coop: true,
-        text: "🤝 [2인 팀 협동 레이드] 같은 팀원 2명이 함께 이 상자 주변에 모여야 도전할 수 있습니다!\n\n한 변의 길이가 4인 정사각형 ABCD에서 두 팀원의 위치벡터를 각각 [p₁], [p₂]라 하자. 두 팀원이 변 BC와 CD 위를 각각 움직일 때, |[p₁]+[p₂]|의 최댓값을 구하시오. (단, 시점은 점 A)",
-        answer: { kind: "expr", label: "최댓값 =" },
-        hint: "두 팀원이 점 C에서 만날 때 두 벡터의 합의 크기가 최대가 돼요. A를 원점으로 두면 [p₁]=(4, t), [p₂]=(s, 4)라서 [p₁]+[p₂]=(4+s, 4+t)예요. s=t=4일 때 (8, 8)이 되어 최댓값은 8√2예요.",
-      },
-    },
-    text: "오른쪽 정사각형 ABCD에서 변 AB의 중점을 M, 변 AD의 중점을 N이라 하자. $|\\VV{MN}-\\VV{MB}|=2\\sqrt{5}$일 때, 이 정사각형의 한 변의 길이를 구하시오.",
-    answer: { kind: "expr", label: "한 변의 길이 =" },
-    toolHelp: "주황 점선 벡터 $-\\VV{MB}$의 시점을 끌어 꼭짓점 B에 놓아 보세요.",
-    hint: "$\\VV{MN}-\\VV{MB}=\\VV{MN}+\\VV{BM}=\\VV{BM}+\\VV{MN}$이에요. 이어 붙이면 어떤 벡터가 되는지 보고, 한 변의 길이를 $a$로 놓고 그 크기를 구해 보세요.",
-    tool: squareTool,
-  },
-  {
-    id: "p3", relic: "부채꼴 부채", icon: "🪭", level: "표준", source: "중단원 08번 유사",
-    diffs: {
-      low: {
-        level: "초심자 교과서 예제", points: 70, source: "교과서 예제 3번",
-        text: "반지름의 길이가 6이고 중심각의 크기가 90°인 부채꼴 OAB에서 두 벡터 [OA]와 [OB]의 내적 [OA] · [OB]의 값을 구하시오.",
-        answer: { kind: "expr", label: "OA · OB =" },
-        hint: "두 벡터가 이루는 각이 90°(직각)이면 cos 90° = 0이므로 내적의 값은 얼마일까요?",
-      },
-      mid: {
-        level: "중단원 표준", points: 100, source: "중단원 08번 유사",
-        text: "반지름의 길이가 $6$이고 중심각의 크기가 $90^\\circ$인 부채꼴 OAB의 호 AB 위의 점 C에 대하여 $\\VV{OA}=\\vv{a}$, $\\VV{OB}=\\vv{b}$, $\\VV{OC}=m\\vv{a}+n\\vv{b}$라 하자. $\\angle\\mathrm{AOC}=30^\\circ$일 때, 두 실수 $m$, $n$에 대하여 $m^2-n^2$의 값을 구하시오.",
-        answer: { kind: "expr", label: "m² − n² =" },
-        hint: "C에서 OA, OB에 수선을 내리면 직각삼각형이 생겨요. $|m\\vv{a}|=6m$, $|n\\vv{b}|=6n$이 각각 $6\\cos 30^\\circ$, $6\\sin 30^\\circ$와 같아요.",
-      },
-      high: {
-        level: "심화 수능 기출", points: 150, source: "수능 기하 4점 기출 합답형",
-        text: "반지름의 길이가 6인 부채꼴 OAB (∠AOB=90°)의 호 위의 점 C에 대하여 <보기>에서 옳은 것만을 있는 대로 고른 것은?\n\n[보기]\nㄱ. [OA] · [OB] = 0\nㄴ. |[OC]|² = 36\nㄷ. [OC] · ([OA]+[OB])의 최댓값은 36√2이다.",
-        answer: { kind: "choice", options: ["① ㄱ", "② ㄱ, ㄴ", "③ ㄱ, ㄷ", "④ ㄴ, ㄷ", "⑤ ㄱ, ㄴ, ㄷ"], valueKey: ["1", "2", "3", "4", "5"] },
-        hint: "ㄱ: 직교하므로 0 (참). ㄴ: 반지름 6이므로 크기 제곱은 36 (참). ㄷ: [OA]+[OB] 방향과 일치할 때 내적이 최대가 돼요 (참).",
-      },
-    },
-    text: "반지름의 길이가 $6$이고 중심각의 크기가 $90^\\circ$인 부채꼴 OAB의 호 AB 위의 점 C에 대하여 $\\VV{OA}=\\vv{a}$, $\\VV{OB}=\\vv{b}$, $\\VV{OC}=m\\vv{a}+n\\vv{b}$라 하자. $\\angle\\mathrm{AOC}=30^\\circ$일 때, 두 실수 $m$, $n$에 대하여 $m^2-n^2$의 값을 구하시오.",
-    answer: { kind: "expr", label: "m² − n² =" },
-    toolHelp: "점 C를 호 위에서 움직이면 $\\VV{OC}$가 $m\\vv{a}$와 $n\\vv{b}$로 나뉘는 모습이 보여요.",
-    hint: "C에서 OA, OB에 수선을 내리면 직각삼각형이 생겨요. $|m\\vv{a}|=6m$, $|n\\vv{b}|=6n$이 각각 $6\\cos 30^\\circ$, $6\\sin 30^\\circ$와 같아요.",
-    tool: sectorTool,
-  },
-  {
-    id: "p4", relic: "평행 쌍검", icon: "⚔️", level: "표준", source: "중단원 10번 유사",
-    diffs: {
-      low: {
-        level: "초심자 교과서 예제", points: 70, source: "교과서 예제 4번",
-        text: "두 벡터 [a]=(2, 1), [b]=(4, m)이 서로 평행하도록 하는 실수 m의 값을 구하시오.",
-        answer: { kind: "expr", label: "m =" },
-        hint: "두 벡터가 평행하면 x성분과 y성분의 비가 서로 같아요. 2/4 = 1/m에서 m을 구해 보세요.",
-      },
-      mid: {
-        level: "중단원 표준", points: 100, source: "중단원 10번 유사",
-        text: "영벡터가 아니고 서로 평행하지 않은 두 벡터 $\\vv{a}$, $\\vv{b}$에 대하여 $\\vv{p}=2\\vv{a}-3\\vv{b}$, $\\vv{q}=-\\vv{a}+\\vv{b}$, $\\vv{r}=m\\vv{a}-3\\vv{b}$일 때, 두 벡터 $\\vv{p}+\\vv{q}$와 $\\vv{q}-\\vv{r}$가 서로 평행하도록 하는 실수 $m$의 값을 구하시오.",
-        answer: { kind: "expr", label: "m =" },
-        hint: "$\\vv{p}+\\vv{q}$와 $\\vv{q}-\\vv{r}$를 각각 $\\vv{a}$, $\\vv{b}$로 정리한 뒤, $\\vv{q}-\\vv{r}=k(\\vv{p}+\\vv{q})$로 놓고 $\\vv{a}$, $\\vv{b}$의 계수를 비교해 보세요.",
-      },
-      high: {
-        level: "심화 2인 협동 레이드", points: 150, source: "수능 기하 4점 변형 · 2인 협동", coop: true,
-        text: "🤝 [2인 팀 협동 레이드] 같은 팀원 2명이 함께 모여 힘을 합쳐야 풀 수 있습니다!\n\n평면 위의 두 벡터 [a], [b]에 대하여 두 팀원이 조작하는 벡터 [v₁]=3[a]+2[b], [v₂]=m[a]-4[b]가 서로 평행하고 반대 방향을 가리키도록 하는 실수 m의 값을 구하시오.",
-        answer: { kind: "expr", label: "m =" },
-        hint: "두 벡터가 평행하면 3/m = 2/(-4)가 성립해요. 반대 방향이므로 m은 음수예요.",
-      },
-    },
-    text: "영벡터가 아니고 서로 평행하지 않은 두 벡터 $\\vv{a}$, $\\vv{b}$에 대하여 $\\vv{p}=2\\vv{a}-3\\vv{b}$, $\\vv{q}=-\\vv{a}+\\vv{b}$, $\\vv{r}=m\\vv{a}-3\\vv{b}$일 때, 두 벡터 $\\vv{p}+\\vv{q}$와 $\\vv{q}-\\vv{r}$가 서로 평행하도록 하는 실수 $m$의 값을 구하시오.",
-    answer: { kind: "expr", label: "m =" },
-    toolHelp: "슬라이더로 $m$을 바꾸면 $\\vv{q}-\\vv{r}$가 움직여요. 보라색 점선은 $\\vv{p}+\\vv{q}$의 방향이에요.",
-    hint: "$\\vv{p}+\\vv{q}$와 $\\vv{q}-\\vv{r}$를 각각 $\\vv{a}$, $\\vv{b}$로 정리한 뒤, $\\vv{q}-\\vv{r}=k(\\vv{p}+\\vv{q})$로 놓고 $\\vv{a}$, $\\vv{b}$의 계수를 비교해 보세요.",
-    tool: parallelTool,
-  },
-  {
-    id: "p5", relic: "일직선 창", icon: "🔱", level: "표준", source: "중단원 11번 유사",
-    diffs: {
-      low: {
-        level: "초심자 교과서 예제", points: 70, source: "교과서 예제 5번",
-        text: "서로 다른 세 점 O, A, B에 대하여 [OC] = m[OA] + (1-m)[OB]일 때, 실수 m=3이면 세 점 A, B, C는 한 직선 위에 있다. (옳으면 1, 틀리면 0을 입력)",
-        answer: { kind: "expr", label: "정답 =" },
-        hint: "[OA]와 [OB]의 계수의 합이 m + (1-m) = 1이므로 점 C는 항상 직선 AB 위에 있어요.",
-      },
-      mid: {
-        level: "중단원 표준", points: 100, source: "중단원 11번 유사",
-        text: "평면 위의 서로 다른 네 점 O, A, B, C에 대하여 $\\VV{OA}=\\vv{a}$, $\\VV{OB}=\\vv{b}$, $\\VV{OC}=2m\\vv{a}+(m-5)\\vv{b}$일 때, 세 점 A, B, C가 한 직선 위에 있도록 하는 실수 $m$의 값을 구하시오. (단, $\\vv{a}$와 $\\vv{b}$는 영벡터가 아니고 서로 평행하지 않다.)",
-        answer: { kind: "expr", label: "m =" },
-        hint: "$\\VV{AC}=t\\VV{AB}$인 실수 $t$가 있어야 해요. 그러면 $\\VV{OC}=(1-t)\\vv{a}+t\\vv{b}$이므로 $\\vv{a}$, $\\vv{b}$의 계수의 합은 얼마일까요?",
-      },
-      high: {
-        level: "심화 수능 기출", points: 150, source: "수능 기하 4점 기출 합답형",
-        text: "평면 위의 서로 다른 네 점 O, A, B, C에 대하여 <보기>에서 옳은 것만을 있는 대로 고른 것은?\n\n[보기]\nㄱ. [OC] = 1/3[OA] + 2/3[OB]이면 점 C는 선분 AB를 2:1로 내분한다.\nㄴ. 세 점 O, A, B가 한 직선 위에 있지 않을 때, 세 점 A, B, C가 한 직선 위에 있을 필요충분조건은 [OC]=s[OA]+t[OB]에서 s+t=1이다.\nㄷ. [OC]=2[OA]-[OB]이면 점 A는 선분 BC의 중점이다.",
-        answer: { kind: "choice", options: ["① ㄱ", "② ㄱ, ㄴ", "③ ㄱ, ㄷ", "④ ㄴ, ㄷ", "⑤ ㄱ, ㄴ, ㄷ"], valueKey: ["1", "2", "3", "4", "5"] },
-        hint: "ㄱ: 내분점 공식 m/(m+n)을 확인하세요. ㄴ: 계수 합=1 조건은 일직선 필요충분조건이에요. ㄷ: [OA]=([OB]+[OC])/2가 되므로 A는 중점이에요.",
-      },
-    },
-    text: "평면 위의 서로 다른 네 점 O, A, B, C에 대하여 $\\VV{OA}=\\vv{a}$, $\\VV{OB}=\\vv{b}$, $\\VV{OC}=2m\\vv{a}+(m-5)\\vv{b}$일 때, 세 점 A, B, C가 한 직선 위에 있도록 하는 실수 $m$의 값을 구하시오. (단, $\\vv{a}$와 $\\vv{b}$는 영벡터가 아니고 서로 평행하지 않다.)",
-    answer: { kind: "expr", label: "m =" },
-    toolHelp: "슬라이더로 $m$을 바꾸면 점 C가 움직이고, 지나간 자리가 점으로 남아요.",
-    hint: "$\\VV{AC}=t\\VV{AB}$인 실수 $t$가 있어야 해요. 그러면 $\\VV{OC}=(1-t)\\vv{a}+t\\vv{b}$이므로 $\\vv{a}$, $\\vv{b}$의 계수의 합은 얼마일까요?",
-    tool: collinearTool,
-  },
-  {
-    id: "p6", relic: "정육면체 상자", icon: "📦", level: "발전", source: "중단원 13번 유사",
-    diffs: {
-      low: {
-        level: "초심자 교과서 예제", points: 70, source: "교과서 예제 6번",
-        text: "한 모서리의 길이가 2인 정육면체 ABCD-EFGH에서 벡터 [AE]의 크기 |[AE]|를 구하시오.",
-        answer: { kind: "expr", label: "|AE| =" },
-        hint: "정육면체의 모서리의 길이는 모두 같아요. 한 모서리의 길이가 2예요.",
-      },
-      mid: {
-        level: "중단원 표준", points: 100, source: "중단원 13번 유사",
-        text: "다음 그림과 같은 직육면체 ABCD-EFGH에서 $\\VV{AG}+\\VV{BH}+\\VV{CE}+\\VV{DF}=m\\VV{GC}$를 만족시키는 실수 $m$의 값을 구하시오.",
-        answer: { kind: "expr", label: "m =" },
-        hint: "네 벡터를 가로, 세로, 높이 방향으로 나누어 보세요. 가로·세로 방향은 서로 지워지고 높이 방향만 남아요. [GC]의 방향(위? 아래?)에 주의하세요.",
-      },
-      high: {
-        level: "심화 수능 기출", points: 150, source: "수능 기하 4점 기출 공간도형",
-        text: "한 모서리의 길이가 2인 정육면체 ABCD-EFGH에서 대각선 벡터 [AG]와 면 대각선 벡터 [AC]의 내적 [AG] · [AC]의 값을 구하시오.",
-        answer: { kind: "expr", label: "내적 =" },
-        hint: "[AG]=[AC]+[CG]이고 [CG]는 밑면과 수직이므로 [AC] · [CG] = 0이에요. 따라서 [AG] · [AC] = |[AC]|² = 2² + 2² = 8이에요.",
-      },
-    },
-    text: "다음 그림과 같은 직육면체 ABCD-EFGH에서 $\\VV{AG}+\\VV{BH}+\\VV{CE}+\\VV{DF}=m\\VV{GC}$를 만족시키는 실수 $m$의 값을 구하시오.",
-    answer: { kind: "expr", label: "m =" },
-    toolHelp: "그림을 끌면 돌아가요. '이어 붙이기'를 누르면 네 벡터를 화살촉에 시점을 이어 차례로 연결해요.",
-    hint: "네 벡터를 가로, 세로, 높이 방향으로 나누어 보세요. 가로·세로 방향은 서로 지워지고 높이 방향만 남아요. [GC]의 방향(위? 아래?)에 주의하세요.",
-    tool: cuboidTool,
-  },
-  {
-    id: "p7", relic: "원형 거울", icon: "🪞", level: "발전", source: "중단원 15번 유사",
-    diffs: {
-      low: {
-        level: "초심자 교과서 예제", points: 70, source: "교과서 예제 7번",
-        text: "원 (x-1)² + (y-2)² = 9 위의 점 P에 대하여, 중심 C(1, 2)에서 점 P까지의 거리(원의 반지름)를 구하시오.",
-        answer: { kind: "expr", label: "반지름 r =" },
-        hint: "원의 방정식 (x-a)² + (y-b)² = r²에서 r² = 9이므로 반지름 r은 얼마일까요?",
-      },
-      mid: {
-        level: "중단원 표준", points: 100, source: "중단원 15번 유사",
-        text: "원 $(x-2)^2+(y-2)^2=4$ 위를 움직이는 점 P에 대하여 $\\VV{OQ}=\\dfrac{\\VV{OP}}{|\\VV{OP}|}$를 만족시키는 점 Q가 나타내는 도형의 길이를 구하시오. (단, O는 원점)",
-        answer: { kind: "expr", label: "길이 =" },
-        hint: "Q는 원점에서 P 쪽으로 거리 1인 점이에요. 원점에서 원에 그은 두 접선 사이의 각을 구하면 Q가 움직이는 호의 중심각이 돼요.",
-      },
-      high: {
-        level: "심화 수능 기출", points: 150, source: "수능 기하 4점 기출 자취",
-        text: "원 (x-3)² + (y-4)² = 4 위를 움직이는 점 P와 원점 O에 대하여 벡터 [OP]의 크기의 최댓값 M과 최솟값 m의 곱 M × m의 값을 구하시오.",
-        answer: { kind: "expr", label: "M × m =" },
-        hint: "원점 O에서 원의 중심 C(3, 4)까지 거리는 d = √(3²+4²) = 5, 반지름은 r = 2예요. M = d+r = 7, m = d-r = 3이므로 곱을 구하세요.",
-      },
-    },
-    text: "원 $(x-2)^2+(y-2)^2=4$ 위를 움직이는 점 P에 대하여 $\\VV{OQ}=\\dfrac{\\VV{OP}}{|\\VV{OP}|}$를 만족시키는 점 Q가 나타내는 도형의 길이를 구하시오. (단, O는 원점)",
-    answer: { kind: "expr", label: "길이 =" },
-    toolHelp: "점 P를 끌거나 '한 바퀴 돌리기'를 누르면 Q가 지나간 자리가 남아요.",
-    hint: "Q는 원점에서 P 쪽으로 거리 1인 점이에요. 원점에서 원에 그은 두 접선 사이의 각을 구하면 Q가 움직이는 호의 중심각이 돼요.",
-    tool: circleTool,
-  },
-];
+// 상자별 유물 아이콘 (상자 N번)
+const RELIC_ICONS = ["🛡️", "🧭", "🪭", "⚔️", "🔱", "📦", "🪞", "🏺", "👑"];
+const LEVEL_NAME = { low: "하 · 기본", mid: "중 · 표준", high: "상 · 사고력" };
+
+// 내장 확인 도구: 문항 파일의 '그림:' 이름 → 도구 함수와 안내
+export const TOOLS = {
+  hex: { fn: (ui) => hexTool(ui), help: "빨간 점선 벡터의 시점(동그라미)을 끌어 꼭짓점이나 O에 놓아 보세요. 평행이동한 벡터예요." },
+  square: { fn: (ui) => squareTool(ui), help: "주황 점선 벡터 $-\\VV{MB}$의 시점을 끌어 꼭짓점 B에 놓아 보세요." },
+  sector: { fn: (ui) => sectorTool(ui), help: "조절기로 점 C를 움직이면 $\\VV{OC}$가 $m\\vv{a}$와 $n\\vv{b}$로 나뉘는 모습이 보여요." },
+  parallel: { fn: (ui) => parallelTool(ui), help: "조절기로 m을 바꾸며 두 벡터가 평행해지는 순간을 찾아보세요." },
+  collinear: { fn: (ui) => collinearTool(ui), help: "조절기로 m을 바꾸면 점 C가 움직여요. 계수의 합이 1이면 C가 직선 AB 위에 와요." },
+  cuboid: { fn: (ui) => cuboidTool(ui), help: "그림을 좌우로 끌면 돌아가요. '이어 붙이기'로 벡터를 차례로 연결해 보세요." },
+  circle: { fn: (ui) => circleTool(ui), help: "점 P를 끌거나 '한 바퀴 돌리기'를 누르면 Q가 지나간 자리가 남아요." },
+};
+
+// 서버가 보낸 세트 → 화면에서 쓰는 문제 목록. 다른 파일이 PROBLEMS를 그대로 쓰도록 배열 안을 바꾼다.
+export const PROBLEMS = [];
+export let SET = null; // { id, meta, cards, boxes }
+export function loadSet(set) {
+  SET = set;
+  const KIND = { num: "expr", vec: "expr", choice: "choice", set: "multi" };
+  PROBLEMS.length = 0;
+  for (const b of set.boxes) {
+    const tool = TOOLS[b.tool];
+    const diffs = {};
+    for (const k of ["low", "mid", "high"]) {
+      const lv = b.levels[k];
+      diffs[k] = {
+        level: LEVEL_NAME[k] + (lv.coop ? " · 🤝 협업" : ""), points: lv.points, source: set.meta?.제목 ?? "",
+        text: lv.text, hint: lv.hint, coop: !!lv.coop, conditions: lv.conditions ?? null, conditionLabels: lv.conditionLabels ?? [],
+        answer: { kind: KIND[lv.kind] ?? "expr", vec: lv.kind === "vec", options: lv.options, label: lv.kind === "vec" ? "벡터식 =" : "정답 =" },
+        answerText: lv.answerText ?? "",
+      };
+    }
+    PROBLEMS.push({
+      id: `p${b.no}`, no: b.no, relic: b.title, icon: RELIC_ICONS[b.no - 1] ?? "🗝️", room: b.room, coop: b.coop, concept: b.concept,
+      level: diffs.mid.level, source: diffs.mid.source, text: diffs.mid.text, answer: diffs.mid.answer, hint: diffs.mid.hint,
+      diffs, tool: tool?.fn ?? (() => {}), toolHelp: tool?.help ?? "", hasTool: !!tool, image: /^https?:\/\//.test(b.tool ?? "") ? b.tool : "",
+    });
+  }
+}
+
+// 조작 그림을 인쇄용 SVG 글자로 (자동 재생 없이 한 장면)
+export function figureHtml(p) {
+  if (!p.hasTool) return p.image ? `<img src="${p.image}" alt="" style="max-width:160px">` : "";
+  const box = document.createElement("div");
+  const dummy = document.createElement("div");
+  try { p.tool({ board: box, info: dummy, ctrl: dummy, autoplay: false }); } catch { return ""; }
+  return box.innerHTML;
+}
 
 // 끄는 동안 같은 문장을 매번 다시 조판하지 않도록, 바뀔 때만 고친다.
 function info(ui, text) {

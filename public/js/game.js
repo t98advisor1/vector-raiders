@@ -14,7 +14,7 @@ export const roomAt = (x) => {
   return i < 0 ? ROOMS.length - 1 : i;
 };
 
-// 문 번호 → 열쇠 조각(문제), 문이 있는 세로줄
+// 문 번호 → 열쇠 조각(문제), 문이 있는 세로줄. 상자 8·9번은 마지막 방(유물 제단)에 있다.
 export const DOORS = { 1: ["p1", "p2", "p3"], 2: ["p4", "p5"], 3: ["p6", "p7"] };
 export const DOOR_COLS = { 1: 19, 2: 39, 3: 59 };
 export const DOOR_ROWS = [6, 7, 8];
@@ -36,6 +36,9 @@ export const OBJECTS = [
   { pid: "p5", x: 35, y: 3, model: "chest", icon: "📦", name: "상자" },
   { pid: "p6", x: 48, y: 3, model: "pot", icon: "⚱️", name: "항아리" },
   { pid: "p7", x: 43, y: 11, model: "chest", icon: "💰", name: "보물상자" },
+  // 유물 제단 방: 3·4번 방은 2인 협업 상자(상 난이도)
+  { pid: "p8", x: 62, y: 5, model: "barrel", icon: "🛢️", name: "나무통" },
+  { pid: "p9", x: 71, y: 4, model: "chest", icon: "👑", name: "왕의 상자" },
 ];
 export const ALTAR = { x: 68, y: 7 };
 export const SPAWN = [2.5, 7.5];

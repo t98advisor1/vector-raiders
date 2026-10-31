@@ -14,3 +14,9 @@ class_name = "Room"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+# 문항 세트(content/sets/*.md)를 글자 그대로 서버 코드에 넣는다 (정답이 학생 화면 파일로 나가지 않게)
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true

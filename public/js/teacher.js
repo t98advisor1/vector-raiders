@@ -1,10 +1,9 @@
 import { connect } from "./net.js";
 import { fmt, watchMath } from "./mathtext.js";
-import { PROBLEMS } from "./problems.js";
+import { PROBLEMS, loadSet, figureHtml, SET } from "./problems.js";
 import { LAB_LEVELS } from "./lab.js";
 import { renderClassBar } from "./classbar.js";
 import { ROOMS, BRIDGES, roomAt } from "./game.js";
-import { DIAGRAMS } from "./diagrams.js";
 
 const $ = (s) => document.querySelector(s);
 // 수업 채널 1~7: 채널마다 완전히 분리된 수업 유적(Durable Object class:1~7)이다.
@@ -77,28 +76,84 @@ $("#invite-copy").onclick = async () => {
 };
 
 // 교사용 문제·정답·해설 PDF: 인쇄 창에 'PDF로 저장'하면 파일로 내려받는다.
-$("#print-sheet-btn").onclick = () => {
-  if (!answers) return alert("먼저 접속한 뒤에 출력할 수 있어요. 비밀번호를 입력하고 들어가 주세요.");
-  printSheet();
+// ---------- 교사용 출력 (미리 보고 PDF로 저장) ----------
+// 📄 해설집(하·중·상 전체) · 📝 형성평가 문제지 · ✅ 답지 · 📚 핵심 카드. 난이도는 출력 창에서 고른다.
+const LV = { low: "하", mid: "중", high: "상" };
+$("#print-sheet-btn").onclick = () => openPrintMenu();
+
+function openPrintMenu() {
+  if (!answers || !PROBLEMS.length) return alert("먼저 접속한 뒤에 출력할 수 있어요. 비밀번호를 입력하고 들어가 주세요.");
+  const box = $("#print-menu");
+  box.hidden = !box.hidden;
+}
+for (const b of document.querySelectorAll("[data-print]")) b.onclick = () => {
+  const kind = b.dataset.print, level = $("#print-level").value;
+  if (kind === "guide") printSheet();
+  else if (kind === "cards") printCards();
+  else printAssessmentTeacher(kind, level);
 };
 
+function printLevels(level) { return level === "all" ? ["low", "mid", "high"] : [level]; }
+
+// 형성평가 문제지(sheet)·답지(answer): 학생이 받는 것과 같은 모양을 난이도별로 미리 본다
+function printAssessmentTeacher(kind, level) {
+  const isAnswer = kind === "answer";
+  const items = PROBLEMS.flatMap((p, i) => printLevels(level).map((d) => {
+    const v = p.diffs[d];
+    const opts = v.answer.options ?? [];
+    const optHtml = v.answer.kind === "choice" ? `<p class="fa-opts">${opts.map((o) => fmt(o)).join("&emsp;")}</p>`
+      : v.answer.kind === "multi" ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${fmt(`[${o}]`)}`).join("&emsp;")}</p>` : "";
+    const conds = (v.conditions ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("");
+    const head = `<h3>${i + 1}${level === "all" ? `-${LV[d]}` : ""}. ${p.icon} ${p.relic} <small>${v.level} · ${v.points}점</small></h3>`;
+    if (!isAnswer) {
+      const fig = figureHtml(p);
+      return `<section class="fa-item">${head}<div class="fa-body"><div class="fa-q"><p class="pr-text">${fmt(v.text)}</p>${conds}${optHtml}</div>${fig ? `<div class="fa-fig">${fig}</div>` : ""}</div><p class="fa-blank"><b>답</b> <span></span></p></section>`;
+    }
+    return `<section class="fa-item">${head}<p class="pr-answer"><b>정답</b> ${fmt(answers[p.id]?.[d] ?? "")}</p><p class="pr-hint"><b>풀이</b> ${fmt(v.hint ?? "")}</p></section>`;
+  })).join("");
+  showPrint(`
+    <header class="pr-head fa-head">
+      <h1>${fmt(SET?.meta?.제목 ?? "벡터 유적 탈출")} · 형성평가 ${isAnswer ? '<span class="fa-tag ans">답지</span>' : '<span class="fa-tag">문제지</span>'} <small>${level === "all" ? "하·중·상 전체" : `${LV[level]} 난이도`}</small></h1>
+      <p>${new Date().toLocaleDateString("ko-KR")} · ${activeCh}채널</p>
+      ${isAnswer ? "" : '<p class="fa-name">이름: ____________ &emsp; 점수: ________</p>'}
+    </header>${items}`);
+}
+
+// 핵심 카드 모음: 수업 전에 나눠 주거나 칠판에 붙일 수 있게
+function printCards() {
+  const cards = SET?.cards ?? [];
+  showPrint(`
+    <header class="pr-head fa-head"><h1>${fmt(SET?.meta?.제목 ?? "")} · 핵심 카드 ${cards.length}장</h1><p>게임 속 개념 비석과 같은 내용이에요.</p></header>
+    <div class="card-grid">${cards.map((c) => `
+      <section class="print-card"><h3>📚 ${c.tablet}. ${fmt(c.title)}</h3><p class="pc-sum">${fmt(c.summary)}</p><ul>${c.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul></section>`).join("")}</div>`);
+}
+
+function showPrint(html) {
+  const sheet = $("#teacher-print-sheet");
+  sheet.innerHTML = html;
+  sheet.hidden = false;
+  setTimeout(() => { window.print(); setTimeout(() => { sheet.hidden = true; }, 300); }, 800);
+}
+
+// 📄 교사용 해설집: 상자마다 하·중·상 문항, 정답, 풀이, 협업 조건, 오답 분석
 function printSheet() {
   const rows = PROBLEMS.map((p, i) => {
     const s = last?.stats?.[p.id];
     const wrong = s?.topWrong?.length ? s.topWrong.map(([w, n]) => `${w} (${n}명)`).join(", ") : "아직 응답 없음";
-    const diagram = DIAGRAMS[p.id] ? `<div class="tp-diagram">${DIAGRAMS[p.id]}</div>` : "";
+    const fig = figureHtml(p);
+    const levels = ["low", "mid", "high"].map((d) => {
+      const v = p.diffs[d];
+      const conds = (v.conditions ?? []).map((c) => `<br><b>조건 ${c.label}</b> ${fmt(c.text)}`).join("");
+      return `<p class="tp-text"><b>[${LV[d]} · ${v.points}점${v.coop ? " · 🤝 협업" : ""}]</b> ${fmt(v.text)}${conds}</p>
+        <div class="tp-ans-block"><span class="tp-answer"><b>정답:</b> ${fmt(answers[p.id]?.[d] ?? "–")}</span></div>
+        <p class="tp-solution"><b>풀이</b> ${fmt(v.hint)}</p>`;
+    }).join("");
     return `
       <section class="tp-item">
-        <div class="tp-item-header">
-          <h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.level} · 교과서 ${p.source}</small></h3>
-        </div>
+        <div class="tp-item-header"><h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.room}번 방${p.coop ? " · 상 난이도 2인 협업" : ""} · 개념: ${p.concept}</small></h3></div>
         <div class="tp-item-body">
-          <p class="tp-text"><b>[문제]</b> ${fmt(p.text)}</p>
-          ${diagram}
-          <div class="tp-ans-block">
-            <span class="tp-answer"><b>정답:</b> ${fmt(answers[p.id] ?? "–")}</span>
-          </div>
-          <p class="tp-solution"><b>[상세 풀이]</b> ${fmt(p.hint)}</p>
+          ${fig ? `<div class="tp-diagram">${fig}</div>` : ""}
+          ${levels}
           <p class="tp-wrong"><b>[수업 팁·오답 분석]</b> ${wrong}</p>
         </div>
       </section>`;
@@ -113,8 +168,8 @@ function printSheet() {
   sheet.innerHTML = `
     <header class="tp-head">
       <div class="tp-head-left">
-        <h1>2026학년도 기하 Ⅲ-1 벡터의 연산 교사용 문제·정답·해설집</h1>
-        <p>수업 유적 탐험 형성평가 문항 해설 · 접속 주소: ${location.origin}/?ch=${activeCh}</p>
+        <h1>${fmt(SET?.meta?.제목 ?? "")} 교사용 문제·정답·해설집</h1>
+        <p>상자 ${PROBLEMS.length}개 × 하·중·상 = ${PROBLEMS.length * 3}문항 · 접속 주소: ${location.origin}/?ch=${activeCh}</p>
       </div>
       <div class="tp-head-meta">
         <div><b>채널:</b> ${activeCh}번 채널</div>
@@ -125,7 +180,7 @@ function printSheet() {
     <section class="tp-labs">
       <h2>🗺️ 벡터 실험실 지도 가이드</h2>
       <ul>${labTips}</ul>
-      <p class="tp-tip">※ 모든 문은 해당 구역 열쇠 조각(문제)을 반의 70%가 해결하면 열리며, 7개 유물은 반 전체 협동으로 완성합니다.</p>
+      <p class="tp-tip">※ 문은 그 방의 열쇠(상자)를 모두 모으거나, 같은 팀의 2/3 이상이 열면 팀 전체에게 열립니다. 3·4번 방의 상 난이도는 2인 협업 문제입니다.</p>
     </section>
     <div class="tp-columns">
       ${rows}
@@ -173,6 +228,7 @@ function onChannelMessage(ch, msg) {
       conns[ch]?.send({ type: "adminGet" });
     }
     if (!msg.master && msg.period) $(".admin-banner").dataset.period = `📅 ${ch}채널 사용 기간: ${msg.period}`;
+    if (msg.set) loadSet(msg.set); // 이 채널의 문항 세트 (교사에게는 정답·조건까지 온다)
     answers = msg.answers ?? null;
     $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
     buildAnswerSheet(); // 문제·정답 일람표도 정답을 받은 뒤에 그린다
@@ -313,7 +369,7 @@ function buildProblems() {
     card.innerHTML = `
       <header><span class="p-icon">${p.icon}</span><div><b>${i + 1}. ${p.relic}</b><small>${p.level} · 교과서 ${p.source}</small></div></header>
       <p class="ptext">${fmt(p.text)}</p>
-      <p class="pans">정답: ${fmt(answers?.[p.id] ?? "–")}</p>
+      <p class="pans">정답(중): ${fmt(answers?.[p.id]?.mid ?? "–")}</p>
       <div class="pgauge" title="정답률"><i></i><span class="pgauge-label"></span></div>
       <dl class="pstats"></dl>
       <p class="pwrong"></p>`;
@@ -338,7 +394,7 @@ function buildAnswerSheet() {
     text.innerHTML = fmt(p.text); // 수식은 MathJax로 조판 (watchMath가 처리)
     const ans = document.createElement("td");
     ans.className = "as-answer";
-    ans.innerHTML = fmt(answers[p.id] ?? "–");
+    ans.innerHTML = ["low", "mid", "high"].map((k) => `<b>${{ low: "하", mid: "중", high: "상" }[k]}</b> ${fmt(answers[p.id]?.[k] ?? "–")}`).join(" · ");
     tr.append(no, text, ans);
     table.appendChild(tr);
   });
@@ -456,6 +512,9 @@ function renderDash(d) {
 }
 
 // 학생 한 명이 문제마다 어떻게 했는지 펼쳐 보기
+// 풀이 시간 글자: 83000 → "1분 23초"
+const dur = (ms) => { if (!ms) return ""; const sec = Math.round(ms / 1000); return sec >= 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec}초`; };
+
 function detailRow(st, span) {
   const tr = document.createElement("tr");
   tr.className = "detail";
@@ -470,6 +529,10 @@ function detailRow(st, span) {
     else text = `✗ ${r.tries}번 시도, 아직 못 맞힘`;
     if (r?.hinted && r?.tries) text += " · 💡 힌트 봄";
     if (r?.wrongs?.length) text += ` · 낸 오답: ${r.wrongs.join(", ")}`;
+    if (r?.diff) text += ` · ${{ low: "하", mid: "중", high: "상" }[r.diff]}`;
+    if (r?.timeMs) text += ` · ⏱ ${dur(r.timeMs)}`;
+    if (r?.coopWith) text += ` · 🤝 ${r.coopWith}와 협업`;
+    else if (r?.soloCoop) text += " · 협업 문제를 혼자 풂";
     const li = document.createElement("li");
     li.textContent = `${p.icon} ${i + 1}. ${p.relic} — ${text}`;
     ul.appendChild(li);
@@ -485,16 +548,19 @@ function clock(ms) {
 
 function downloadCsv(d) {
   const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
-  const head = ["순위", "이름", "팀", "점수", "들어온 시각", "탈출 시각", "벡터 점프", "활동 마일리지", "개념 학습", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`)];;;
+  const head = ["순위", "이름", "팀", "점수", "들어온 시각", "탈출 시각", "벡터 점프", "활동 마일리지", "개념 학습", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.풀이시간(초)`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`)];
   const rows = d.students.map((st) => {
     const marks = PROBLEMS.map((p) => {
       const r = st.probs[p.id];
       const hint = r?.hinted ? ", 힌트" : "";
       if (!r || !r.tries) return r?.hinted ? "미응시(힌트 봄)" : "미응시";
-      return r.solved ? `정답(${r.tries}회${hint})` : `오답(${r.tries}회${hint})`;
+      const lv = r.diff ? `${{ low: "하", mid: "중", high: "상" }[r.diff]}, ` : "";
+      const co = r.coopWith ? `, 협업:${r.coopWith}` : "";
+      return r.solved ? `정답(${lv}${r.tries}회${hint}${co})` : `오답(${lv}${r.tries}회${hint})`;
     });
+    const times = PROBLEMS.map((p) => (st.probs[p.id]?.timeMs ? Math.round(st.probs[p.id].timeMs / 1000) : ""));
     const wrongs = PROBLEMS.map((p) => (st.probs[p.id]?.wrongs ?? []).join(" / "));
-    return [st.rank, st.name, st.team ?? "", st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, st.mileage ?? 0, st.concepts ?? 0, ...marks, ...wrongs];
+    return [st.rank, st.name, st.team ?? "", st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, st.mileage ?? 0, st.concepts ?? 0, ...marks, ...times, ...wrongs];
   });
   const csv = "﻿" + [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n");
   const a = document.createElement("a");

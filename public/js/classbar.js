@@ -15,7 +15,7 @@ export function renderClassBar(root, cls, { showEnergy, showShelf }) {
 
   if (showShelf) {
     const unlocked = PROBLEMS.filter((p) => cls.relics[p.id]?.unlocked).length;
-    const need = cls.relics[PROBLEMS[0].id]?.need ?? 1;
+    const need = cls.relics[PROBLEMS[0]?.id]?.need ?? 1;
     const title = document.createElement("div");
     title.className = "shelf-title";
     title.textContent = `우리 반 유물 ${unlocked}/${PROBLEMS.length} · 한 문제를 ${need}명이 풀면 그 유물이 깨어나요`;
