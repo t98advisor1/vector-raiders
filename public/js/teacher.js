@@ -4,6 +4,7 @@ import { PROBLEMS } from "./problems.js";
 import { LAB_LEVELS } from "./lab.js";
 import { renderClassBar } from "./classbar.js";
 import { ROOMS, BRIDGES, roomAt } from "./game.js";
+import { DIAGRAMS } from "./diagrams.js";
 
 const $ = (s) => document.querySelector(s);
 // 수업 채널 1~5: 채널마다 완전히 분리된 수업 유적(Durable Object class:1~5)이다.
@@ -80,13 +81,21 @@ function printSheet() {
   const rows = PROBLEMS.map((p, i) => {
     const s = last?.stats?.[p.id];
     const wrong = s?.topWrong?.length ? s.topWrong.map(([w, n]) => `${w} (${n}명)`).join(", ") : "아직 응답 없음";
+    const diagram = DIAGRAMS[p.id] ? `<div class="tp-diagram">${DIAGRAMS[p.id]}</div>` : "";
     return `
       <section class="tp-item">
-        <h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.level} · 교과서 ${p.source}</small></h3>
-        <p class="tp-text"><b>지문:</b> ${fmt(p.text)}</p>
-        <p class="tp-answer"><b>정답:</b> ${fmt(answers[p.id] ?? "–")}</p>
-        <p class="tp-solution"><b>상세 풀이:</b> ${fmt(p.hint)}</p>
-        <p class="tp-wrong"><b>오답 분석:</b> ${wrong}</p>
+        <div class="tp-item-header">
+          <h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.level} · 교과서 ${p.source}</small></h3>
+        </div>
+        <div class="tp-item-body">
+          <p class="tp-text"><b>[문제]</b> ${fmt(p.text)}</p>
+          ${diagram}
+          <div class="tp-ans-block">
+            <span class="tp-answer"><b>정답:</b> ${fmt(answers[p.id] ?? "–")}</span>
+          </div>
+          <p class="tp-solution"><b>[상세 풀이]</b> ${fmt(p.hint)}</p>
+          <p class="tp-wrong"><b>[수업 팁·오답 분석]</b> ${wrong}</p>
+        </div>
       </section>`;
   }).join("");
   // 벡터 실험실(장애물) 지도 팁: 어느 방의 어떤 위험지대가 어떤 실험으로 열리는지
@@ -98,15 +107,24 @@ function printSheet() {
   const sheet = $("#teacher-print-sheet");
   sheet.innerHTML = `
     <header class="tp-head">
-      <h1>벡터 유적 탈출 · 교사용 문제·정답·해설</h1>
-      <p>${new Date().toLocaleDateString("ko-KR")} · 참여 학생 ${last?.students?.length ?? 0}명 · 접속 주소 ${location.origin}</p>
+      <div class="tp-head-left">
+        <h1>2026학년도 기하 Ⅲ-1 벡터의 연산 교사용 문제·정답·해설집</h1>
+        <p>수업 유적 탐험 형성평가 문항 해설 · 접속 주소: ${location.origin}/?ch=${activeCh}</p>
+      </div>
+      <div class="tp-head-meta">
+        <div><b>채널:</b> ${activeCh}번 채널</div>
+        <div><b>참여 학생:</b> ${last?.students?.length ?? 0}명</div>
+        <div><b>일시:</b> ${new Date().toLocaleDateString("ko-KR")}</div>
+      </div>
     </header>
     <section class="tp-labs">
-      <h2>🗺️ 벡터 실험실 지도 팁</h2>
+      <h2>🗺️ 벡터 실험실 지도 가이드</h2>
       <ul>${labTips}</ul>
-      <p class="tp-tip">모든 문은 그 방의 열쇠 조각(문제)을 반의 70%가 풀면 열리고, 유물 7개는 반 전체 협동으로 깨워요.</p>
+      <p class="tp-tip">※ 모든 문은 해당 구역 열쇠 조각(문제)을 반의 70%가 해결하면 열리며, 7개 유물은 반 전체 협동으로 완성합니다.</p>
     </section>
-    ${rows}`;
+    <div class="tp-columns">
+      ${rows}
+    </div>`;
   sheet.hidden = false;
   // 수식(MathJax) 조판이 끈 뒤 인쇄 창을 연다
   setTimeout(() => {

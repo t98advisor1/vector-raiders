@@ -446,28 +446,158 @@ body.touch-device .chat-toggle { bottom: 84px; }
 /* 교사용 강퇴 버튼 */
 .kick-btn { font-size: 0.8rem; padding: 3px 8px; }
 
-/* 교사용 문제·정답·해설 인쇄 (teacher.html) */
+/* 교사용 문제·정답·해설 인쇄 (teacher.html) - 수능 시험지 스타일 2단 편집 및 기하 도해 */
 #print-sheet-btn { border: 0; cursor: pointer; }
 #teacher-print-sheet { display: none; }
 @media print {
-  @page { size: A4; margin: 18mm 16mm; }
+  @page { size: A4 portrait; margin: 12mm 10mm 12mm 10mm; }
   body.teacher > *:not(#teacher-print-sheet) { display: none !important; }
-  #teacher-print-sheet { display: block !important; color: #111; font-size: 10.5pt; line-height: 1.6; }
-  .tp-head { border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 14px; }
-  .tp-head h1 { font-size: 16pt; }
-  .tp-head p { margin: 2px 0 0; color: #444; }
-  .tp-labs { background: #f6f2e8; border: 1px solid #ccc; border-radius: 8px; padding: 8px 14px; margin-bottom: 14px; }
-  .tp-labs h2 { font-size: 12pt; margin: 0 0 4px; }
-  .tp-labs ul { margin: 0; padding-left: 18px; }
-  .tp-tip { color: #555; font-size: 9.5pt; margin: 6px 0 0; }
-  .tp-item { break-inside: avoid; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px dashed #bbb; }
-  .tp-item h3 { font-size: 11.5pt; margin: 0 0 4px; }
-  .tp-item h3 small { font-weight: 400; color: #555; }
-  .tp-text { margin: 4px 0; }
-  .tp-answer { margin: 4px 0; font-weight: 600; color: #0f766e; }
-  .tp-solution { margin: 4px 0; color: #333; }
-  .tp-wrong { margin: 4px 0 0; color: #b91c1c; }
-  mjx-container { font-size: 100% !important; }
+  #teacher-print-sheet {
+    display: block !important;
+    color: #0f172a;
+    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Pretendard", sans-serif;
+    font-size: 9.2pt;
+    line-height: 1.5;
+    background: #fff;
+  }
+  .tp-head {
+    border-bottom: 2.5px solid #0f172a;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .tp-head-left h1 {
+    font-size: 14pt;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.4px;
+    color: #0f172a;
+  }
+  .tp-head-left p {
+    margin: 2px 0 0;
+    font-size: 8.2pt;
+    color: #475569;
+  }
+  .tp-head-meta {
+    text-align: right;
+    font-size: 8.2pt;
+    color: #334155;
+    line-height: 1.35;
+  }
+  .tp-labs {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 5px 10px;
+    margin-bottom: 10px;
+    font-size: 8.2pt;
+  }
+  .tp-labs h2 {
+    font-size: 9pt;
+    margin: 0 0 2px;
+    color: #0f766e;
+    font-weight: 700;
+  }
+  .tp-labs ul {
+    margin: 0;
+    padding-left: 14px;
+  }
+  .tp-tip {
+    color: #64748b;
+    font-size: 7.8pt;
+    margin: 3px 0 0;
+  }
+
+  /* 2단 편집 (Two-column layout) */
+  .tp-columns {
+    column-count: 2;
+    column-gap: 8mm;
+    column-rule: 1px dashed #cbd5e1;
+  }
+  .tp-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 11pt;
+    padding-bottom: 9pt;
+    border-bottom: 1px dotted #cbd5e1;
+  }
+  .tp-item:last-child {
+    border-bottom: none;
+  }
+  .tp-item-header h3 {
+    font-size: 10pt;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: #0f172a;
+    border-left: 3px solid #0f766e;
+    padding-left: 5px;
+  }
+  .tp-item-header h3 small {
+    font-weight: 400;
+    font-size: 7.8pt;
+    color: #64748b;
+    margin-left: 4px;
+  }
+  .tp-item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tp-text {
+    margin: 0;
+    font-size: 8.8pt;
+    line-height: 1.45;
+    color: #1e293b;
+    text-align: justify;
+  }
+  .tp-diagram {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 4px auto;
+    background: #fafafa;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 3px;
+    width: fit-content;
+  }
+  .tp-svg {
+    display: block;
+    max-width: 145px;
+    max-height: 115px;
+    height: auto;
+  }
+  .tp-ans-block {
+    margin: 2px 0;
+    padding: 2px 6px;
+    background: #f0fdf4;
+    border-left: 2.5px solid #16a34a;
+    border-radius: 3px;
+  }
+  .tp-answer {
+    font-weight: 700;
+    color: #15803d;
+    font-size: 8.8pt;
+  }
+  .tp-solution {
+    margin: 2px 0;
+    font-size: 8.4pt;
+    color: #334155;
+    line-height: 1.4;
+    background: #f8fafc;
+    padding: 3px 6px;
+    border-radius: 4px;
+  }
+  .tp-wrong {
+    margin: 2px 0 0;
+    font-size: 8pt;
+    color: #b91c1c;
+  }
+  mjx-container {
+    font-size: 95% !important;
+  }
 }
 
 .banner .btn { margin-left: 8px; padding: 4px 10px; font-size: 0.9rem; }
