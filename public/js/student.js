@@ -6,7 +6,7 @@ import { PROBLEMS, DIFFICULTY } from "./problems.js";
 import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
 import { MATHEMATICIANS, mathematicianCard } from "./mathematicians.js";
 import { renderClassBar } from "./classbar.js";
-import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, ALTAR, roomAt, W, H, buildGrid, DOOR_COLS, DOOR_ROWS } from "./game.js";
+import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, ALTAR, roomAt, W, H, buildGrid, DOOR_COLS, DOOR_ROWS, TABLETS, TARGETS } from "./game.js";
 import { World3D } from "./world3d.js";
 import { sound } from "./sound.js";
 import { createIntro } from "./intro.js";
@@ -975,10 +975,44 @@ function drawMinimap() {
     ctx.fillStyle = labDone(br.lab) ? "rgba(160,102,43,0.95)" : "rgba(103,232,249,0.8)";
     ctx.fillRect((br.cx - 1) * cell, (br.cy - 1) * cell, cell * 2, cell * 2);
   }
-  // 보물상자·유물 제단
-  ctx.font = `${cell}px serif`;
-  ctx.textAlign = "center";
-  for (const o of OBJECTS) ctx.fillText(o.icon, (o.x + 0.5) * cell, (o.y + 0.9) * cell);
+  // 1. 교과서 개념 비석 (14개소 - 하늘색 원 핀)
+  for (const tb of TABLETS) {
+    const tx = (tb.x + 0.5) * cell, ty = (tb.y + 0.5) * cell;
+    ctx.beginPath();
+    ctx.arc(tx, ty, cell * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(56, 189, 248, 0.95)";
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+  }
+
+  // 2. 유물 문제 상자 (7개소 - 주황/황금 사각 핀)
+  for (const o of OBJECTS) {
+    const ox = (o.x + 0.5) * cell, oy = (o.y + 0.5) * cell;
+    const isSol = solved(o.pid);
+    ctx.fillStyle = isSol ? "rgba(52, 211, 153, 0.95)" : "rgba(245, 158, 11, 0.95)";
+    ctx.fillRect(ox - cell * 0.45, oy - cell * 0.45, cell * 0.9, cell * 0.9);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeRect(ox - cell * 0.45, oy - cell * 0.45, cell * 0.9, cell * 0.9);
+  }
+
+  // 3. 수학사 인물 비석 (사격 표적 4개소 및 제단 - 보라색 마름모 핀)
+  for (const tg of TARGETS) {
+    const mx = tg.x * cell, my = tg.y * cell;
+    ctx.beginPath();
+    ctx.moveTo(mx, my - cell * 0.5);
+    ctx.lineTo(mx + cell * 0.5, my);
+    ctx.lineTo(mx, my + cell * 0.5);
+    ctx.lineTo(mx - cell * 0.5, my);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(168, 85, 247, 0.95)";
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+  }
   ctx.fillText("🏛️", (ALTAR.x + 0.5) * cell, (ALTAR.y + 0.9) * cell);
 
   // 팀원·나: 팀 색 원 마커. 이름은 작게.
@@ -1119,6 +1153,19 @@ function showConcept(key, next, kind) {
     </div>`;
   sound.sfx("open");
   mountConceptWidget(key, $(".concept-widget", body));
+  $$(".c-mode-btn", body).forEach((btn) => {
+    btn.onclick = () => {
+      $$(".c-mode-btn", body).forEach((b) => b.classList.remove("on"));
+      btn.classList.add("on");
+      const mode = btn.dataset.mode;
+      const tWrap = $(".concept-table-wrap", body);
+      const wWrap = $(".concept-widget", body);
+      if (tWrap && wWrap) {
+        if (mode === "table") { tWrap.hidden = false; wWrap.hidden = true; }
+        else { tWrap.hidden = true; wWrap.hidden = false; }
+      }
+    };
+  });
   $("#concept-done", body).onclick = () => {
     awardConcept(key);
     toast("💡 개념 학습 +50점! 팀 점수에도 더해졌어요.", "ok");

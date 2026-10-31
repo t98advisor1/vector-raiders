@@ -866,3 +866,44 @@ body.touch-device .chat-toggle { left: 50%; bottom: 12px; transform: translateX(
 .math-card-bonus { display: flex; justify-content: space-between; align-items: center; background: rgba(245, 158, 11, 0.18); border: 1px dashed #f59e0b; border-radius: 12px; padding: 10px 14px; margin-top: 10px; }
 .math-card-bonus span { color: #fde68a; font-weight: 700; font-size: 0.95rem; }
 .math-card-bonus b { color: #34d399; font-size: 1.35rem; font-family: 'BMJUA', sans-serif; text-shadow: 0 0 10px rgba(52, 211, 153, 0.5); }
+
+/* 미니맵 범례 */
+.minimap-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: center; align-items: center; background: rgba(15, 23, 42, 0.85); padding: 6px 10px; border-radius: 10px; margin-bottom: 8px; border: 1px solid rgba(255, 255, 255, 0.1); }
+.m-leg { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #f1f5f9; font-weight: 700; }
+.m-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
+
+/* 문제 창 모션 그래픽 & 가독성 대폭 향상 */
+.modal-sheet { animation: modalPopIn 0.32s cubic-bezier(0.16, 1, 0.3, 1); border: 2.5px solid var(--line); box-shadow: 0 0 35px rgba(94, 234, 212, 0.35), 0 20px 50px rgba(0, 0, 0, 0.6); }
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.92) translateY(16px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.problem-text { font-size: 1.25rem !important; line-height: 1.7 !important; color: #0f172a !important; font-weight: 600 !important; margin: 14px 0 !important; word-break: keep-all; }
+.problem-card .problem-head h2 { font-size: 1.55rem !important; color: #1e1b4b !important; font-family: 'BMJUA', sans-serif !important; }
+.diff-tab { font-size: 1.05rem !important; padding: 7px 14px !important; }
+
+/* 교과서 핵심 개념 정리 표 */
+.concept-table-wrap { width: 100%; overflow-x: auto; margin: 12px 0; border-radius: 12px; border: 2px solid #bae6fd; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08); }
+.concept-table { width: 100%; border-collapse: collapse; font-family: Pretendard, sans-serif; font-size: 0.95rem; text-align: left; background: #fff; }
+.concept-table th { background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; padding: 10px 14px; font-weight: 800; border-bottom: 2px solid #0284c7; }
+.concept-table td { padding: 10px 14px; border-bottom: 1px solid #e0f2fe; color: #1e293b; line-height: 1.5; }
+.concept-table tr:last-child td { border-bottom: 0; }
+.concept-table tr:nth-child(even) td { background: #f0f9ff; }
+.concept-table b { color: #0369a1; }
+.concept-table code { font-family: 'Times New Roman', serif; font-size: 1.05rem; background: rgba(2, 132, 199, 0.08); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #0c4a6e; }
+
+/* 개념 카드 뷰 전환 탭 */
+.concept-mode-tabs { display: flex; gap: 8px; margin: 10px 0 14px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+.c-mode-btn { font: inherit; font-size: 0.95rem; font-weight: 800; border: 0; background: #f1f5f9; color: #475569; padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: all 0.15s ease; }
+.c-mode-btn.on { background: #0284c7; color: #fff; box-shadow: 0 0 10px rgba(2, 132, 199, 0.4); }
+
+/* 황금 고대 유적 열쇠 카드 리디자인 */
+.relic-key-card { background: linear-gradient(145deg, #1e1b4b, #2a1538); border: 2.5px solid #f59e0b; border-radius: 20px; padding: 20px; text-align: center; color: #fff;
+  box-shadow: 0 0 30px rgba(245, 158, 11, 0.45), 0 16px 40px rgba(0, 0, 0, 0.6); animation: modalPopIn 0.35s ease; }
+.relic-key-glow { font-size: 3.8rem; margin-bottom: 8px; display: inline-block; animation: keyFloat 2s infinite ease-in-out; text-shadow: 0 0 20px #f59e0b; }
+@keyframes keyFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.relic-key-title { font-size: 1.6rem !important; color: #fde68a !important; font-family: 'BMJUA', sans-serif !important; margin: 0 0 6px; }
+.relic-key-desc { font-size: 1.05rem; color: #cbd5e1; margin-bottom: 14px; line-height: 1.5; }
+.relic-progress-bar { background: rgba(255, 255, 255, 0.15); height: 12px; border-radius: 999px; overflow: hidden; margin: 12px 0; border: 1px solid rgba(255, 255, 255, 0.2); }
+.relic-progress-fill { background: linear-gradient(90deg, #34d399, #5eead4); height: 100%; border-radius: 999px; transition: width 0.5s ease; box-shadow: 0 0 10px #34d399; }

@@ -149,22 +149,22 @@
         <div class="team-grid-large" role="group" aria-label="팀 선택">
           <button type="button" class="team-card-btn on" data-team="A">
             <span class="team-icon">🔵</span>
-            <b>A팀 (여우)</b>
+            <b>A팀</b>
             <span class="team-cnt" id="cnt-A">(0/8명)</span>
           </button>
           <button type="button" class="team-card-btn" data-team="B">
             <span class="team-icon">🟠</span>
-            <b>B팀 (고양이)</b>
+            <b>B팀</b>
             <span class="team-cnt" id="cnt-B">(0/8명)</span>
           </button>
           <button type="button" class="team-card-btn" data-team="C">
             <span class="team-icon">🟢</span>
-            <b>C팀 (곰)</b>
+            <b>C팀</b>
             <span class="team-cnt" id="cnt-C">(0/8명)</span>
           </button>
           <button type="button" class="team-card-btn" data-team="D">
             <span class="team-icon">🟣</span>
-            <b>D팀 (토끼)</b>
+            <b>D팀</b>
             <span class="team-cnt" id="cnt-D">(0/8명)</span>
           </button>
         </div>
@@ -262,7 +262,7 @@
               <div class="slide-visual">
                 <div class="visual-badge">🤝 3. 팀 레이드 & 채팅</div>
                 <div class="visual-diagram">
-                  <div class="diagram-key">🚩 A(여우) · B(고양이) · C(곰) · D(토끼)</div>
+                  <div class="diagram-key">🚩 A팀 · B팀 · C팀 · D팀 (팀당 8명 정원)</div>
                   <div class="diagram-key">⚖️ 세 벡터 합 평형 레이드 (a+b+c=0)</div>
                   <div class="diagram-key">💬 하단 중앙 실시간 채팅 협동</div>
                 </div>
@@ -347,8 +347,14 @@
       <div id="popups" class="popups" aria-live="polite"></div>
       <div id="banner" class="banner" hidden></div>
       <div id="minimap" class="minimap" hidden>
-        <div class="minimap-head"><b>🗺️ 유적 전체 지도</b><button id="minimap-close" class="hud-btn" type="button" aria-label="지도 닫기">✕</button></div>
-        <canvas id="map-canvas" aria-label="유적 전체 미니맵. 내 위치와 팀원, 보물상자가 표시돼요."></canvas>
+        <div class="minimap-head"><b>🗺️ 유적 전체 미로 지도</b><button id="minimap-close" class="hud-btn" type="button" aria-label="지도 닫기">✕</button></div>
+        <div class="minimap-legend">
+          <span class="m-leg"><i style="background:#38bdf8"></i> 📖 개념 비석</span>
+          <span class="m-leg"><i style="background:#f59e0b"></i> ⚔️ 문제 상자</span>
+          <span class="m-leg"><i style="background:#a855f7"></i> 🏛️ 수학사 비석</span>
+          <span class="m-leg"><i style="background:#5eead4"></i> 🟢 나 & 팀원</span>
+        </div>
+        <canvas id="map-canvas" aria-label="유적 전체 미니맵. 개념 비석, 문제 상자, 수학사 비석 위치와 내 위치가 표시돼요."></canvas>
       </div>
       <div id="vignette" class="vignette" aria-hidden="true"></div>
       <!-- 학생 간 실시간 채팅 -->

@@ -383,16 +383,120 @@ function slider(box, { min, max, step, value, label }, onInput) {
   return input;
 }
 
+export const CONCEPT_TABLES = {
+  l1: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["삼각형법 덧셈", "\\vv{AB} + \\vv{BC} = \\vv{AC}", "시점과 종점을 이어 붙여 처음과 끝을 연결"],
+      ["교환법칙", "\\vv{a} + \\vv{b} = \\vv{b} + \\vv{a}", "더하는 순서를 바꾸어도 결과 벡터는 동일"],
+      ["결합법칙", "(\\vv{a} + \\vv{b}) + \\vv{c} = \\vv{a} + (\\vv{b} + \\vv{c})", "괄호의 위치에 관계없이 일관된 합성"],
+    ],
+  },
+  l2: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["평행사변형법", "\\vv{AB} + \\vv{AD} = \\vv{AC}", "시점을 일치시킨 두 벡터가 이루는 평행사변형 대각선"],
+      ["영벡터 덧셈", "\\vv{a} + \\vv{0} = \\vv{a}", "크기가 0인 영벡터를 더해도 크기와 방향 불변"],
+      ["역벡터 덧셈", "\\vv{a} + (-\\vv{a}) = \\vv{0}", "크기가 같고 방향이 반대인 두 벡터의 합은 영벡터"],
+    ],
+  },
+  l3: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["실수배의 크기", "|k\\vv{a}| = |k||\\vv{a}|", "실수 k의 절댓값만큼 원래 벡터의 길이가 신축"],
+      ["방향 결정", "k > 0: 동일 방향, k < 0: 반대 방향", "k = 0일 때는 영벡터 \\vv{0}"],
+      ["분배법칙", "k(\\vv{a}+\\vv{b}) = k\\vv{a} + k\\vv{b}", "실수와 벡터 덧셈 사이의 일관된 분배 성립"],
+    ],
+  },
+  p1: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["벡터의 정의", "크기와 방향을 함께 갖는 양", "유향선분의 길이(크기)와 화살촉(방향)으로 표시"],
+      ["벡터의 상등", "\\vv{a} = \\vv{b} ⟺ |\\vv{a}| = |\\vv{b}| 및 방향 일치", "위치에 관계없이 평행이동하여 겹쳐지면 같은 벡터"],
+      ["단위벡터", "|\\vv{e}| = 1", "크기가 1이고 방향만을 지정하는 기준 벡터"],
+    ],
+  },
+  p2: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["뺄셈의 정의", "\\vv{a} - \\vv{b} = \\vv{a} + (-\\vv{b})", "빼는 벡터의 방향을 반대로 뒤집어 더함"],
+      ["시점 통일 공식", "\\vv{AB} = \\vv{OB} - \\vv{OA}", "종점의 위치벡터에서 시점의 위치벡터를 뺌 (필수 핵심 공식!)"],
+      ["기하학적 의미", "|\\vv{a} - \\vv{b}| = 두 종점 사이의 거리", "시점이 일치할 때 두 종점을 잇는 변위 선분의 길이"],
+    ],
+  },
+  p3: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["기저벡터 분해", "\\vv{a} = a_1\\vv{e_1} + a_2\\vv{e_2}", "서로 수직인 x축, y축 단위벡터의 선형결합"],
+      ["성분 표시", "\\vv{a} = (a_1, a_2)", "좌표평면 위의 순서쌍으로 유일하게 결정"],
+      ["성분 벡터의 크기", "|\\vv{a}| = \\sqrt{a_1^2 + a_2^2}", "원점과 점 (a_1, a_2) 사이의 피타고라스 거리"],
+    ],
+  },
+  p4: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["기하학적 평행", "\\vv{a} ∥ \\vv{b} ⟺ \\vv{b} = k\\vv{a} (k ≠ 0)", "영벡터가 아닌 두 벡터의 방향이 같거나 반대"],
+      ["성분 비례식", "a_1 b_2 - a_2 b_1 = 0", "두 벡터의 성분 비가 일치 (b_1/a_1 = b_2/a_2 = k)"],
+      ["실수배 판정법", "한 벡터에 적절한 실수를 곱해 상대 벡터 생성", "선형종속 및 동직선 방향 판별의 기본 도구"],
+    ],
+  },
+  p5: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["일직선 조건", "\\vv{AC} = t\\vv{AB} (실수 t 존재)", "서로 다른 세 점 A, B, C가 한 직선 위에 위치"],
+      ["계수 합 = 1", "\\vv{OC} = (1-t)\\vv{OA} + t\\vv{OB}", "기준점 O에 대해 위치벡터 계수의 합이 정확히 1"],
+      ["내분·외분 판정", "0 < t < 1: 선분 AB 내부(내분), 그 외: 외부(외분)", "실수 t의 부호와 크기에 따른 점 C의 위치 분기"],
+    ],
+  },
+  p6: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["다각형법 연속합", "\\vv{AB} + \\vv{BC} + \\vv{CD} = \\vv{AD}", "연속된 꼬리물기 화살표의 처음 시점과 끝 종점 직결"],
+      ["공간 직육면체 합성", "\\vv{AG} = \\vv{AB} + \\vv{AD} + \\vv{AE}", "가로, 세로, 높이 세 모서리 방향 독립 성분의 합성"],
+      ["공간벡터의 크기", "|\\vv{v}| = \\sqrt{v_1^2 + v_2^2 + v_3^2}", "3차원 공간에서의 유클리드 입체 대각선 거리"],
+    ],
+  },
+  p7: {
+    headers: ["구분", "교과서 핵심 공식", "기하학적 의미 및 성질"],
+    rows: [
+      ["원의 벡터방정식", "|\\vv{p} - \\vv{c}| = r", "중심 C, 반지름 r인 원 위의 모든 점 P의 자취"],
+      ["내적 표현식", "(\\vv{p}-\\vv{c}) · (\\vv{p}-\\vv{c}) = r^2", "변위벡터 자기 자신과의 내적은 반지름 제곱과 동일"],
+      ["직선의 벡터방정식", "\\vv{p} = \\vv{a} + t\\vv{u} (방향벡터 \\vv{u})", "점 A를 지나고 방향벡터 \\vv{u}에 평행한 직선 위의 점 P"],
+    ],
+  },
+};
+
 // 위젯이 달린 카드 한 장을 문자열로 돌려준다. 위젯은 mountConceptWidget()으로 붙인다.
 export function conceptCard(p, key, { fmt }) {
   const c = CONCEPTS[key];
   if (!c) return "";
   const points = c.points.map((t) => `<li>${fmt(t)}</li>`).join("");
+  const tbl = CONCEPT_TABLES[key];
+  let tableHtml = "";
+  if (tbl) {
+    const ths = tbl.headers.map((h) => `<th>${h}</th>`).join("");
+    const trs = tbl.rows.map((r) => `<tr><td><b>${r[0]}</b></td><td><code>${fmt(r[1])}</code></td><td>${fmt(r[2])}</td></tr>`).join("");
+    tableHtml = `
+      <div class="concept-table-wrap">
+        <table class="concept-table">
+          <thead><tr>${ths}</tr></thead>
+          <tbody>${trs}</tbody>
+        </table>
+      </div>`;
+  }
   return `
     <div class="concept-card">
-      <div class="concept-head"><span class="concept-badge">📚 개념 카드</span><h2>${c.title}</h2></div>
+      <div class="concept-head"><span class="concept-badge">📖 교과서 핵심 개념 비석</span><h2>${c.title}</h2></div>
       <p class="concept-tagline">${fmt(c.tagline)}</p>
-      <div class="concept-body"><div class="concept-widget" data-key="${key}"></div><ul class="concept-points">${points}</ul></div>
+      <div class="concept-mode-tabs">
+        <button type="button" class="c-mode-btn on" data-mode="table">📊 교과서 정리 표</button>
+        <button type="button" class="c-mode-btn" data-mode="widget">🕹️ 인터랙티브 조작</button>
+      </div>
+      <div class="concept-body">
+        ${tableHtml}
+        <div class="concept-widget" data-key="${key}" hidden></div>
+        <ul class="concept-points">${points}</ul>
+      </div>
     </div>`;
 }
 
