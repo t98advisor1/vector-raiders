@@ -117,6 +117,13 @@ export class World3D {
     this.fill = new THREE.DirectionalLight(0xfff2dd, 1.25);
     this.scene.add(this.fill, this.fill.target);
 
+    // 진행 방향 120° 탐험 후레시 (SpotLight): 캐릭터 앞길을 120도 원뿔 조명으로 시원하게 비춘다
+    this.flashlight = new THREE.SpotLight(0xfff7e6, 3.8, 18, THREE.MathUtils.degToRad(60), 0.35, 1.2);
+    this.flashlight.castShadow = true;
+    this.flashlightTarget = new THREE.Object3D();
+    this.scene.add(this.flashlight, this.flashlightTarget);
+    this.flashlight.target = this.flashlightTarget;
+
     this.mixers = [];
     this.avatars = new Map(); // n(나는 "me") → 캐릭터
     this.objects = new Map(); // pid → { root, kind, solved, key, ring, mixer, clip }
@@ -646,13 +653,23 @@ export class World3D {
       }
     }
 
+    // 120° 전방 탐험 후레시 및 진행 방향 시야 확장
+    const dirX = g.me.dir?.[0] ?? 0, dirZ = g.me.dir?.[1] ?? 1;
+    const dLen = Math.hypot(dirX, dirZ) || 1;
+    const nx = dirX / dLen, nz = dirZ / dLen;
+    if (this.flashlight && this.flashlightTarget) {
+      this.flashlight.position.set(g.me.x, (g.me.jumpY || 0) + 1.2, g.me.y);
+      this.flashlightTarget.position.set(g.me.x + nx * 5.5, 0.4, g.me.y + nz * 5.5);
+    }
+
     // 카메라: 지면 기준 약 30° 사선 쿼터뷰(아이소메트릭)
-    // 수직 탑다운(90°)이 아닌 30° 완만한 사선으로 캐릭터의 얼굴, 안경, 모자, 망토가 선명하게 보인다
+    // 수직 탑다운(90°)이 아닌 30° 완만한 사선으로 캐릭터의 얼굴, 안경, 모자, 망토가 선명하게 보이며,
+    // 진행 방향으로 시야를 1.2칸 살짝 밀어 주어 앞길이 시원하게 보인다
     const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 12.0 * this.camera.aspect;
-    const camX = Math.min(W - halfW, Math.max(Math.min(halfW, W / 2), g.me.x));
-    const want = new THREE.Vector3(camX, 5.2, g.me.y + 8.8);
+    const camX = Math.min(W - halfW, Math.max(Math.min(halfW, W / 2), g.me.x + nx * 1.2));
+    const want = new THREE.Vector3(camX, 5.2, g.me.y + 8.6 + nz * 0.8);
     this.camera.position.lerp(want, this.ready ? 1 - Math.pow(0.002, dt) : 1);
-    this.camera.lookAt(this.camera.position.x, 1.1, g.me.y);
+    this.camera.lookAt(camX, 1.1, g.me.y + nz * 1.2);
     this.sun.position.set(g.me.x - 5, 12, g.me.y + 6);
     this.sun.target.position.set(g.me.x, 0, g.me.y);
     this.rim.position.set(g.me.x + 3, 5, g.me.y - 8);
