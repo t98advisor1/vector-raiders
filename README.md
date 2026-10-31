@@ -119,6 +119,8 @@ npx wrangler secret put START_CODES
 npm run deploy
 ```
 
+**자동 배포:** Cloudflare 대시보드의 `go` Worker → Settings → Builds에 이 GitHub 저장소가 연결되어 있어서, `main`에 병합하면 Cloudflare가 `npx wrangler deploy`로 자동 배포합니다. 진행 상황은 Worker의 Deployments 탭에서 봅니다. 아래 명령은 처음 설치할 때나 컴퓨터에서 직접 배포할 때 씁니다.
+
 가운데 세 명령은 배포 서버에서 쓸 비밀번호를 묻습니다. 비밀번호는 공개 저장소의 코드에 적지 않습니다. 교사 비밀번호(TEACHER_PASSWORD, CHANNEL_PASSWORDS)가 하나도 없으면 교사 화면에 들어갈 수 없고, START_CODES가 없으면 학생 화면에서 수업 탐험을 시작할 수 없습니다. 하이픈과 띄어쓰기는 무시하므로 `12-34`를 입력해도 `1234`로 들어갑니다.
 
 배포하면 `https://go.<계정의 workers.dev 하위 도메인>.workers.dev` 주소가 생깁니다(앞부분 `go`는 `wrangler.toml`의 `name`). 하위 도메인은 Cloudflare 대시보드의 Workers & Pages → Account details → Subdomain에서 바꿀 수 있습니다. Durable Objects(SQLite 저장)를 쓰며, 한 반 규모라면 무료 플랜 한도 안에서 쓸 수 있을 것으로 예상합니다. 다만 실제 요금과 한도는 Cloudflare 요금 안내에서 확인해 주세요.
