@@ -364,10 +364,53 @@ body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #
   mjx-container { font-size: 100% !important; }
 }
 
-/* 좁은 화면 */
-@media (max-width: 820px) {
+/* 좁은 화면 (모바일·태블릿) 레이아웃 최적화: 랭킹창 및 미니맵의 화면 가림 방지 */
+@media (max-width: 768px) {
   .shelf { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .help { display: none; }
+  .hud { flex-wrap: nowrap; gap: 6px; }
+  .hud-card { padding: 4px 8px; font-size: 0.85rem; gap: 8px; }
+  .hud-right {
+    display: none;
+    position: fixed;
+    top: 52px;
+    right: 10px;
+    z-index: 40;
+    background: rgba(17, 24, 39, 0.95);
+    border: 1.5px solid rgba(94, 234, 212, 0.5);
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+    max-width: calc(100vw - 20px);
+  }
+  .hud-right.open {
+    display: grid !important;
+  }
+  .hud-teams { min-width: auto; font-size: 0.88rem; padding: 6px 10px; }
+  .hud-rank { min-width: auto; font-size: 0.84rem; padding: 6px 10px; }
+  .minimap {
+    position: fixed !important;
+    left: 50% !important;
+    top: 60px !important;
+    bottom: auto !important;
+    transform: translateX(-50%);
+    z-index: 35;
+    max-width: calc(100vw - 20px);
+  }
+}
+
+/* 교사 로그인 및 수업 참가 모션 그래픽 */
+.splash .title-tag { animation: floatTag 3s ease-in-out infinite alternate; }
+@keyframes floatTag { 0% { transform: rotate(-4deg) translateY(0); } 100% { transform: rotate(-2deg) translateY(-6px); } }
+.panel.setup h2 {
+  background: linear-gradient(135deg, #1e1b4b, #0f766e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: glowTitle 2s ease-in-out infinite alternate;
+}
+@keyframes glowTitle {
+  0% { filter: drop-shadow(0 0 1px rgba(94, 234, 212, 0.2)); }
+  100% { filter: drop-shadow(0 0 8px rgba(94, 234, 212, 0.6)); }
 }
 
 /* 입장 폼: 팀 선택 */
@@ -426,7 +469,7 @@ body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #
 .touch-btn-round:active { background: rgba(94, 234, 212, 0.5); }
 /* 터치 기기에서는 키보드 도움말 대신 패드가 있다 */
 body.touch-device .help { display: none; }
-body.touch-device .chat-toggle { bottom: 84px; }
+body.touch-device .chat-toggle { bottom: 230px; right: 14px; }
 
 /* 문제 난이도 선택: 상(150점)·중(100점)·하(70점) */
 .diff-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }

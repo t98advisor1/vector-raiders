@@ -203,7 +203,8 @@ function onMessage(msg) {
     S.game.setMe(msg.n, msg.name);
     if (msg.pos) { S.game.me.x = msg.pos.x; S.game.me.y = msg.pos.y; } // 새로고침해도 하던 자리에서
     S.game.forceSend();
-    $("#minimap").hidden = false; // 유적 전체 지도는 들어오면 펼쳐 둔다
+    // 모바일/터치 기기에서는 지도로 조작 버튼이 가려지지 않도록 기본은 닫아 두고, 🗺️ 버튼을 눌렀을 때만 연다
+    $("#minimap").hidden = document.body.classList.contains("touch-device") || window.innerWidth <= 768;
     $("#world").focus();
   } else if (msg.type === "me") {
     const before = S.me;
@@ -710,6 +711,7 @@ let mapGrid = null; // 벽·위험지대 그리기용 격자 (한 번만 만든�
 
 $("#map-btn").onclick = () => { $("#minimap").hidden = !$("#minimap").hidden; if (!$("#minimap").hidden) drawMinimap(); };
 $("#minimap-close").onclick = () => { $("#minimap").hidden = true; };
+$("#rank-btn").onclick = () => { $(".hud-right")?.classList.toggle("open"); };
 
 function drawMinimap() {
   if ($("#minimap").hidden || !S.game) return;
