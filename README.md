@@ -74,7 +74,8 @@
 | `public/js/lab.js` | 벡터 점프 5단계 |
 | `public/js/student.js` | 학생 화면: 메뉴 흐름, HUD, 랭킹, 발견 팝업, 문제 창, 타자 효과, 서버 통신 |
 | `public/js/intro.js` | 첫 화면 연출: 기하 기호 비, 달리는 탐험가, 카드 그림 |
-| `public/js/characters.js` | 캐릭터 불러오기와 다듬기(매끈한 음영, 윤곽선) |
+| `public/js/characters.js` | 레이더 캐릭터: 원래 얼굴·옷을 살리고 배낭(수학자별 문장)·팀 색 스카프·블래스터를 단다, 윤곽선 |
+| `public/js/fx.js` | 화면 연출: 파티클(총구 섬광·스파크·흙먼지·불티), 횃불 빛 번짐, 코드로 그린 돌·용암·물 텍스처 |
 | `public/js/settings.js` | 배경음·효과음·그래픽 품질 설정 |
 | `public/js/sound.js` | 배경 음악과 효과음 (Web Audio로 직접 만들어 소리 파일 없음) |
 | `public/js/mathtext.js` | 문제 표기를 MathJax 수식으로 바꾸고 조판 |
