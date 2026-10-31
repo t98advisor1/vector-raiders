@@ -241,7 +241,7 @@ export class Room extends DurableObject {
       const entered = String(msg.password ?? "").trim();
       const ch = this.channel ?? "1";
       // 비밀번호 체계:
-      // 1. 전체 관리자 채널 비밀번호: 119-129 (또는 119129) - 모든 채널 접속 가능
+      // 1. 전체 관리자 채널 비밀번호: 119119 (또는 119-119) - 모든 채널 접속 가능
       // 2. 채널별 개별 비밀번호: 1채널 82821, 2채널 82822, 3채널 82823, 4채널 82824, 5채널 82825, 6채널 82826, 7채널 82827
       // 3. Cloudflare 환경변수 TEACHER_PASSWORD 및 기본값 1234
       const chPwMap = {
@@ -254,7 +254,7 @@ export class Room extends DurableObject {
         "7": ["82827"],
       };
       const allowed = [
-        "119-129", "119129",
+        "119119", "119-119",
         ...(chPwMap[ch] ?? []),
         ...(this.env.TEACHER_PASSWORD ? [this.env.TEACHER_PASSWORD] : ["1234"]),
       ];
