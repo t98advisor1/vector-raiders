@@ -48,3 +48,17 @@ test("채널 선택 및 팀 선택 분리 버튼 7개 및 4개 팀 구성 검증
     assert.equal(html.includes(`data-slide="${s}"`), true, `${s}번 설명서 슬라이드 존재`);
   }
 });
+
+test("문장 속 수식에 역슬래시가 두 번 들어가 벡터 표시가 깨지지 않는다", async () => {
+  // JS 문자열 "$\\VV{AB}$"는 TeX \VV{AB}가 되지만, "$\\\\VV{AB}$"는 줄바꿈(\\) + VVAB 글자로 깨진다.
+  const { readdirSync } = await import("node:fs");
+  for (const f of readdirSync("public/js").filter((n) => n.endsWith(".js"))) {
+    const src = fs.readFileSync(`public/js/${f}`, "utf8");
+    assert.doesNotMatch(src, /\\\\\\\\(vv|VV|dfrac|frac|circ|parallel|sqrt)\b/, f);
+  }
+});
+
+test("연습 모드에서는 정답표(출력용)를 보내지 않는다", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /if \(this\.practice \|\| this\.data\.stage !== "done"\) return;/);
+});

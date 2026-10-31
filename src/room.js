@@ -2,7 +2,7 @@
 // 학생 진행 상황을 저장하고, 반 전체 협동 현황(벡터 점프 에너지, 유물)과 친구들 위치를 모두에게 알린다.
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
-import { checkAnswer, PROBLEM_IDS, ANSWER_TEXT } from "./answers.js";
+import { checkAnswer, PROBLEM_IDS, ANSWER_TEXT, ANSWER_TEXT_BY_DIFF } from "./answers.js";
 import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, cleanDate, todayKst, parseChannelPasswords } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
 
@@ -470,9 +470,10 @@ export class Room extends DurableObject {
     }
 
     if (msg.type === "review") {
-      // 탐험이 끝난 뒤 오답 정리용으로 정답표를 내려 준다. 수업 중에는 정답이 학생에게 가지 않는다.
-      if (this.data.stage !== "done" && !(this.practice && st.escapedAt)) return;
-      return this.send(ws, { type: "review", answers: ANSWER_TEXT });
+      // 수업 탐험이 끝난 뒤 오답 정리·형성평가 답지용으로 정답표를 내려 준다.
+      // 수업 중에는 정답이 학생에게 가지 않고, 연습 모드에서는 출력(PDF)을 하지 않으므로 보내지 않는다.
+      if (this.practice || this.data.stage !== "done") return;
+      return this.send(ws, { type: "review", answers: ANSWER_TEXT, byDiff: ANSWER_TEXT_BY_DIFF });
     }
 
     if (msg.type === "chat") {

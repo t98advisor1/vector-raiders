@@ -2,7 +2,8 @@ import { connect, store } from "./net.js";
 const load = store;
 import { fmt, watchMath } from "./mathtext.js";
 import { LAB_LEVELS } from "./lab.js";
-import { PROBLEMS, DIFFICULTY } from "./problems.js";
+import { PROBLEMS, DIFFICULTY, UNITS } from "./problems.js";
+import { DIAGRAMS } from "./diagrams.js";
 import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
 import { MATHEMATICIANS, mathematicianCard } from "./mathematicians.js";
 import { renderClassBar } from "./classbar.js";
@@ -478,7 +479,9 @@ function onMessage(msg) {
     if (msg.n !== S.game?.me.n) showFound(msg); // 내 발견은 문제 창에서 이미 축하한다
   } else if (msg.type === "review") {
     reviewAnswers = msg.answers ?? null;
-    toast("📄 정답표를 받았어요. 결과 화면에서 오답 정리를 인쇄할 수 있어요.", "ok");
+    reviewByDiff = msg.byDiff ?? null;
+    document.querySelectorAll(".needs-answers").forEach((b) => { b.disabled = false; });
+    toast("📄 정답표를 받았어요. 결과 화면에서 형성평가 답지와 오답 정리를 인쇄할 수 있어요.", "ok");
   } else if (msg.type === "error") {
     if ($("#game").hidden) showJoinError(msg.message);
     else toast(msg.message);
@@ -1425,14 +1428,25 @@ function showSummary() {
   const body = openModal(false);
   const mine = PROBLEMS.filter((p) => solved(p.id)).length;
   const unlocked = PROBLEMS.filter((p) => S.cls?.relics[p.id]?.unlocked).length;
-  // 오답 정리 인쇄용 정답표: 탐험이 끝나면 서버가 내려 준다(reviewAnswers에 저장).
-  S.net?.send({ type: "review" });
+  // 오답 정리·형성평가 답지용 정답표: 수업 탐험이 끝나면 서버가 내려 준다(reviewAnswers에 저장).
+  // 연습 모드에서는 PDF 출력을 하지 않는다.
+  const canPrint = S.mode === "class";
+  if (canPrint) S.net?.send({ type: "review" });
+  const wait = reviewAnswers ? "" : "disabled";
   body.innerHTML = `
     <div class="done">
       <h2>탐험 끝!</h2>
       <p class="big-num">우리 반이 깨운 유물 <b>${unlocked}</b> / ${PROBLEMS.length}</p>
       <p>내가 연 상자 <b>${mine}</b> / ${PROBLEMS.length} · 벡터 점프 ${S.me?.lab.length ?? 0} / ${LAB_LEVELS.length}</p>
-      <div class="summary-actions"><button id="print-btn" class="btn primary" type="button">📄 오답 정리 A4로 인쇄 (PDF)</button></div>
+      ${canPrint ? `<div class="print-box">
+        <b>📝 한 번 더 복습하기 · 형성평가 출력</b>
+        <small>문제지로 다시 풀어 보고, 답지로 스스로 채점해요. 인쇄 창에서 'PDF로 저장'을 고르면 파일로 받아요.</small>
+        <div class="summary-actions">
+          <button id="fa-sheet-btn" class="btn primary" type="button">📝 형성평가 문제지</button>
+          <button id="fa-answer-btn" class="btn needs-answers" type="button" ${wait}>✅ 형성평가 답지</button>
+          <button id="print-btn" class="btn needs-answers" type="button" ${wait}>📄 나의 오답 정리</button>
+        </div>
+      </div>` : ""}
     </div>`;
   const ul = document.createElement("ul");
   ul.className = "mine";
@@ -1443,13 +1457,79 @@ function showSummary() {
     ul.appendChild(li);
   }
   $(".done", body).appendChild(ul);
-  $("#print-btn", body).onclick = printReview;
+  if (canPrint) {
+    $("#print-btn", body).onclick = printReview;
+    $("#fa-sheet-btn", body).onclick = () => printAssessment("sheet");
+    $("#fa-answer-btn", body).onclick = () => printAssessment("answer");
+  }
 }
 
 // 오답 정리: 내가 틀리거나 못 푼 문제를 문제·내가 낸 오답·정답·풀이로 정리해 A4 인쇄 창에 채운다.
 let reviewAnswers = null; // 서버가 내려 준 정답표 (탐험 끝 이후에만)
+let reviewByDiff = null; // 난이도별 정답표 { p1: { low, mid, high } } (형성평가 답지용)
+
+// 인쇄 영역을 채운 뒤 수식(MathJax) 조판이 끝나면 인쇄 창을 연다
+function openPrint(html) {
+  const area = $("#print-area");
+  area.innerHTML = html;
+  area.hidden = false;
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { area.hidden = true; }, 300);
+  }, 700);
+}
+
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+// 형성평가: 내가 탐험에서 푼 난이도의 문제 7개를 문제지(sheet)와 답지(answer)로 따로 인쇄한다.
+const DIFF_NAME = { low: "하 · 교과서 예제", mid: "중 · 중단원 표준", high: "상 · 수능 심화" };
+function printAssessment(kind) {
+  if (S.mode !== "class") return;
+  const isAnswer = kind === "answer";
+  if (isAnswer && !reviewByDiff) return toast("정답표를 받는 중이에요. 잠시 후 다시 눌러 주세요.");
+  const unit = UNITS.find((u) => u.id === S.unit);
+  const items = PROBLEMS.map((p, i) => {
+    const m = S.me?.probs[p.id];
+    const d = m?.diff ?? S.diff ?? "mid";
+    const v = p.diffs?.[d] ?? p;
+    const text = (v.text ?? p.text).replace(/^🤝 \[2인 팀 협동 레이드\][^\n]*\n+/, "");
+    const opts = v.answer?.options ?? [];
+    const optHtml = v.answer?.kind === "choice"
+      ? `<p class="fa-opts">${opts.map((o) => fmt(o)).join("&emsp;")}</p>`
+      : v.answer?.kind === "multi"
+        ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${fmt(`[${o}]`)}`).join("&emsp;")}</p>`
+        : "";
+    const head = `<h3>${i + 1}. ${p.icon} ${p.relic} <small>${DIFF_NAME[d] ?? ""} · ${v.points ?? ""}점</small></h3>`;
+    if (!isAnswer) {
+      return `<section class="fa-item">
+        ${head}
+        <div class="fa-body">
+          <div class="fa-q"><p class="pr-text">${fmt(text)}</p>${optHtml}</div>
+          ${DIAGRAMS[p.id] ? `<div class="fa-fig">${DIAGRAMS[p.id]}</div>` : ""}
+        </div>
+        <p class="fa-blank"><b>답</b> <span></span></p>
+      </section>`;
+    }
+    const status = m?.solved ? (m.firstTry ? "★ 탐험 중 한 번에 정답" : `✓ 탐험 중 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ 탐험 중 ${m.tries}번 시도, 미해결` : "– 탐험 중 미응시";
+    return `<section class="fa-item">
+      ${head.replace("</h3>", ` <span class="pr-status">${status}</span></h3>`)}
+      <p class="pr-answer"><b>정답</b> ${fmt(reviewByDiff[p.id]?.[d] ?? reviewAnswers?.[p.id] ?? "")}</p>
+      <p class="pr-hint"><b>풀이</b> ${fmt(v.hint ?? p.hint ?? "")}</p>
+      <p class="fa-check">채점: □ 맞음 &nbsp; □ 틀림 &nbsp;→ 틀렸다면 풀이를 보고 다시 풀어 보기</p>
+    </section>`;
+  }).join("");
+  openPrint(`
+    <header class="pr-head fa-head">
+      <h1>벡터 유적 탈출 · 형성평가 ${isAnswer ? "<span class=\"fa-tag ans\">답지</span>" : "<span class=\"fa-tag\">문제지</span>"}</h1>
+      <p>${unit ? `기하 ${unit.name} · ` : ""}${new Date().toLocaleDateString("ko-KR")} · ${S.ch}채널</p>
+      <p class="fa-name">이름: <b>${esc(S.name ?? "")}</b> &emsp; ${isAnswer ? "" : "점수: ________ / 7"}</p>
+    </header>
+    ${isAnswer ? "" : `<p class="fa-guide">탐험에서 만난 문제를 다시 풀어 보세요. 풀이 과정을 적고 '답' 칸에 답을 쓰세요.</p>`}
+    ${items}`);
+}
 
 function printReview() {
+  if (S.mode !== "class") return;
   const area = $("#print-area");
   const rows = PROBLEMS.map((p, i) => {
     const m = S.me?.probs[p.id];
@@ -1457,13 +1537,15 @@ function printReview() {
     const status = m?.solved ? (m.firstTry ? "★ 한 번에 정답" : `✓ 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ ${m.tries}번 시도, 미해결` : "미응시";
     const need = !m?.solved || !m.firstTry; // 틀리거나 여러 번 시도한 문제만 자세히
     if (!need) return "";
+    const d = m?.diff ?? S.diff ?? "mid";
+    const v = p.diffs?.[d] ?? p;
     return `
       <section class="pr-item">
         <h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.level} · ${p.source}</small> <span class="pr-status">${status}</span></h3>
-        <p class="pr-text">${fmt(p.text)}</p>
+        <p class="pr-text">${fmt(v.text ?? p.text)}</p>
         ${wrongs ? `<p class="pr-wrongs"><b>내가 낸 답:</b> ${wrongs}</p>` : ""}
-        <p class="pr-answer"><b>정답:</b> ${fmt(reviewAnswers?.[p.id] ?? "탐험이 끝나면 공개돼요")}</p>
-        <p class="pr-hint"><b>풀이</b>: ${fmt(p.hint)}</p>
+        <p class="pr-answer"><b>정답:</b> ${fmt(reviewByDiff?.[p.id]?.[d] ?? reviewAnswers?.[p.id] ?? "탐험이 끝나면 공개돼요")}</p>
+        <p class="pr-hint"><b>풀이</b>: ${fmt(v.hint ?? p.hint)}</p>
       </section>`;
   }).join("");
   area.innerHTML = `
