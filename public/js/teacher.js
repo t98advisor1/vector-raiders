@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // 수업 채널 1~7: 채널마다 완전히 분리된 수업 유적(Durable Object class:1~7)이다.
 const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
 const STAGE_TEXT = { lobby: "⏸ 대기", play: "▶ 탐험 중", done: "■ 탐험 끝" };
-let net = null, last = null, answers = null;
+let net = null, last = null, answers = null, isMaster = false;
 const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)
 const pwByCh = {}; // 채널 번호 → 로그인 비밀번호 (joined 뒤 기억해 두기)
 const dashByCh = {}; // 채널 번호 → 마지막 받은 대시보드 (통합 뷰용)
@@ -161,6 +161,13 @@ function openChannel(ch, password) {
 function onChannelMessage(ch, msg) {
   if (msg.type === "joined") {
     remember(pwByCh[ch] ?? null); // 비밀번호는 탭을 닫을 때까지 기억한다
+    if (msg.master && !isMaster) {
+      // 전체 관리자: 중간관리자 관리 창을 열고 현재 설정을 받아 온다
+      isMaster = true;
+      $("#admin-panel").hidden = false;
+      conns[ch]?.send({ type: "adminGet" });
+    }
+    if (!msg.master && msg.period) $(".admin-banner").dataset.period = `📅 ${ch}채널 사용 기간: ${msg.period}`;
     answers = msg.answers ?? null;
     $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
     buildAnswerSheet(); // 문제·정답 일람표도 정답을 받은 뒤에 그린다
@@ -177,6 +184,12 @@ function onChannelMessage(ch, msg) {
     chatLog.push({ at: Date.now(), ch, name: msg.name, team: msg.team, text: msg.text });
     if (chatLog.length > 3000) chatLog.splice(0, chatLog.length - 3000);
     $("#chat-download").textContent = `💬 학생 채팅 기록 다운로드 (${chatLog.length})`;
+  } else if (msg.type === "admin") {
+    renderAdmin(msg);
+  } else if (msg.type === "adminResult") {
+    const m = $("#admin-msg");
+    m.textContent = (msg.ok ? "✅ " : "⚠️ ") + msg.message;
+    m.className = `admin-msg ${msg.ok ? "ok" : "bad"}`;
   } else if (msg.type === "error") {
     $("#setup-error").textContent = msg.message;
   }
@@ -481,4 +494,58 @@ function downloadCsv(d) {
   a.download = `벡터유적탈출_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---------- 전체 관리자: 중간관리자 비밀번호·사용 기간 관리 ----------
+const STATUS_TEXT = { ok: "🟢 사용 중", notyet: "⏳ 시작 전", expired: "⛔ 기간 끝" };
+function renderAdmin(msg) {
+  const rows = $("#admin-rows");
+  rows.replaceChildren();
+  for (const c of msg.channels) {
+    const tr = document.createElement("tr");
+    const td = (child) => { const d = document.createElement("td"); if (child) d.append(child); tr.appendChild(d); return d; };
+    const b = document.createElement("b");
+    b.textContent = `${c.ch}채널`;
+    td(b);
+    const cur = document.createElement("span");
+    cur.className = "admin-cur";
+    cur.textContent = c.passwords.length ? c.passwords.join(", ") : c.usesSecret ? "비밀 값 사용 중" : "없음 (전체 관리자만)";
+    td(cur);
+    const input = (type, value, label) => {
+      const el = document.createElement("input");
+      el.type = type;
+      el.value = value;
+      el.setAttribute("aria-label", `${c.ch}채널 ${label}`);
+      return el;
+    };
+    const pw = input("text", "", "새 비밀번호");
+    pw.placeholder = "바꿀 때만 입력";
+    pw.autocomplete = "off";
+    const from = input("date", c.from, "시작일");
+    const until = input("date", c.until, "종료일");
+    td(pw); td(from); td(until);
+    const st = document.createElement("span");
+    st.className = `admin-status ${c.status}`;
+    st.textContent = STATUS_TEXT[c.status] ?? c.status;
+    td(st);
+    const save = document.createElement("button");
+    save.type = "button";
+    save.className = "btn primary";
+    save.textContent = "저장";
+    save.onclick = () => net?.send({ type: "adminSet", ch: c.ch, password: pw.value, from: from.value, until: until.value });
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "btn";
+    clear.textContent = "비밀번호 초기화";
+    clear.title = "화면에서 정한 비밀번호를 지우고 비밀 값(CHANNEL_PASSWORDS)으로 되돌려요";
+    clear.hidden = !c.passwords.length;
+    clear.onclick = () => {
+      if (confirm(`${c.ch}채널 중간관리자 비밀번호를 지우고 처음 설정(비밀 값)으로 되돌릴까요?`))
+        net?.send({ type: "adminSet", ch: c.ch, clearPassword: true, from: from.value, until: until.value });
+    };
+    const cell = td();
+    cell.className = "admin-actions";
+    cell.append(save, clear);
+    rows.appendChild(tr);
+  }
 }

@@ -1056,3 +1056,21 @@ body.touch-device .chat-toggle { left: 10px; right: auto; top: 64px; bottom: aut
   .game #hud-keys, .game #hud-jumps, .game #hud-mile { padding: 1px 5px; }
 }
 .mcard .gear .tag { text-shadow: none; }
+
+/* 전체 관리자: 중간관리자 관리 */
+.admin-panel { border: 1px solid rgba(255, 201, 77, 0.45) !important; }
+.admin-panel h2 small { font-size: 0.8rem; font-weight: 600; margin-left: 6px; }
+.admin-table input { font: inherit; font-size: 0.9rem; padding: 5px 8px; border-radius: 8px; border: 1px solid rgba(129, 140, 248, 0.45);
+  background: #0f1530; color: #e5e9f5; min-width: 120px; color-scheme: dark; }
+.admin-table td { vertical-align: middle; }
+.admin-cur { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; color: #fde68a; }
+.admin-status { white-space: nowrap; font-weight: 700; }
+.admin-status.expired { color: #fca5a5; }
+.admin-status.notyet { color: #fde68a; }
+.admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.admin-actions .btn { padding: 5px 12px; font-size: 0.85rem; }
+.admin-msg { margin: 8px 0 0; font-weight: 700; min-height: 1.4em; }
+.admin-msg.ok { color: #86efac; }
+.admin-msg.bad { color: #fca5a5; }
+.admin-banner[data-period]::after { content: attr(data-period); margin-left: 12px; color: #fde68a; font-weight: 700; }
+.admin-panel .panel-head h2 { white-space: nowrap; }

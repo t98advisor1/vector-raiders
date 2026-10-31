@@ -3,7 +3,7 @@
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
 import { checkAnswer, PROBLEM_IDS, ANSWER_TEXT } from "./answers.js";
-import { samePassword, checkTeacherPassword } from "./passwords.js";
+import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, cleanDate, todayKst, parseChannelPasswords } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
 
 const STAGES = ["lobby", "play", "done"];
@@ -32,6 +32,10 @@ const problemName = (pid) => `문제 ${pid.slice(1)}`;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // 마지막 활동 뒤 24시간이 지나면 수업 기록을 지운다
 const TTL_REFRESH_MS = 60 * 60 * 1000; // 삭제 예약은 한 시간에 한 번만 뒤로 미룬다
 const MAX_MESSAGE = 2048;
+const ADMIN_ROOM = "admin:global"; // 전체 관리자가 바꾼 중간관리자(채널) 설정을 보관하는 Durable Object
+const CHANNEL_IDS = ["1", "2", "3", "4", "5", "6", "7"];
+const PERIOD_TEXT = { notyet: "아직 사용 기간이 시작되지 않았어요", expired: "사용 기간이 끝났어요" };
+const periodLabel = (cfg) => (cfg?.from || cfg?.until ? `${cfg.from || "처음"} ~ ${cfg.until || "제한 없음"}` : "제한 없음");
 
 // mode: "class"(반 전체가 함께하는 수업 유적) 또는 "practice"(학생 한 명의 연습 유적, 바로 탐험 시작)
 const freshData = (mode = "class") => ({ mode, createdAt: Date.now(), stage: mode === "practice" ? "play" : "lobby", students: {}, unlocked: [] });
@@ -107,6 +111,16 @@ export class Room extends DurableObject {
 
   async fetch(request) {
     const url = new URL(request.url);
+    // 중간관리자 설정 보관함(admin:global) 전용. worker.js는 /ws와 /api/stats만 넘기므로 밖에서는 부를 수 없다.
+    if (url.pathname === "/admin/get") return Response.json((await this.ctx.storage.get("channels")) ?? {});
+    if (url.pathname === "/admin/set" && request.method === "POST") {
+      const { ch, cfg } = await request.json();
+      const all = (await this.ctx.storage.get("channels")) ?? {};
+      if (cfg) all[ch] = cfg;
+      else delete all[ch];
+      await this.ctx.storage.put("channels", all);
+      return Response.json(all);
+    }
     if (url.pathname === "/api/stats") {
       const stats = await this.getStats();
       return new Response(JSON.stringify(stats), {
@@ -122,6 +136,12 @@ export class Room extends DurableObject {
     pair[1].serializeAttachment({ role: null });
     await this.recordVisit();
     return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  // 전체 관리자가 저장한 채널 설정 { "1": { passwords, from, until }, ... }
+  adminStub() { return this.env.ROOM.get(this.env.ROOM.idFromName(ADMIN_ROOM)); }
+  async adminChannels() {
+    try { return await (await this.adminStub().fetch("https://admin/admin/get")).json(); } catch { return {}; }
   }
 
   async alarm() {
@@ -232,8 +252,14 @@ export class Room extends DurableObject {
   async onHello(ws, msg) {
     if (msg.role === "teacher") {
       if (this.practice) return ws.close(4003, "practice room");
-      // 비밀번호는 비밀 값(TEACHER_PASSWORD: 전체 관리자, CHANNEL_PASSWORDS: 채널별)에서만 읽는다. src/passwords.js 참고.
-      const result = checkTeacherPassword(this.env, this.channel ?? "1", msg.password);
+      // 전체 관리자: 비밀 값 TEACHER_PASSWORD. 중간관리자(채널): 전체 관리자가 교사 화면에서 정한 비밀번호,
+      // 없으면 비밀 값 CHANNEL_PASSWORDS. 중간관리자는 사용 기간 안에서만 들어온다. src/passwords.js 참고.
+      const overrides = await this.adminChannels();
+      const { result, master, cfg } = checkTeacherAccess(this.env, this.channel ?? "1", msg.password, overrides);
+      if (result === "notyet" || result === "expired") {
+        this.send(ws, { type: "error", message: `${this.channel}채널은 ${PERIOD_TEXT[result]}. (사용 기간: ${periodLabel(cfg)}) 전체 관리자에게 문의해 주세요.` });
+        return ws.close(4003, "out of period");
+      }
       if (result === "unset") {
         this.send(ws, { type: "error", message: "서버에 교사 비밀번호(TEACHER_PASSWORD 또는 CHANNEL_PASSWORDS)가 설정되지 않았어요. README를 참고해 주세요." });
         return ws.close(4003, "no password set");
@@ -242,8 +268,8 @@ export class Room extends DurableObject {
         this.send(ws, { type: "error", message: "비밀번호가 맞지 않아요." });
         return ws.close(4003, "forbidden");
       }
-      ws.serializeAttachment({ role: "teacher" });
-      this.send(ws, { type: "joined", role: "teacher", answers: ANSWER_TEXT });
+      ws.serializeAttachment({ role: "teacher", master });
+      this.send(ws, { type: "joined", role: "teacher", master, answers: ANSWER_TEXT, period: master ? null : periodLabel(cfg) });
       this.send(ws, this.dashboard());
       this.send(ws, this.classState());
       return;
@@ -254,6 +280,15 @@ export class Room extends DurableObject {
       if (!cid || !name) {
         this.send(ws, { type: "error", message: "이름을 입력해 주세요." });
         return ws.close(4001, "bad hello");
+      }
+      // 수업 채널의 사용 기간 밖이면 들어올 수 없다 (연습 모드는 상관없다)
+      if (!this.practice) {
+        const cfg = (await this.adminChannels())[this.channel ?? "1"];
+        const period = periodStatus(cfg);
+        if (period !== "ok") {
+          this.send(ws, { type: "error", message: `${this.channel}채널은 ${PERIOD_TEXT[period]}. 선생님께 알려 주세요.` });
+          return ws.close(4008, "out of period");
+        }
       }
       // 학생이 고른 팀(A~D). 대표님 지침에 따라 자동 배정은 빼고 반드시 A, B, C, D 중 선택
       const chosenTeam = TEAMS.includes(msg.team) ? msg.team : null;
@@ -309,7 +344,49 @@ export class Room extends DurableObject {
     }
   }
 
+  // 전체 관리자 전용: 중간관리자(채널) 비밀번호·사용 기간 보기와 바꾸기
+  async onAdmin(ws, msg) {
+    if (!ws.deserializeAttachment()?.master) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
+    if (msg.type === "adminSet") {
+      const ch = String(msg.ch);
+      if (!CHANNEL_IDS.includes(ch)) return;
+      const all = await this.adminChannels();
+      const cur = all[ch] ?? {};
+      const next = { passwords: cur.passwords ?? [], from: cleanDate(msg.from), until: cleanDate(msg.until) };
+      if (next.from && next.until && next.from > next.until) return this.send(ws, { type: "adminResult", ok: false, ch, message: "시작일이 종료일보다 늦어요." });
+      if (msg.clearPassword) next.passwords = [];
+      else if (String(msg.password ?? "").trim()) {
+        const pw = cleanPasswordList(msg.password);
+        if (!pw.ok) return this.send(ws, { type: "adminResult", ok: false, ch, message: pw.message });
+        next.passwords = pw.list;
+      }
+      const empty = !next.passwords.length && !next.from && !next.until;
+      await this.adminStub().fetch("https://admin/admin/set", { method: "POST", body: JSON.stringify({ ch, cfg: empty ? null : next }) });
+      this.log({ type: "관리자", name: "전체 관리자", detail: `${ch}채널 설정 변경` });
+      this.send(ws, { type: "adminResult", ok: true, ch, message: `${ch}채널 설정을 저장했어요.` });
+    }
+    const all = await this.adminChannels();
+    const envPws = parseChannelPasswords(this.env.CHANNEL_PASSWORDS);
+    const today = todayKst();
+    this.send(ws, {
+      type: "admin",
+      today,
+      channels: CHANNEL_IDS.map((ch) => {
+        const cfg = all[ch] ?? {};
+        return {
+          ch,
+          passwords: cfg.passwords ?? [],
+          usesSecret: !cfg.passwords?.length && envPws.has(ch),
+          from: cfg.from ?? "",
+          until: cfg.until ?? "",
+          status: periodStatus(cfg, today),
+        };
+      }),
+    });
+  }
+
   async onTeacher(ws, msg) {
+    if (msg.type === "adminGet" || msg.type === "adminSet") return this.onAdmin(ws, msg);
     if (msg.type === "stage" && STAGES.includes(msg.stage)) {
       this.data.stage = msg.stage;
       await this.save();
