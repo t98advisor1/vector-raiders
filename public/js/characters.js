@@ -11,8 +11,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 export const CHARS = ["male-a", "female-a", "male-b", "female-b", "male-c", "female-c", "male-d", "female-d", "male-e", "female-e", "male-f", "female-f"]
   .map((s) => `/models/chars/character-${s}.glb`);
 
-// 팀 색 (A 레드, B 블루, C 그린, D 골드). 미니맵·이름표·바닥 링도 같은 색을 쓴다.
-export const TEAM_COLORS = { A: 0xff4d5e, B: 0x3d8bff, C: 0x22d39a, D: 0xffc22e };
+// 팀 색 (A 레드, B 블루, C 그린, D 퍼플) — 학생 화면 TEAMS 색과 같게. 미니맵·이름표·바닥 링도 같은 색을 쓴다.
+export const TEAM_COLORS = { A: 0xff4d5e, B: 0x3d8bff, C: 0x22d39a, D: 0xb15cff };
 export const teamColor = (team, n = 0) =>
   TEAM_COLORS[team] ?? Object.values(TEAM_COLORS)[Math.abs(Number(n) || 0) % 4];
 

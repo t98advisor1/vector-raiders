@@ -236,12 +236,15 @@ export class Room extends DurableObject {
   // 수업·연습 기록 중 수업 기록만 구글 시트로 보낸다.
   log(row) { if (!this.practice) this.sheet.event(row); }
 
-  // 학생 시작 화면의 '선생님: 탐험 시작' 버튼. 비밀번호는 비밀 값 START_CODES(쉼표로 여러 개).
+  // 학생 시작 화면의 '선생님: 탐험 시작' 버튼. 시작 비밀번호(비밀 값 START_CODES, 쉼표로 여러 개) 또는
+  // 이 채널에 들어갈 수 있는 교사 비밀번호(전체 관리자·중간관리자)로 시작한다.
   async onStartCode(ws, msg) {
     if (this.practice) return;
-    const codes = String(this.env.START_CODES ?? "").split(",").map((c) => c.trim()).filter(Boolean);
-    if (!codes.length) return this.send(ws, { type: "error", message: "서버에 시작 비밀번호(START_CODES)가 설정되지 않았어요." });
-    if (!codes.some((c) => samePassword(String(msg.code ?? ""), c))) return this.send(ws, { type: "error", message: "시작 비밀번호가 맞지 않아요." });
+    const code = String(msg.code ?? "").replace(/[-\s]/g, "");
+    const codes = String(this.env.START_CODES ?? "").split(",").map((c) => c.replace(/[-\s]/g, "")).filter(Boolean);
+    const byCode = codes.some((c) => samePassword(code, c));
+    const byTeacher = !byCode && checkTeacherAccess(this.env, this.channel ?? "1", code, await this.adminChannels()).result === "ok";
+    if (!byCode && !byTeacher) return this.send(ws, { type: "error", message: "시작 비밀번호가 맞지 않아요. 선생님 비밀번호를 넣어도 돼요." });
     this.data.stage = "play";
     await this.save();
     this.log({ type: "진행 단계", name: "선생님(시작 비밀번호)", detail: STAGE_NAMES.play });

@@ -147,23 +147,23 @@
         </div>
         <div class="team-grid-large" role="group" aria-label="팀 선택">
           <button type="button" class="team-card-btn on" data-team="A">
-            <span class="team-icon">🔵</span>
-            <b>A팀 (여우)</b>
+            <span class="team-icon">🔴</span>
+            <b>A팀</b>
             <span class="team-cnt" id="cnt-A">(0/8명)</span>
           </button>
           <button type="button" class="team-card-btn" data-team="B">
-            <span class="team-icon">🟠</span>
-            <b>B팀 (고양이)</b>
+            <span class="team-icon">🔵</span>
+            <b>B팀</b>
             <span class="team-cnt" id="cnt-B">(0/8명)</span>
           </button>
           <button type="button" class="team-card-btn" data-team="C">
             <span class="team-icon">🟢</span>
-            <b>C팀 (곰)</b>
+            <b>C팀</b>
             <span class="team-cnt" id="cnt-C">(0/8명)</span>
           </button>
           <button type="button" class="team-card-btn" data-team="D">
             <span class="team-icon">🟣</span>
-            <b>D팀 (토끼)</b>
+            <b>D팀</b>
             <span class="team-cnt" id="cnt-D">(0/8명)</span>
           </button>
         </div>
@@ -238,9 +238,9 @@
               <div class="slide-visual">
                 <div class="visual-badge">🕹️ 1. 조작 가이드</div>
                 <div class="visual-diagram">
-                  <div class="diagram-key">WASD / 가상 D-패드 : 3D 이동</div>
-                  <div class="diagram-key">Space / 🦘 : 점프 & 오비 발판</div>
-                  <div class="diagram-key">G / 🎯 : 네온 벡터 탄환 사격</div>
+                  <div class="diagram-key">WASD · 방향키 / 가상 D-패드 : 3D 이동</div>
+                  <div class="diagram-key">H · 왼쪽 Alt / 🦘 : 점프 & 오비 발판</div>
+                  <div class="diagram-key">G · 스페이스바 / 🎯 : 네온 벡터 탄환 사격</div>
                   <div class="diagram-key">E / 🔍 : 유물 조사 & 퀴즈 열기</div>
                 </div>
               </div>
@@ -267,7 +267,7 @@
               <div class="slide-visual">
                 <div class="visual-badge">🤝 3. 팀 레이드 & 채팅</div>
                 <div class="visual-diagram">
-                  <div class="diagram-key">🚩 A(여우) · B(고양이) · C(곰) · D(토끼)</div>
+                  <div class="diagram-key">🚩 A팀 · B팀 · C팀 · D팀</div>
                   <div class="diagram-key">⚖️ 세 벡터 합 평형 레이드 (a+b+c=0)</div>
                   <div class="diagram-key">💬 하단 중앙 실시간 채팅 협동</div>
                 </div>
@@ -376,12 +376,12 @@
       </div>
       <div id="touch-actions" class="touch-actions" hidden>
         <button id="actions-handle" class="pad-handle" type="button" aria-label="버튼 이동">⠿</button>
-        <button id="touch-shoot" class="touch-btn-round" type="button" aria-label="사격 (G)">🎯<small>사격</small></button>
-        <button id="touch-jump" class="touch-btn-round" type="button" aria-label="점프">🦘<small>점프</small></button>
+        <button id="touch-shoot" class="touch-btn-round" type="button" aria-label="사격 (G 또는 스페이스바)">🎯<small>사격</small></button>
+        <button id="touch-jump" class="touch-btn-round" type="button" aria-label="점프 (H 또는 왼쪽 Alt)">🦘<small>점프</small></button>
         <button id="touch-act" class="touch-btn-round" type="button" aria-label="열기 또는 조사">✋<small>열기</small></button>
       </div>
       <div id="loading" class="loading" hidden>🏺 유적을 불러오는 중…</div>
-      <div class="help">WASD·방향키 이동 · <kbd>E</kbd> 또는 클릭: 열기 · <kbd>G</kbd>: 사격 · <kbd>Space</kbd>: 점프 · <kbd>M</kbd> 소리</div>
+      <div class="help">WASD·방향키 이동 · <kbd>E</kbd> 열기 · <kbd>N</kbd> 지도 · <kbd>G</kbd>/<kbd>Space</kbd> 사격 · <kbd>H</kbd>/<kbd>왼쪽 Alt</kbd> 점프 · <kbd>M</kbd> 소리</div>
     </div>
   </section>
 

@@ -109,6 +109,9 @@ const MOVE_KEYS = {
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
 };
 const ACT_KEYS = new Set(["KeyE", "KeyF", "Enter"]);
+// 조작 키: 사격 G(또는 스페이스바), 점프 H(또는 왼쪽 Alt). 이동은 WASD·방향키.
+const SHOOT_KEYS = new Set(["KeyG", "Space"]);
+const JUMP_KEYS = new Set(["KeyH", "AltLeft"]);
 
 // 지도 글자: # 벽, . 바닥, ~ 물, ^ 절벽, ! 용암, 1~3 문, a~e 다리 자리, o 상자류, @ 제단
 export function buildGrid() {
@@ -167,19 +170,22 @@ export class Game {
   }
 
   onKey(e, down) {
-    if (!down) { this.keys.delete(e.code); return; }
     const tag = e.target?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || this.h.paused()) return;
+    const typing = tag === "INPUT" || tag === "TEXTAREA";
+    // 왼쪽 Alt는 브라우저 메뉴로 초점이 가지 않게 누를 때·뗄 때 모두 막는다
+    if (e.code === "AltLeft" && !typing) e.preventDefault();
+    if (!down) { this.keys.delete(e.code); return; }
+    if (typing || this.h.paused()) return;
     if (MOVE_KEYS[e.code]) { this.keys.add(e.code); this.taps.add(e.code); e.preventDefault(); }
-    else if (e.code === "Space" && !e.repeat) { e.preventDefault(); this.jump(); }
-    else if ((e.code === "KeyG" || e.code === "KeyC" || e.code === "KeyZ") && !e.repeat) { e.preventDefault(); this.shoot(); }
+    else if (JUMP_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) this.jump(); }
+    else if (SHOOT_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) this.shoot(); }
     else if (ACT_KEYS.has(e.code) && !e.repeat) {
       e.preventDefault();
       if (this.focus) this.h.onInteract(this.focus);
     }
   }
 
-  // 스페이스바·점프 버튼: 바닥(또는 발판)에 서 있을 때만 뛴다
+  // H·왼쪽 Alt·점프 버튼: 바닥(또는 발판)에 서 있을 때만 뛴다
   jump() {
     if (this.h.paused() || this.me.air) return;
     this.me.jumpVy = JUMP_VY;
@@ -187,7 +193,7 @@ export class Game {
     this.activity.jumps++;
   }
 
-  // G키·🎯 버튼: 전방으로 네온 벡터 탄환을 쏜다. 실제 탄환 연출은 world3d.js가 그린다.
+  // G·스페이스바·🎯 버튼: 전방으로 네온 벡터 탄환을 쏜다. 실제 탄환 연출은 world3d.js가 그린다.
   shoot() {
     if (this.h.paused()) return;
     this.activity.shots++;
