@@ -2,12 +2,11 @@ import { connect, store } from "./net.js";
 const load = store;
 import { fmt, watchMath } from "./mathtext.js";
 import { LAB_LEVELS } from "./lab.js";
-import { PROBLEMS, DIFFICULTY, UNITS } from "./problems.js";
-import { DIAGRAMS } from "./diagrams.js";
+import { PROBLEMS, DIFFICULTY, UNITS, loadSet, figureHtml, SET } from "./problems.js";
 import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
 import { MATHEMATICIANS, mathematicianCard } from "./mathematicians.js";
 import { renderClassBar } from "./classbar.js";
-import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, ALTAR, roomAt, W, H, buildGrid, DOOR_COLS, DOOR_ROWS } from "./game.js";
+import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, ALTAR, roomAt, W, H, buildGrid, DOOR_COLS, DOOR_ROWS, TABLETS } from "./game.js";
 import { World3D } from "./world3d.js";
 import { sound } from "./sound.js";
 import { createIntro } from "./intro.js";
@@ -62,7 +61,9 @@ const doorKeyCount = (doorId) => {
   return Math.min(need.length, solvedCount + bonus);
 };
 
-const doorOpen = (id) => doorKeyCount(id) >= (DOORS[id]?.length ?? 1);
+// 문: 내 열쇠를 다 모았거나, 수업에서 같은 팀의 2/3 이상이 이 문을 열었으면 열린다
+const teamDoor = (id) => S.mode === "class" ? S.cls?.teamDoors?.[S.team]?.[id] ?? null : null;
+const doorOpen = (id) => doorKeyCount(id) >= (DOORS[id]?.length ?? 1) || !!teamDoor(id)?.open;
 const altarLit = () => !!S.cls && PROBLEMS.every((p) => S.cls.relics[p.id]?.unlocked);
 // 팀전: 캐릭터 번호(n) → 팀 이름. 미니맵 마커와 랭킹 뱃지가 쓴다.
 const teamOf = (n) => {
@@ -259,6 +260,7 @@ function updateTeamCounts(counts) {
 
 // 단원(스테이지) 선택: 연습 모드·수업 참가에 들어간 뒤 카드로 고르고, 고르면 다음 단계로 자동 진행
 S.unit = store("vr-unit") || "3-1";
+if (UNITS.find((u) => u.id === S.unit)?.soon) S.unit = "3-1"; // 아직 문항 세트가 없는 단원은 3-1로
 function selectUnit(u) {
   S.unit = u;
   store("vr-unit", u);
@@ -433,6 +435,11 @@ function onStatus(kind, code) {
 }
 
 function onMessage(msg) {
+  if (msg.type === "set") {
+    loadSet(msg.set); // 이 유적의 문항 세트 (정답은 빠져 있다)
+    return;
+  }
+  if (msg.type === "coop") return onCoop(msg);
   if (msg.type === "joined") {
     store("vr-session", { name: msg.name });
     $("#join").hidden = true;
@@ -481,6 +488,7 @@ function onMessage(msg) {
   } else if (msg.type === "review") {
     reviewAnswers = msg.answers ?? null;
     reviewByDiff = msg.byDiff ?? null;
+    reviewConds = msg.conditions ?? null;
     document.querySelectorAll(".needs-answers").forEach((b) => { b.disabled = false; });
     toast("📄 정답표를 받았어요. 결과 화면에서 형성평가 답지와 오답 정리를 인쇄할 수 있어요.", "ok");
   } else if (msg.type === "error") {
@@ -907,7 +915,7 @@ function announceRelics(before, cls) {
       sound.sfx("relic");
     }
   }
-  if (altarLit() && !PROBLEMS.every((p) => before.relics[p.id]?.unlocked)) toast("🏛️ 유물 7개가 모두 깨어났어요! 우리 반 유적 탈출 성공!", "ok");
+  if (altarLit() && !PROBLEMS.every((p) => before.relics[p.id]?.unlocked)) toast(`🏛️ 유물 ${PROBLEMS.length}개가 모두 깨어났어요! 우리 반 유적 탈출 성공!`, "ok");
 }
 
 // ---------- 창 ----------
@@ -1053,10 +1061,17 @@ function onInteract(target) {
     const need = DOORS[target.id];
     const left = need.length - doorKeyCount(target.id);
     const bonus = conceptKeys(target.id);
-    return toast(`🔒 잠겨 있어요. 이 방에서 열쇠 조각 ${left}개를 더 모아야 해요.${bonus ? " (💡개념 패스 1개 적용 중)" : ""}`);
+    const td = teamDoor(target.id);
+    const teamText = td ? ` 또는 팀원 ${td.need}명이 이 문을 열면 함께 열려요 (지금 ${td.opened}/${td.members}명).` : "";
+    return toast(`🔒 잠겨 있어요. 이 방에서 열쇠 조각 ${left}개를 더 모아야 해요.${teamText}${bonus ? " (💡개념 패스 1개 적용 중)" : ""}`);
   }
   if (target.kind === "altar") return showAltar();
-  if (target.kind === "tablet") return showConcept(target.id, closeModal, "tablet");
+  if (target.kind === "tablet") {
+    const cards = SET?.cards ?? [];
+    const i = TABLETS.findIndex((t) => t.id === target.tablet?.id);
+    if (cards.length && i >= 0) return showSetCard(cards[i % cards.length], closeModal);
+    return showConcept(target.id, closeModal, "tablet");
+  }
   if (stage !== "play") return toast("선생님이 탐험을 시작하면 열 수 있어요.");
   if (target.kind === "object") return openProblem(target.id);
   if (target.kind === "bridge") return openBridge(target.bridge);
@@ -1095,7 +1110,8 @@ function openProblem(pid) {
   const mine = S.me?.probs[pid];
   // 이미 푼 상자를 다시 열 때는 바로 본문으로. 안 푼 상자는 개념 카드 → 난이도 선택 → 본문 순서.
   if (mine?.solved) return openProblemBody(pid);
-  if (!conceptSeen.has(pid) && CONCEPTS[pid]) return showConcept(pid, () => showDifficulty(pid), "problem");
+  const card = setCardFor(pid);
+  if (!conceptSeen.has(pid) && card) { conceptSeen.add(pid); return showSetCard(card, () => showDifficulty(pid), "problem"); }
   return showDifficulty(pid);
 }
 
@@ -1151,6 +1167,63 @@ function showMathematicianCard(m, next) {
 }
 
 // 개념 카드 팝업: 학습을 돕는다. 직접 조작하다가 '학습 완료'(+50점) 또는 '문제 풀기'를 누른다.
+// ---------- 문항 세트의 핵심 카드 ----------
+const setCardFor = (pid) => {
+  const p = PROBLEMS.find((x) => x.id === pid);
+  return p?.concept ? SET?.cards?.find((c) => c.title === p.concept) ?? null : null;
+};
+
+function showSetCard(card, next, kind = "tablet") {
+  if (!card) return next();
+  const key = `card${card.tablet}`;
+  const goLabel = next === closeModal ? "계속 탐험하기 →" : "문제 풀기 →";
+  const body = openModal();
+  body.innerHTML = `
+    <div class="concept-card set-card">
+      <div class="concept-head"><span class="concept-badge">📚 핵심 카드 ${card.tablet}</span><h2>${fmt(card.title)}</h2></div>
+      <p class="concept-tagline">${fmt(card.summary)}</p>
+      <ul class="concept-points">${card.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul>
+    </div>
+    <div class="concept-actions">
+      <button class="btn" type="button" id="concept-done">💡 학습 완료 +50</button>
+      <button class="btn primary big" type="button" id="concept-go">${goLabel}</button>
+    </div>`;
+  sound.sfx("open");
+  $("#concept-done", body).onclick = () => { awardConcept(key); toast("💡 개념 학습 +50점! 팀 점수에도 더해졌어요.", "ok"); sound.sfx("found"); next(); };
+  $("#concept-go", body).onclick = () => { awardConcept(key); next(); };
+}
+
+// ---------- 협업 문제 ----------
+const coopState = new Map(); // pid → 서버가 보낸 협업 상태
+let coopTimer = null;
+function onCoop(msg) {
+  coopState.set(msg.pid, msg);
+  if (msg.pid !== S.pid || S.diff !== "high") return;
+  const body = $("#modal-body");
+  const box = $("#coop-box", body), conds = $(".coop-conds", body);
+  if (!box || !conds) return;
+  clearTimeout(coopTimer);
+  if (msg.waiting) {
+    box.className = "coop-status warn";
+    box.innerHTML = `⏳ 팀원을 기다리는 중… 같은 팀원이 이 상자 가까이 와서 '상' 문제를 열면 시작돼요. 채팅으로 팀원을 불러 보세요!
+      <button class="btn" type="button" id="coop-solo" hidden>혼자 풀기 (중 배점 100점)</button>`;
+    // 1분이 지나도 짝이 없으면 혼자 풀 수 있다 (두 조건을 다 보고, 점수는 중 배점)
+    coopTimer = setTimeout(() => {
+      const b = $("#coop-solo", body);
+      if (!b) return;
+      b.hidden = false;
+      b.onclick = () => S.net?.send({ type: "coopSolo", pid: msg.pid });
+    }, 60000);
+    return;
+  }
+  box.className = "coop-status ok";
+  box.innerHTML = msg.solo
+    ? (S.mode === "practice" ? "🤝 협업 문제예요. 연습 모드에서는 두 조건을 모두 보고 혼자 풀어요." : "🙋 혼자 풀기: 두 조건을 모두 보여 줄게요. 맞히면 중 배점(100점)이에요.")
+    : `🤝 <b>${msg.partner ?? "팀원"}</b>와(과) 짝이 되었어요! 내 조건을 채팅으로 알려 주고, 팀원의 조건도 받아서 함께 풀어요. 한 명이 맞히면 둘 다 열려요.`;
+  conds.hidden = false;
+  conds.innerHTML = msg.conditions.map((c) => `<p class="coop-cond"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("");
+}
+
 function showConcept(key, next, kind) {
   conceptSeen.add(key);
   const goLabel = next === closeModal ? "계속 탐험하기 →" : kind === "bridge" ? "도전하기 →" : "문제 풀기 →";
@@ -1189,33 +1262,24 @@ function openProblemBody(pid) {
     const diffSpec = p.diffs?.[curDiff] ?? { text: p.text, answer: p.answer, hint: p.hint, level: p.level, points: curDiff === "high" ? 150 : curDiff === "low" ? 70 : 100, source: p.source };
     const curDiffMeta = DIFFICULTY.find((d) => d.key === curDiff);
 
-    // 2인 협동 레이드 체크
-    let coopWarning = "";
-    if (diffSpec.coop) {
-      const myTeam = teamOf(S.game?.me.n);
-      const myX = S.game?.me.x ?? 0, myY = S.game?.me.y ?? 0;
-      let nearbyTeammates = 0;
-      for (const [on, o] of S.game?.others ?? []) {
-        if (teamOf(on) === myTeam && Math.hypot(o.x - myX, o.y - myY) < 3.5) nearbyTeammates++;
-      }
-      if (nearbyTeammates >= 1) {
-        coopWarning = `<div class="coop-status ok">🤝 [2인 팀 협동 레이드 활성화] 같은 팀원과 함께 모여 도전 중! (+${diffSpec.points}점)</div>`;
-      } else {
-        coopWarning = `<div class="coop-status warn">⚠️ [2인 팀 협동 레이드] 같은 팀원 1명이 더 이 상자 근처로 모여야 해요! (현재 1/2명) 채팅으로 팀원을 불러보세요!</div>`;
-      }
-    }
+    // 협업 문제(상): 같은 팀원과 함께 열면 서버가 조건 ㉠·㉡을 하나씩 나눠 준다
+    const coopBox = diffSpec.coop
+      ? `<div class="coop-status warn" id="coop-box">🤝 협업 문제예요. 같은 팀원 한 명이 이 상자 가까이에서 '상' 문제를 함께 열면 조건을 하나씩 나눠 받아요. 채팅으로 서로 조건을 알려 주며 풀어요.</div>`
+      : "";
+    const coopWarning = coopBox;
 
     body.innerHTML = `
       <div class="p-head"><span class="p-icon">${obj.icon}</span>
-        <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}</h2><small>${diffSpec.level} · ${diffSpec.source} · <b class="diff-chip">${curDiffMeta?.name ?? ""} ${diffSpec.points}점</b> · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각${CONCEPTS[pid] ? ` · <button class="link-card-btn" type="button" data-concept="${pid}">📚 개념 카드</button>` : ""}</small></div></div>
+        <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}</h2><small>${diffSpec.level} · ${diffSpec.source} · <b class="diff-chip">${curDiffMeta?.name ?? ""} ${diffSpec.points}점</b> · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각${setCardFor(pid) ? ` · <button class="link-card-btn" type="button" data-concept="${pid}">📚 개념 카드</button>` : ""}</small></div></div>
       <div class="diff-toggle-bar">
-        <button type="button" class="p-diff-btn ${curDiff === 'low' ? 'on' : ''}" data-pdiff="low">🟢 초심자 예제형 (70점)</button>
-        <button type="button" class="p-diff-btn ${curDiff === 'mid' ? 'on' : ''}" data-pdiff="mid">🟡 기본 중단원형 (100점)</button>
-        <button type="button" class="p-diff-btn ${curDiff === 'high' ? 'on' : ''}" data-pdiff="high">🔴 심화 수능형 (150점)</button>
+        <button type="button" class="p-diff-btn ${curDiff === 'low' ? 'on' : ''}" data-pdiff="low">🟢 하 · 기본 (70점)</button>
+        <button type="button" class="p-diff-btn ${curDiff === 'mid' ? 'on' : ''}" data-pdiff="mid">🟡 중 · 표준 (100점)</button>
+        <button type="button" class="p-diff-btn ${curDiff === 'high' ? 'on' : ''}" data-pdiff="high">🔴 상 · 사고력 (150점)${p.coop ? " 🤝" : ""}</button>
       </div>
       ${coopWarning}
       <p class="p-text"></p>
-      <div class="tool">
+      <div class="coop-conds" hidden></div>
+      <div class="tool" ${p.hasTool ? "" : "hidden"}>
         <div class="tool-help">🔍 ${fmt(p.toolHelp)}</div>
         <div class="board-wrap"></div>
         <div class="tool-info"></div>
@@ -1225,9 +1289,14 @@ function openProblemBody(pid) {
       <div class="feedback" role="status"></div>
       <div class="hint" hidden></div>`;
 
-    p.tool({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: true });
+    if (p.hasTool) p.tool({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: true });
     typeText($(".p-text", body), diffSpec.text);
+    S.net?.send({ type: "open", pid, diff: curDiff }); // 풀이 시간 기록 시작 (처음 연 때만 서버가 적는다)
     const mine = S.me?.probs[pid];
+    if (diffSpec.coop && !mine?.solved) {
+      coopState.delete(pid);
+      S.net?.send({ type: "coopOpen", pid });
+    }
     if (mine?.solved) {
       lockSolved(body);
     } else {
@@ -1238,7 +1307,7 @@ function openProblemBody(pid) {
     body.querySelectorAll(".p-diff-btn[data-pdiff]").forEach((b) => {
       b.onclick = () => renderContent(b.dataset.pdiff);
     });
-    if ($("[data-concept]", body)) $("[data-concept]", body).onclick = () => showConcept(pid, () => openProblemBody(pid), "problem");
+    if ($("[data-concept]", body)) $("[data-concept]", body).onclick = () => showSetCard(setCardFor(pid), () => openProblemBody(pid), "problem");
   };
 
   renderContent(S.diff);
@@ -1352,11 +1421,11 @@ function buildAnswer(p, root, spec = null) {
   const label = document.createElement("label");
   label.textContent = ansSpec.label ?? "정답 =";
   const input = document.createElement("input");
-  Object.assign(input, { type: "text", maxLength: 40, placeholder: "예: 2√5, 1/2, π/2, −3", autocomplete: "off" });
+  Object.assign(input, { type: "text", maxLength: 40, placeholder: ansSpec.vec ? "예: -a+2b, 3/2a+b, a-b+c" : "예: 2√5, 1/2, π/2, −3", autocomplete: "off" });
   label.appendChild(input);
   const pad = document.createElement("div");
   pad.className = "keypad";
-  for (const k of ["√", "π", "/", "−", "(", ")", "⌫"]) {
+  for (const k of ansSpec.vec ? ["a", "b", "c", "+", "−", "/", "⌫"] : ["√", "π", "/", "−", "(", ")", "⌫"]) {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = k;
@@ -1416,9 +1485,9 @@ function onResult(msg) {
   if (msg.pid !== S.pid) return;
   const body = $("#modal-body");
   const p = PROBLEMS.find((x) => x.id === msg.pid);
-  if (msg.invalid) return feedback("답의 형식을 확인해 주세요. 예: 4, −3, 1/2, 2√5, π/2", "warn");
+  if (msg.invalid) return feedback("답의 형식을 확인해 주세요. 예: 4, −3, 1/2, 2√5, π/2 (벡터식은 -a+2b처럼)", "warn");
   if (msg.ok) {
-    feedback(msg.already ? "이미 연 상자예요." : `정답! ${p.icon} 상자가 열렸어요.`, "ok");
+    feedback(msg.already ? "이미 연 상자예요." : msg.coopBy ? `🤝 ${msg.coopBy}이(가) 정답을 맞혀서 함께 열었어요!` : `정답! ${p.icon} 상자가 열렸어요.`, "ok");
     if (!msg.already) sound.sfx("correct");
     lockSolved(body);
     return;
@@ -1469,7 +1538,7 @@ function showSummary() {
   for (const p of PROBLEMS) {
     const m = S.me?.probs[p.id];
     const li = document.createElement("li");
-    li.textContent = `${p.icon} ${p.relic} — ${m?.solved ? (m.firstTry ? "★ 한 번에 정답" : `✓ 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ 아직 (${m.tries}번 시도)` : "– 못 연 상자"}`;
+    li.textContent = `${p.icon} ${p.relic} — ${m?.solved ? (m.firstTry ? "★ 한 번에 정답" : `✓ 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ 아직 (${m.tries}번 시도)` : "– 못 연 상자"}${m?.timeMs ? ` · ⏱ ${durText(m.timeMs)}` : ""}${m?.coopWith ? ` · 🤝 ${m.coopWith}` : ""}`;
     ul.appendChild(li);
   }
   $(".done", body).appendChild(ul);
@@ -1483,6 +1552,9 @@ function showSummary() {
 // 오답 정리: 내가 틀리거나 못 푼 문제를 문제·내가 낸 오답·정답·풀이로 정리해 A4 인쇄 창에 채운다.
 let reviewAnswers = null; // 서버가 내려 준 정답표 (탐험 끝 이후에만)
 let reviewByDiff = null; // 난이도별 정답표 { p1: { low, mid, high } } (형성평가 답지용)
+let reviewConds = null; // 협업 문제의 조건 ㉠·㉡ (탐험이 끝난 뒤 인쇄용)
+// 풀이 시간 글자: 83000 → "1분 23초"
+const durText = (ms) => { if (!ms) return ""; const s = Math.round(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`; };
 
 // 인쇄 영역을 채운 뒤 수식(MathJax) 조판이 끝나면 인쇄 창을 연다
 function openPrint(html) {
@@ -1520,13 +1592,13 @@ function printAssessment(kind) {
       return `<section class="fa-item">
         ${head}
         <div class="fa-body">
-          <div class="fa-q"><p class="pr-text">${fmt(text)}</p>${optHtml}</div>
-          ${DIAGRAMS[p.id] ? `<div class="fa-fig">${DIAGRAMS[p.id]}</div>` : ""}
+          <div class="fa-q"><p class="pr-text">${fmt(text)}</p>${(reviewConds?.[p.id]?.[d] ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("")}${optHtml}</div>
+          ${(() => { const f = figureHtml(p); return f ? `<div class="fa-fig">${f}</div>` : ""; })()}
         </div>
         <p class="fa-blank"><b>답</b> <span></span></p>
       </section>`;
     }
-    const status = m?.solved ? (m.firstTry ? "★ 탐험 중 한 번에 정답" : `✓ 탐험 중 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ 탐험 중 ${m.tries}번 시도, 미해결` : "– 탐험 중 미응시";
+    const status = (m?.solved ? (m.firstTry ? "★ 탐험 중 한 번에 정답" : `✓ 탐험 중 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ 탐험 중 ${m.tries}번 시도, 미해결` : "– 탐험 중 미응시") + (m?.timeMs ? ` · ⏱ ${durText(m.timeMs)}` : "");
     return `<section class="fa-item">
       ${head.replace("</h3>", ` <span class="pr-status">${status}</span></h3>`)}
       <p class="pr-answer"><b>정답</b> ${fmt(reviewByDiff[p.id]?.[d] ?? reviewAnswers?.[p.id] ?? "")}</p>

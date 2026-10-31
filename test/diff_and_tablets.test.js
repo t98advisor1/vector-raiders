@@ -1,72 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PROBLEMS, DIFFICULTY } from "../public/js/problems.js";
-import { TABLETS, PLATFORMS } from "../public/js/game.js";
-import { checkAnswer } from "../src/answers.js";
+import { TABLETS, PLATFORMS, OBJECTS, DOORS } from "../public/js/game.js";
 
-test("모든 7개 문제에 3대 난이도(low, mid, high)가 완전 분기되어 있다", () => {
-  assert.equal(PROBLEMS.length, 7);
-  for (const p of PROBLEMS) {
-    assert.ok(p.diffs, `${p.id}에 diffs 객체가 있어야 함`);
-    for (const d of ["low", "mid", "high"]) {
-      const s = p.diffs[d];
-      assert.ok(s, `${p.id}의 ${d} 난이도 스펙 존재`);
-      assert.ok(s.text && s.text.length > 10, `${p.id}의 ${d} 지문 존재`);
-      assert.ok(s.points > 0, `${p.id}의 ${d} 배점 존재`);
-    }
-  }
-});
-
-test("p2와 p4의 high 난이도는 2인 협동 레이드 관문이다", () => {
-  const p2 = PROBLEMS.find((x) => x.id === "p2");
-  const p4 = PROBLEMS.find((x) => x.id === "p4");
-  assert.equal(p2.diffs.high.coop, true);
-  assert.equal(p4.diffs.high.coop, true);
-});
-
-test("p1, p3, p5의 high 난이도는 수능형 5지선다 객관식 보기이다", () => {
-  for (const pid of ["p1", "p3", "p5"]) {
-    const p = PROBLEMS.find((x) => x.id === pid);
-    assert.equal(p.diffs.high.answer.kind, "choice");
-    assert.equal(p.diffs.high.answer.options.length, 5);
-  }
-});
-
-test("난이도별 서버 정답 채점 검증", () => {
-  // p1
-  assert.equal(checkAnswer("p1", ["FO", "OC", "ED"], "low").ok, true);
-  assert.equal(checkAnswer("p1", ["AO", "OD", "FE"], "mid").ok, true);
-  assert.equal(checkAnswer("p1", "5", "high").ok, true);
-
-  // p2
-  assert.equal(checkAnswer("p2", "2", "low").ok, true);
-  assert.equal(checkAnswer("p2", "4", "mid").ok, true);
-  assert.equal(checkAnswer("p2", "8√2", "high").ok, true); // |(8,8)| = 8√2
-
-  // p3
-  assert.equal(checkAnswer("p3", "0", "low").ok, true);
-  assert.equal(checkAnswer("p3", "1/2", "mid").ok, true);
-  assert.equal(checkAnswer("p3", "5", "high").ok, true);
-
-  // p4
-  assert.equal(checkAnswer("p4", "2", "low").ok, true);
-  assert.equal(checkAnswer("p4", "1", "mid").ok, true);
-  assert.equal(checkAnswer("p4", "-6", "high").ok, true);
-
-  // p5
-  assert.equal(checkAnswer("p5", "1", "low").ok, true);
-  assert.equal(checkAnswer("p5", "2", "mid").ok, true);
-  assert.equal(checkAnswer("p5", "5", "high").ok, true);
-
-  // p6
-  assert.equal(checkAnswer("p6", "2", "low").ok, true);
-  assert.equal(checkAnswer("p6", "-4", "mid").ok, true);
-  assert.equal(checkAnswer("p6", "8", "high").ok, true); // (2,2,2)·(2,2,0) = 8
-
-  // p7
-  assert.equal(checkAnswer("p7", "3", "low").ok, true);
-  assert.equal(checkAnswer("p7", "pi/2", "mid").ok, true);
-  assert.equal(checkAnswer("p7", "21", "high").ok, true);
+test("지도에 상자 9개가 있고, 1~3번 방 상자가 문 열쇠가 된다", () => {
+  assert.equal(OBJECTS.length, 9);
+  assert.deepEqual(OBJECTS.map((o) => o.pid), ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]);
+  assert.deepEqual(Object.values(DOORS).flat(), ["p1", "p2", "p3", "p4", "p5", "p6", "p7"]);
 });
 
 test("유적 곳곳에 14개 교과서 개념 비석이 배치되어 있다", () => {

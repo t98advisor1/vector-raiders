@@ -22,7 +22,7 @@
       <div id="ch-tabs" class="ch-tabs" role="tablist" aria-label="수업 채널 전환"></div>
       <span id="stage-chip" class="chip"></span><span id="conn-chip" class="chip soft">연결 전</span>
       <button id="chat-download" class="chip soft print-sheet-btn" type="button">💬 학생 채팅 기록 다운로드</button>
-      <button id="print-sheet-btn" class="chip soft print-sheet-btn" type="button">📄 교사용 문제·정답·해설 PDF 다운로드</button>
+      <button id="print-sheet-btn" class="chip soft print-sheet-btn" type="button">🖨️ 문항·핵심 카드 PDF 출력</button>
     </div>
   </header>
 
@@ -39,6 +39,17 @@
   <section id="dash" class="dash" hidden>
     <div class="admin-banner">
       <span>🧑‍🏫 <b>교사 관제 시스템</b>: 1~7채널 독립 수업 실시간 관제 중</span>
+    </div>
+    <!-- 교사용 출력: 미리 보고 인쇄 창에서 'PDF로 저장' -->
+    <div id="print-menu" class="panel print-menu" hidden>
+      <div class="panel-head"><h2>🖨️ 미리 출력해 보기</h2><small>인쇄 창이 열리면 '대상'을 'PDF로 저장'으로 고르면 파일로 받아요.</small></div>
+      <div class="print-menu-row">
+        <label>난이도 <select id="print-level"><option value="all">하·중·상 전체</option><option value="low">하</option><option value="mid" selected>중</option><option value="high">상</option></select></label>
+        <button class="btn" type="button" data-print="sheet">📝 형성평가 문제지</button>
+        <button class="btn" type="button" data-print="answer">✅ 형성평가 답지</button>
+        <button class="btn" type="button" data-print="cards">📚 핵심 카드</button>
+        <button class="btn primary" type="button" data-print="guide">📄 교사용 해설집 (전체)</button>
+      </div>
     </div>
     <div id="ch-overview" class="ch-overview" aria-label="채널 통합 현황"></div>
     <!-- 전체 관리자 전용: 중간관리자(채널 교사) 비밀번호와 사용 기간 -->

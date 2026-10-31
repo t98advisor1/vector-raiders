@@ -2,7 +2,8 @@
 // 학생 진행 상황을 저장하고, 반 전체 협동 현황(벡터 점프 에너지, 유물)과 친구들 위치를 모두에게 알린다.
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
-import { checkAnswer, PROBLEM_IDS, ANSWER_TEXT, ANSWER_TEXT_BY_DIFF } from "./answers.js";
+import { gradeLevel, answerText } from "./answers.js";
+import { builtinSet, UNIT_SET, DEFAULT_SET } from "./sets.js";
 import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, cleanDate, todayKst, parseChannelPasswords } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
 
@@ -22,13 +23,22 @@ const DIFF_POINTS = { high: 150, mid: 100, low: 70 };
 const MILEAGE_CAP = 200;
 const ACTIVITY_LIMIT = { dist: 60, jumps: 15, shots: 30 }; // 5초마다 오는 활동 보고의 최대값(어뷰ing 방지)
 // 개념 카드 점수를 매길 수 있는 key: 문제(p1~p7)와 벡터 실험실 단계(l1~l5)
-const CONCEPT_KEYS = [...PROBLEM_IDS, ...LAB_LEVELS];
+// 상자 9개(p1~p9). 문항 세트의 상자 N번 = pN. 어떤 세트든 상자는 9개다.
+const PROBLEM_IDS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"];
+const LEVELS = ["low", "mid", "high"];
+// 문 번호 → 그 문을 여는 상자 (public/js/game.js의 DOORS와 같다)
+const DOOR_KEYS = { 1: ["p1", "p2", "p3"], 2: ["p4", "p5"], 3: ["p6", "p7"] };
+const TEAM_DOOR_RATIO = 2 / 3; // 같은 팀의 2/3 이상이 문을 열면 그 팀 모두에게 열린다
+const COOP_REACH = 4; // 협업 상자: 같은 팀원이 이만큼(칸) 가까이 있어야 짝이 된다
+const COOP_WAIT_MS = 2 * 60 * 1000;
+// 개념 학습 점수를 줄 수 있는 카드: 문항(p1~p9), 벡터 점프(l1~l5), 핵심 카드(card1~), 비석, 수학자 카드
+const CONCEPT_KEY_RE = /^(p[1-9]|l[1-5]|card\d{1,2}|tab_[a-z0-9_]{1,20}|math_[a-z]{1,20})$/;
 // 팀전: 학생이 들어올 때마다 가장 사람이 적은 팀에 한 명씩 나눠 담는다.
 const TEAMS = ["A", "B", "C", "D"];
 const TEAM_NAMES = { A: "A팀", B: "B팀", C: "C팀", D: "D팀" };
 const LAB_NAMES = { l1: "삼각형법", l2: "평행사변형법", l3: "실수배", l4: "길 찾기", l5: "길 찾기 2" };
 const STAGE_NAMES = { lobby: "대기", play: "탐험 시작", done: "탐험 끝" };
-const problemName = (pid) => `문제 ${pid.slice(1)}`;
+const problemName = (pid) => `상자 ${pid.slice(1)}`;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // 마지막 활동 뒤 24시간이 지나면 수업 기록을 지운다
 const TTL_REFRESH_MS = 60 * 60 * 1000; // 삭제 예약은 한 시간에 한 번만 뒤로 미룬다
 const MAX_MESSAGE = 2048;
@@ -136,6 +146,99 @@ export class Room extends DurableObject {
     pair[1].serializeAttachment({ role: null });
     await this.recordVisit();
     return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  // ---------- 문항 세트 ----------
+  // 이 유적이 쓰는 세트. 수업 채널은 기본 세트, 연습은 학생이 고른 단원의 세트.
+  set() { return builtinSet(this.data?.setId) ?? builtinSet(DEFAULT_SET); }
+  level(pid, diff) { return this.set().boxes[Number(pid.slice(1)) - 1]?.levels[diff] ?? null; }
+
+  // 학생에게 보내는 세트: 정답을 빼고, 협업 문항의 조건 ㉠·㉡도 뺀다(짝이 되면 따로 보낸다).
+  publicSet() {
+    const s = this.set();
+    return {
+      id: s.id, meta: s.meta, cards: s.cards,
+      boxes: s.boxes.map((b) => ({
+        no: b.no, title: b.title, room: b.room, coop: b.coop, tool: b.tool, concept: b.concept,
+        levels: Object.fromEntries(LEVELS.map((k) => {
+          const lv = b.levels[k];
+          return [k, { points: lv.points, text: lv.text, kind: lv.kind, options: lv.options, hint: lv.hint, coop: b.coop && k === "high", conditionLabels: lv.conditions.map((c) => c.label) }];
+        })),
+      })),
+    };
+  }
+
+  // 교사에게 보내는 세트: 정답(화면용 글자)과 조건까지 모두
+  teacherSet() {
+    const s = this.set();
+    return { ...this.publicSet(), boxes: s.boxes.map((b) => ({ ...b, levels: Object.fromEntries(LEVELS.map((k) => [k, { ...b.levels[k], answerText: answerText(b.levels[k]) }])) })) };
+  }
+
+  answerTable() {
+    return Object.fromEntries(this.set().boxes.map((b) => [`p${b.no}`, Object.fromEntries(LEVELS.map((k) => [k, answerText(b.levels[k])]))]));
+  }
+
+  isCoop(pid, diff) { return diff === "high" && !!this.set().boxes[Number(pid.slice(1)) - 1]?.coop; }
+
+  coopReady(cid, pid) {
+    if (this.practice) return true;
+    const st = this.data.students[cid];
+    return !!(this.coop?.pairs.get(`${st?.team}:${pid}`)?.includes(cid) || this.coop?.solo.has(`${cid}:${pid}`));
+  }
+
+  sendTo(cid, msg) {
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment();
+      if (a?.role === "student" && a.cid === cid) this.send(ws, msg);
+    }
+  }
+
+  // 협업 열기: 같은 팀원이 COOP_REACH칸 안에서 같은 상자(상)를 2분 안에 열면 짝이 된다.
+  // 먼저 연 학생은 조건 ㉠, 나중에 연 학생은 조건 ㉡을 받는다. 1분을 기다려도 짝이 없으면 혼자 풀기(두 조건, 중 배점).
+  async onCoop(ws, cid, st, msg) {
+    const pid = msg.pid;
+    if (!this.isCoop(pid, "high")) return;
+    const conds = this.level(pid, "high").conditions;
+    this.coop ??= { wait: new Map(), pairs: new Map(), solo: new Set() };
+    const key = `${st.team}:${pid}`;
+    if (this.practice || msg.type === "coopSolo" || !st.team) {
+      this.coop.solo.add(`${cid}:${pid}`);
+      return this.send(ws, { type: "coop", pid, solo: true, conditions: conds });
+    }
+    const pair = this.coop.pairs.get(key);
+    if (pair?.includes(cid)) {
+      return this.send(ws, { type: "coop", pid, conditions: [conds[pair.indexOf(cid)]], partner: this.data.students[pair.find((c) => c !== cid)]?.name });
+    }
+    const waiting = this.coop.wait.get(key);
+    const me = this.pos.get(cid);
+    const near = (other) => { const o = this.pos.get(other); return me && o && Math.hypot(o.x - me.x, o.y - me.y) <= COOP_REACH; };
+    if (waiting && waiting.cid !== cid && Date.now() - waiting.at < COOP_WAIT_MS && near(waiting.cid)) {
+      this.coop.wait.delete(key);
+      this.coop.pairs.set(key, [waiting.cid, cid]);
+      const mate = this.data.students[waiting.cid];
+      this.sendTo(waiting.cid, { type: "coop", pid, conditions: [conds[0]], partner: st.name });
+      this.send(ws, { type: "coop", pid, conditions: [conds[1] ?? conds[0]], partner: mate?.name });
+      this.log({ type: "협업 시작", name: `${mate?.name} & ${st.name}`, problem: problemName(pid) });
+      return;
+    }
+    this.coop.wait.set(key, { cid, at: Date.now() });
+    this.send(ws, { type: "coop", pid, waiting: true });
+  }
+
+  // 팀 문 열림: 팀원(2명 이상) 중 2/3 이상이 그 문의 열쇠를 모두 모으면 팀 전체에게 열린다
+  teamDoors() {
+    const out = {};
+    for (const team of TEAMS) {
+      const members = Object.values(this.data.students).filter((st) => st.team === team);
+      if (members.length < 2) continue;
+      const need = Math.ceil(members.length * TEAM_DOOR_RATIO);
+      out[team] = {};
+      for (const [door, keys] of Object.entries(DOOR_KEYS)) {
+        const opened = members.filter((st) => keys.every((k) => st.probs[k]?.solved)).length;
+        out[team][door] = { opened, need, members: members.length, open: opened >= need };
+      }
+    }
+    return out;
   }
 
   // 전체 관리자가 저장한 채널 설정 { "1": { passwords, from, until }, ... }
@@ -272,7 +375,7 @@ export class Room extends DurableObject {
         return ws.close(4003, "forbidden");
       }
       ws.serializeAttachment({ role: "teacher", master });
-      this.send(ws, { type: "joined", role: "teacher", master, answers: ANSWER_TEXT, period: master ? null : periodLabel(cfg) });
+      this.send(ws, { type: "joined", role: "teacher", master, answers: this.answerTable(), set: this.teacherSet(), period: master ? null : periodLabel(cfg) });
       this.send(ws, this.dashboard());
       this.send(ws, this.classState());
       return;
@@ -338,6 +441,12 @@ export class Room extends DurableObject {
       st.lastSeenAt = Date.now();
       await this.save();
       this.log({ type: "입장", name });
+      // 세트: 연습은 학생이 고른 단원, 수업 채널은 기본 세트 (나중에 교사가 채널별로 고른다)
+      if (!this.data.setId) {
+        this.data.setId = this.practice ? (UNIT_SET[msg.unit] ?? DEFAULT_SET) : DEFAULT_SET;
+        await this.save();
+      }
+      this.send(ws, { type: "set", set: this.publicSet() });
       this.send(ws, { type: "joined", role: "student", name, n: st.n, pos: this.lastPos.get(cid) ?? null });
       this.send(ws, { type: "me", me: st });
       this.send(ws, this.classState());
@@ -476,7 +585,9 @@ export class Room extends DurableObject {
       // 수업 탐험이 끝난 뒤 오답 정리·형성평가 답지용으로 정답표를 내려 준다.
       // 수업 중에는 정답이 학생에게 가지 않고, 연습 모드에서는 출력(PDF)을 하지 않으므로 보내지 않는다.
       if (this.practice || this.data.stage !== "done") return;
-      return this.send(ws, { type: "review", answers: ANSWER_TEXT, byDiff: ANSWER_TEXT_BY_DIFF });
+      const table = this.answerTable();
+      const conditions = Object.fromEntries(this.set().boxes.map((b) => [`p${b.no}`, Object.fromEntries(LEVELS.map((k) => [k, b.levels[k].conditions]))]));
+      return this.send(ws, { type: "review", answers: Object.fromEntries(Object.entries(table).map(([k, v]) => [k, v.mid])), byDiff: table, conditions });
     }
 
     if (msg.type === "chat") {
@@ -488,7 +599,7 @@ export class Room extends DurableObject {
 
     if (msg.type === "concept") {
       // 개념 카드 학습 기록: 카드를 처음 학습하면 +50점. 같은 카드는 한 번만 점수를 준다.
-      if (!CONCEPT_KEYS.includes(msg.key)) return;
+      if (typeof msg.key !== "string" || !CONCEPT_KEY_RE.test(msg.key)) return;
       st.concepts ??= [];
       if (!st.concepts.includes(msg.key)) {
         st.concepts.push(msg.key);
@@ -511,6 +622,16 @@ export class Room extends DurableObject {
       return;
     }
 
+    // 풀이 시간: 문제를 처음 연 때부터 맞힐 때까지 (난이도를 바꿔도 처음 연 때부터)
+    if (msg.type === "open" && PROBLEM_IDS.includes(msg.pid)) {
+      const p = (st.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
+      if (!p.openedAt && !p.solved) { p.openedAt = Date.now(); await this.save(); }
+      return;
+    }
+
+    // 협업 상자(상): 같은 팀원 둘이 가까이에서 함께 열면 조건 ㉠·㉡을 하나씩 나눠 준다
+    if ((msg.type === "coopOpen" || msg.type === "coopSolo") && PROBLEM_IDS.includes(msg.pid)) return this.onCoop(ws, cid, st, msg);
+
     if (msg.type === "hint" && PROBLEM_IDS.includes(msg.pid)) {
       // 힌트를 본 기록. 힌트를 보고 맞히면 첫 시도 보너스는 주지 않는다.
       const p = (st.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
@@ -531,34 +652,40 @@ export class Room extends DurableObject {
       if (p.tries >= MAX_TRIES) return this.send(ws, { type: "error", message: "도전 횟수를 다 썼어요. 선생님께 도움을 요청하세요." });
       // 상자를 열 때 고른 난이도(상 150 / 중 100 / 하 70). 고르지 않으면 기본 100점.
       if (DIFF_POINTS[msg.diff]) p.diff = msg.diff;
-      const result = checkAnswer(msg.pid, msg.answer, p.diff ?? msg.diff ?? "mid");
+      const lv = this.level(msg.pid, p.diff ?? "mid");
+      if (lv?.conditions?.length && this.isCoop(msg.pid, p.diff) && !this.coopReady(cid, msg.pid)) {
+        return this.send(ws, { type: "error", message: "협업 문제예요. 팀원과 함께 열어 조건을 나눠 받은 뒤에 제출해 주세요." });
+      }
+      const result = gradeLevel(lv, msg.answer);
       if (!result) return this.send(ws, { type: "result", pid: msg.pid, invalid: true, tries: p.tries });
       p.tries += 1;
       if (result.ok) {
         p.solved = true;
         p.firstTry = p.tries === 1 && !p.hinted;
         p.solvedAt = st.lastAt = Date.now();
-        if (Object.values(st.probs).filter((x) => x.solved).length === PROBLEM_IDS.length) st.escapedAt = p.solvedAt;
+        if (PROBLEM_IDS.every((k) => st.probs[k]?.solved)) st.escapedAt = p.solvedAt;
 
-        // 2인 협동 레이드: 근처에 함께 있던 같은 팀원에게도 동시 해결 인정
-        if (p.diff === "high" && (msg.pid === "p2" || msg.pid === "p4")) {
-          const myPos = this.pos.get(cid);
-          if (myPos && st.team) {
-            for (const [otherCid, otherSt] of Object.entries(this.data.students)) {
-              if (otherCid === cid || otherSt.team !== st.team) continue;
-              const oPos = this.pos.get(otherCid);
-              if (oPos && Math.hypot(oPos.x - myPos.x, oPos.y - myPos.y) < 4.0) {
-                const op = (otherSt.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
-                if (!op.solved) {
-                  op.solved = true;
-                  op.diff = "high";
-                  op.firstTry = true;
-                  op.solvedAt = otherSt.lastAt = Date.now();
-                  this.log({ type: "2인 협동 정답", name: `${st.name} & ${otherSt.name}`, problem: problemName(msg.pid), detail: "팀 협동 완수" });
-                }
+        if (p.openedAt) p.timeMs = p.solvedAt - p.openedAt;
+        // 협업 상자: 짝이 된 팀원도 함께 해결로 인정한다. 혼자 푼 협업 문제는 중 배점(soloCoop).
+        const pair = this.coop?.pairs.get(`${st.team}:${msg.pid}`);
+        if (this.isCoop(msg.pid, p.diff)) {
+          if (pair?.includes(cid)) {
+            const mateCid = pair.find((c) => c !== cid);
+            const mate = this.data.students[mateCid];
+            p.coopWith = mate?.name ?? null;
+            if (mate) {
+              const op = (mate.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
+              if (!op.solved) {
+                Object.assign(op, { solved: true, diff: p.diff, firstTry: false, solvedAt: Date.now(), coopWith: st.name });
+                if (op.openedAt) op.timeMs = op.solvedAt - op.openedAt;
+                mate.lastAt = op.solvedAt;
+                if (PROBLEM_IDS.every((k) => mate.probs[k]?.solved)) mate.escapedAt = op.solvedAt;
+                this.sendTo(mateCid, { type: "result", pid: msg.pid, ok: true, tries: op.tries, coopBy: st.name });
+                this.sendTo(mateCid, { type: "me", me: mate });
               }
+              this.log({ type: "협업 정답", name: `${st.name} & ${mate.name}`, problem: problemName(msg.pid) });
             }
-          }
+          } else p.soloCoop = true;
         }
 
         this.updateUnlocks();
@@ -567,7 +694,7 @@ export class Room extends DurableObject {
       }
       await this.save();
       this.log({ type: result.ok ? "정답" : "오답", name: st.name, problem: problemName(msg.pid), answer: result.display, result: result.ok ? "O" : "X", tries: p.tries });
-      if (result.ok && st.escapedAt === p.solvedAt) this.log({ type: "탈출", name: st.name, detail: "열쇠 조각 7개를 모두 모았어요" });
+      if (result.ok && st.escapedAt === p.solvedAt) this.log({ type: "탈출", name: st.name, detail: "열쇠 조각 9개를 모두 모았어요" });
       this.send(ws, { type: "result", pid: msg.pid, ok: result.ok, tries: p.tries });
       this.send(ws, { type: "me", me: st });
       if (result.ok) this.broadcast({ type: "found", n: st.n, name: st.name, pid: msg.pid }); // 모두에게 "누가 유물을 발견했어요" 팝업
@@ -626,7 +753,7 @@ export class Room extends DurableObject {
         const first = probs.filter((p) => p.firstTry).length;
         st.concepts ??= [];
         st.activity ??= { dist: 0, jumps: 0, shots: 0 };
-        const solveScore = probs.filter((p) => p.solved).reduce((s, p) => s + (DIFF_POINTS[p.diff] ?? SCORE.solve), 0);
+        const solveScore = probs.filter((p) => p.solved).reduce((s, p) => s + (p.soloCoop ? DIFF_POINTS.mid : DIFF_POINTS[p.diff] ?? SCORE.solve), 0);
         const mileage = mileageOf(st.activity);
         return {
           cid, n: st.n, name: st.name, solved, first, lab: st.lab.length, concepts: st.concepts.length, mileage,
@@ -689,6 +816,7 @@ export class Room extends DurableObject {
       online: this.onlineCids().size,
       energy: total ? labDone / (total * LAB_LEVELS.length) : 0,
       relics,
+      teamDoors: this.practice ? {} : this.teamDoors(),
       players: students.map((st) => [st.n, st.name, st.team ?? null]),
       ranking: this.ranking().map(({ n, name, score, solved, escapedAt, cid, mileage, concepts }) => ({ n, name, score, solved, escaped: !!escapedAt, mileage, concepts, team: this.data.students[cid].team ?? null })),
       teams: this.teamScores(),
