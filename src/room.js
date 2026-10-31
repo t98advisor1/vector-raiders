@@ -3,6 +3,7 @@
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
 import { checkAnswer, PROBLEM_IDS, ANSWER_TEXT } from "./answers.js";
+import { samePassword, checkTeacherPassword } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
 
 const STAGES = ["lobby", "play", "done"];
@@ -46,13 +47,6 @@ const mileageOf = (a) =>
   Math.min(MILEAGE_CAP, Math.floor((a?.dist ?? 0) / 10) * 2 + Math.floor(a?.jumps ?? 0) + Math.floor((a?.shots ?? 0) / 5));
 
 // 비밀번호 비교: 길이가 같으면 글자마다 모두 비교한다.
-function samePassword(a, b) {
-  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 function cleanName(raw) {
   if (typeof raw !== "string") return "";
   return raw.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 12);
@@ -238,27 +232,13 @@ export class Room extends DurableObject {
   async onHello(ws, msg) {
     if (msg.role === "teacher") {
       if (this.practice) return ws.close(4003, "practice room");
-      const entered = String(msg.password ?? "").trim();
-      const ch = this.channel ?? "1";
-      // 비밀번호 체계:
-      // 1. 전체 관리자 채널 비밀번호: 119119 (또는 119-119) - 모든 채널 접속 가능
-      // 2. 채널별 개별 비밀번호: 1채널 82821, 2채널 82822, 3채널 82823, 4채널 82824, 5채널 82825, 6채널 82826, 7채널 82827
-      // 3. Cloudflare 환경변수 TEACHER_PASSWORD 및 기본값 1234
-      const chPwMap = {
-        "1": ["82821", "8282185851"],
-        "2": ["82822", "8282282882"],
-        "3": ["82823"],
-        "4": ["82824"],
-        "5": ["82825"],
-        "6": ["82826"],
-        "7": ["82827"],
-      };
-      const allowed = [
-        "119119", "119-119",
-        ...(chPwMap[ch] ?? []),
-        ...(this.env.TEACHER_PASSWORD ? [this.env.TEACHER_PASSWORD] : ["1234"]),
-      ];
-      if (!allowed.some((p) => samePassword(entered, p))) {
+      // 비밀번호는 비밀 값(TEACHER_PASSWORD: 전체 관리자, CHANNEL_PASSWORDS: 채널별)에서만 읽는다. src/passwords.js 참고.
+      const result = checkTeacherPassword(this.env, this.channel ?? "1", msg.password);
+      if (result === "unset") {
+        this.send(ws, { type: "error", message: "서버에 교사 비밀번호(TEACHER_PASSWORD 또는 CHANNEL_PASSWORDS)가 설정되지 않았어요. README를 참고해 주세요." });
+        return ws.close(4003, "no password set");
+      }
+      if (result !== "ok") {
         this.send(ws, { type: "error", message: "비밀번호가 맞지 않아요." });
         return ws.close(4003, "forbidden");
       }

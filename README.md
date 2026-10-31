@@ -96,7 +96,8 @@ npm run dev
 비밀번호는 프로젝트 폴더의 `.dev.vars` 파일에 적습니다. 이 파일은 git에 올라가지 않습니다. 바꾸면 `npm run dev`를 다시 실행합니다.
 
 ```
-TEACHER_PASSWORD=교사 집계 화면 비밀번호
+TEACHER_PASSWORD=전체 관리자 비밀번호(모든 채널의 교사 화면)
+CHANNEL_PASSWORDS=채널별 교사 비밀번호(예: 1=1111,1112;2=2222 — 채널=비밀번호를 세미콜론으로, 한 채널에 여럿이면 쉼표로)
 START_CODES=수업 탐험 시작 비밀번호(여러 개면 쉼표로, 예: 1111,2222)
 ```
 
@@ -112,11 +113,12 @@ START_CODES=수업 탐험 시작 비밀번호(여러 개면 쉼표로, 예: 1111
 ```bash
 npx wrangler login
 npx wrangler secret put TEACHER_PASSWORD
+npx wrangler secret put CHANNEL_PASSWORDS
 npx wrangler secret put START_CODES
 npm run deploy
 ```
 
-두 번째·세 번째 명령은 배포 서버에서 쓸 교사 비밀번호와 시작 비밀번호를 묻습니다. 설정하지 않으면 교사 화면에 들어가거나 수업 탐험을 시작할 수 없습니다.
+가운데 세 명령은 배포 서버에서 쓸 비밀번호를 묻습니다. 비밀번호는 공개 저장소의 코드에 적지 않습니다. 교사 비밀번호(TEACHER_PASSWORD, CHANNEL_PASSWORDS)가 하나도 없으면 교사 화면에 들어갈 수 없고, START_CODES가 없으면 학생 화면에서 수업 탐험을 시작할 수 없습니다. 하이픈과 띄어쓰기는 무시하므로 `12-34`를 입력해도 `1234`로 들어갑니다.
 
 배포하면 `https://go.<계정의 workers.dev 하위 도메인>.workers.dev` 주소가 생깁니다(앞부분 `go`는 `wrangler.toml`의 `name`). 하위 도메인은 Cloudflare 대시보드의 Workers & Pages → Account details → Subdomain에서 바꿀 수 있습니다. Durable Objects(SQLite 저장)를 쓰며, 한 반 규모라면 무료 플랜 한도 안에서 쓸 수 있을 것으로 예상합니다. 다만 실제 요금과 한도는 Cloudflare 요금 안내에서 확인해 주세요.
 
