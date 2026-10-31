@@ -1201,3 +1201,11 @@ body.touch-device .chat-panel { right: 96px; bottom: calc(14px + env(safe-area-i
 .bogi-line { font-size: 1.3rem; font-weight: 700; }
 .coop-conds { font-size: 1.2rem; }
 @media (max-width: 600px) { .p-text { font-size: 1.32rem; } .bogi-line { font-size: 1.15rem; } }
+
+/* 교사용 출력 창: 화면 맨 앞에 뜬다 */
+.print-pop { position: fixed; inset: 0; z-index: 3000; background: rgba(5, 8, 20, 0.6); display: flex; align-items: flex-start; justify-content: center; padding: 72px 16px 16px; }
+.print-pop[hidden] { display: none; }
+.print-pop-card { background: #151b38; color: #e5e9f5; border: 1px solid rgba(129, 140, 248, 0.5); border-radius: 16px; padding: 18px; width: min(720px, 100%); display: grid; gap: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.print-pop-card h2 { margin: 0; font-size: 1.25rem; }
+.print-pop-card small { color: #a5b4fc; }
+.print-msg { margin: 0; min-height: 1.2em; font-weight: 700; color: #fde68a; }

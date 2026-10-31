@@ -84,18 +84,31 @@ $("#invite-copy").onclick = async () => {
 // 📄 해설집(하·중·상 전체) · 📝 형성평가 문제지 · ✅ 답지 · 📚 핵심 카드. 난이도는 출력 창에서 고른다.
 const LV = { low: "하", mid: "중", high: "상" };
 $("#print-sheet-btn").onclick = () => openPrintMenu();
+$("#print-answer-btn").onclick = () => { openPrintMenu(); runPrint("answer"); };
+$("#print-menu-close").onclick = () => { $("#print-menu").hidden = true; };
+$("#print-menu").addEventListener("pointerdown", (e) => { if (e.target.id === "print-menu") $("#print-menu").hidden = true; });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#print-menu").hidden = true; });
 
+// 출력 창은 화면 맨 앞에 뜬다(스크롤 위치·대시보드 상태와 상관없이 보인다).
 function openPrintMenu() {
-  if (!answers || !PROBLEMS.length) return alert("먼저 접속한 뒤에 출력할 수 있어요. 비밀번호를 입력하고 들어가 주세요.");
-  const box = $("#print-menu");
-  box.hidden = !box.hidden;
+  $("#print-menu").hidden = false;
+  printMsg(ready() ? "" : "⏳ 문항을 받는 중이에요. 교사 비밀번호로 들어간 뒤 잠시 기다렸다 눌러 주세요.");
 }
-for (const b of document.querySelectorAll("[data-print]")) b.onclick = () => {
-  const kind = b.dataset.print, level = $("#print-level").value;
-  if (kind === "guide") printSheet();
-  else if (kind === "cards") printCards();
-  else printAssessmentTeacher(kind, level);
-};
+const ready = () => !!answers && PROBLEMS.length > 0;
+function printMsg(t) { $("#print-msg").textContent = t; }
+function runPrint(kind) {
+  if (!ready()) return printMsg("⏳ 문항을 받는 중이에요. 교사 비밀번호로 들어간 뒤 잠시 기다렸다 눌러 주세요.");
+  const level = $("#print-level").value;
+  try {
+    if (kind === "guide") printSheet();
+    else if (kind === "cards") printCards();
+    else printAssessmentTeacher(kind, level);
+    printMsg("✅ 미리보기를 열었어요. 새 창(탭)에서 '🖨️ 인쇄 / PDF로 저장'을 눌러 주세요.");
+  } catch (err) {
+    printMsg(`⚠️ 출력을 만들지 못했어요: ${err?.message ?? err}`);
+  }
+}
+for (const b of document.querySelectorAll("[data-print]")) b.onclick = () => runPrint(b.dataset.print);
 
 function printLevels(level) { return level === "all" ? ["low", "mid", "high"] : [level]; }
 
@@ -135,6 +148,7 @@ function printCards() {
 
 function showPrint(html, title = "교사용 출력") {
   if (openPrintDoc(title, html)) return; // 새 창 미리보기 (팝업이 막혔을 때만 아래 예전 방식)
+  $("#print-menu").hidden = true; // 팝업이 막혔으면 이 화면에서 인쇄한다(출력 창이 가리지 않게 닫는다)
   const sheet = $("#teacher-print-sheet");
   sheet.innerHTML = html;
   sheet.hidden = false;

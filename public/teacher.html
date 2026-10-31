@@ -24,6 +24,7 @@
       <span id="stage-chip" class="chip"></span><span id="conn-chip" class="chip soft">연결 전</span>
       <button id="chat-download" class="chip soft print-sheet-btn" type="button">💬 학생 채팅 기록 다운로드</button>
       <button id="print-sheet-btn" class="chip soft print-sheet-btn" type="button">🖨️ 문항·핵심 카드 PDF 출력</button>
+      <button id="print-answer-btn" class="chip soft print-sheet-btn" type="button">✅ 교사용 답안 PDF</button>
     </div>
   </header>
 
@@ -40,17 +41,6 @@
   <section id="dash" class="dash" hidden>
     <div class="admin-banner">
       <span>🧑‍🏫 <b>교사 관제 시스템</b>: 1~7채널 독립 수업 실시간 관제 중</span>
-    </div>
-    <!-- 교사용 출력: 미리 보고 인쇄 창에서 'PDF로 저장' -->
-    <div id="print-menu" class="panel print-menu" hidden>
-      <div class="panel-head"><h2>🖨️ 미리 출력해 보기</h2><small>인쇄 창이 열리면 '대상'을 'PDF로 저장'으로 고르면 파일로 받아요.</small></div>
-      <div class="print-menu-row">
-        <label>난이도 <select id="print-level"><option value="all">하·중·상 전체</option><option value="low">하</option><option value="mid" selected>중</option><option value="high">상</option></select></label>
-        <button class="btn" type="button" data-print="sheet">📝 형성평가 문제지</button>
-        <button class="btn" type="button" data-print="answer">✅ 형성평가 답지</button>
-        <button class="btn" type="button" data-print="cards">📚 핵심 카드</button>
-        <button class="btn primary" type="button" data-print="guide">📄 교사용 해설집 (전체)</button>
-      </div>
     </div>
     <div id="ch-overview" class="ch-overview" aria-label="채널 통합 현황"></div>
     <!-- 전체 관리자 전용: 중간관리자(채널 교사) 비밀번호와 사용 기간 -->
@@ -125,5 +115,22 @@
   <div id="teacher-print-sheet" hidden></div>
 
   <script type="module" src="/js/teacher.js"></script>
+  <!-- 교사용 출력: 화면 맨 앞에 뜨는 창. 미리 보고 인쇄 창에서 'PDF로 저장' -->
+  <div id="print-menu" class="print-pop" hidden role="dialog" aria-modal="true" aria-label="교사용 출력">
+    <div class="print-pop-card">
+      <div class="panel-head"><h2>🖨️ 미리 출력해 보기</h2><button id="print-menu-close" class="btn" type="button" aria-label="닫기">✕</button></div>
+      <small>새 창에 미리보기가 열려요. 위쪽 '🖨️ 인쇄 / PDF로 저장'을 누르고 대상을 'PDF로 저장'으로 고르면 파일로 받아요.</small>
+      <div class="print-menu-row">
+        <label>난이도 <select id="print-level"><option value="all">하·중·상 전체</option><option value="low">하</option><option value="mid" selected>중</option><option value="high">상</option></select></label>
+      </div>
+      <div class="print-menu-row">
+        <button class="btn" type="button" data-print="sheet">📝 형성평가 문제지</button>
+        <button class="btn primary" type="button" data-print="answer">✅ 교사용 답안 (답지)</button>
+        <button class="btn" type="button" data-print="cards">📚 핵심 카드</button>
+        <button class="btn" type="button" data-print="guide">📄 교사용 해설집 (하·중·상 전체)</button>
+      </div>
+      <p id="print-msg" class="print-msg" role="status"></p>
+    </div>
+  </div>
 </body>
 </html>
