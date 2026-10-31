@@ -28,8 +28,8 @@ function smooth(gltf) {
     o.geometry = mergeVertices(g, 1e-4);
     o.geometry.computeVertexNormals();
     o.material = o.material.clone();
-    o.material.roughness = 0.5;
-    o.material.metalness = 0;
+    o.material.roughness = 0.18; // 카트라이더 스타일: 매끈매끈한 광택
+    o.material.metalness = 0.05;
   });
   return gltf;
 }
@@ -43,7 +43,56 @@ OUTLINE.onBeforeCompile = (shader) => {
 export function makeCharacter(gltf, { outline = true } = {}) {
   const model = SkeletonUtils.clone(gltf.scene);
   const meshes = [];
-  model.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  let headBone = null;
+  model.traverse((o) => {
+    if (o.name === "head") headBone = o;
+    if (o.isMesh) {
+      meshes.push(o);
+      o.material = o.material.clone();
+      o.material.roughness = 0.18;
+      o.material.metalness = 0.05;
+    }
+  });
+
+  // 카트라이더 스타일: 동글동글한 헬멧과 귀여운 동물 귀, 핑크빛 볼터치 장착
+  if (headBone) {
+    const helmetMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      roughness: 0.14,
+      metalness: 0.1,
+    });
+    // 1. 동글동글 헬멧 돔
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 20), helmetMat);
+    helmet.scale.set(1.18, 1.15, 1.18);
+    helmet.position.set(0, 0.14, 0.02);
+    helmet.castShadow = true;
+    headBone.add(helmet);
+
+    // 2. 동글동글 레이싱 고글/바이저
+    const visorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.7 });
+    const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.12, 24, 1, false, -Math.PI / 3, (Math.PI * 2) / 3), visorMat);
+    visor.position.set(0, 0.13, 0.06);
+    headBone.add(visor);
+
+    // 3. 귀여운 동글동글 동물 귀 (곰/고양이 귀)
+    const earMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2 });
+    const earL = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), earMat);
+    earL.position.set(-0.24, 0.38, 0);
+    const earR = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), earMat);
+    earR.position.set(0.24, 0.38, 0);
+    headBone.add(earL, earR);
+
+    // 4. 귀여운 핑크빛 볼터치
+    const cheekMat = new THREE.MeshBasicMaterial({ color: 0xf472b6, transparent: true, opacity: 0.75 });
+    const cheekL = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), cheekMat);
+    cheekL.scale.set(1, 0.6, 0.2);
+    cheekL.position.set(-0.2, -0.02, 0.29);
+    const cheekR = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), cheekMat);
+    cheekR.scale.set(1, 0.6, 0.2);
+    cheekR.position.set(0.2, -0.02, 0.29);
+    headBone.add(cheekL, cheekR);
+  }
+
   for (const m of meshes) {
     m.castShadow = true;
     if (!outline) continue;

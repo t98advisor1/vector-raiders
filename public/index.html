@@ -43,12 +43,20 @@
 
     <!-- 타이틀: TOUCH TO START -->
     <div id="splash" class="splash">
+      <div id="unit-bar-top" class="unit-bar-top" role="group" aria-label="2022 개정 기하 3단원 선택">
+        <span class="unit-tag">2022 개정 교육과정 기하 Ⅲ. 벡터</span>
+        <div class="unit-buttons">
+          <button type="button" class="unit-btn on" data-unit="3-1">3-1. 벡터의 연산</button>
+          <button type="button" class="unit-btn" data-unit="3-2">3-2. 성분과 내적</button>
+          <button type="button" class="unit-btn" data-unit="3-3">3-3. 도형의 방정식</button>
+        </div>
+      </div>
       <div class="title-block">
         <span class="title-tag">기하 방탈출</span>
         <h1 class="game-title"><span class="t1">벡터</span><span class="t2">유적 탈출</span></h1>
       </div>
       <button id="touch" class="touch-btn" type="button">TOUCH TO START</button>
-      <p class="credit">기하 3개 단원(이차곡선·벡터·공간도형) · 난이도 3단계 · <a class="teacher-link" href="/teacher.html" target="_blank" rel="noopener">🧑‍🏫 교사 관리 화면</a></p>
+      <p class="credit">2022 개정 기하 3단원 벡터(3-1, 3-2, 3-3) · 7개 채널 · <a class="teacher-link" href="/teacher.html" target="_blank" rel="noopener">🧑‍🏫 교사 관리 화면</a></p>
     </div>
 
     <!-- 메뉴: 카드 세 장 -->
@@ -59,9 +67,9 @@
           <span class="art"><img id="art-practice" alt=""></span>
           <span class="label"><b>연습 모드</b><small>혼자 언제든 · 기록은 나만 봐요</small></span>
         </button>
-        <button class="mcard class" type="button" data-mode="class">
+        <button class="mcard class class-hero" type="button" data-mode="class">
           <span class="art"><img id="art-class" alt=""></span>
-          <span class="label"><b>수업 참가</b><small>선생님이 연 탐험에 반 친구들과 함께</small></span>
+          <span class="label"><b class="class-hero-title">수업 참가하기</b><small class="class-hero-lead typing-lead">선생님이 연 탐험에 반 친구들과 함께!</small></span>
         </button>
         <button class="mcard settings" type="button" id="open-settings">
           <span class="art gear" aria-hidden="true">⚙</span>
@@ -86,28 +94,33 @@
       <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
       <div class="team-pick" id="channel-pick" role="group" aria-label="수업 채널 선택">
         <span class="team-pick-label">수업 채널 고르기 <small class="muted">선생님이 알려 준 번호</small></span>
-        <div class="team-pick-row">
-          <button type="button" class="ch-opt on" data-ch="1">1채널</button>
-          <button type="button" class="ch-opt" data-ch="2">2채널</button>
-          <button type="button" class="ch-opt" data-ch="3">3채널</button>
-          <button type="button" class="ch-opt" data-ch="4">4채널</button>
-          <button type="button" class="ch-opt" data-ch="5">5채널</button>
+        <div class="team-pick-row ch-row-7">
+          <button type="button" class="ch-opt on" data-ch="1">① 1채널</button>
+          <button type="button" class="ch-opt" data-ch="2">② 2채널</button>
+          <button type="button" class="ch-opt" data-ch="3">③ 3채널</button>
+          <button type="button" class="ch-opt" data-ch="4">④ 4채널</button>
+          <button type="button" class="ch-opt" data-ch="5">⑤ 5채널</button>
+          <button type="button" class="ch-opt" data-ch="6">⑥ 6채널</button>
+          <button type="button" class="ch-opt" data-ch="7">⑦ 7채널</button>
         </div>
       </div>
       <div class="team-pick" role="group" aria-label="팀 선택">
-        <span class="team-pick-label">내 팀 고르기</span>
-        <div class="team-pick-row">
-          <button type="button" class="team-opt on" data-team="">🎲 자동 배정</button>
-          <button type="button" class="team-opt" data-team="A">🔵 A팀 (여우)</button>
-          <button type="button" class="team-opt" data-team="B">🟠 B팀 (고양이)</button>
-          <button type="button" class="team-opt" data-team="C">🟢 C팀 (곰)</button>
-          <button type="button" class="team-opt" data-team="D">🟣 D팀 (토끼)</button>
+        <span class="team-pick-label">내 팀 고르기 <small class="muted">팀당 최대 8명까지 참가 가능</small></span>
+        <div class="team-pick-row team-row-grid">
+          <button type="button" class="team-opt on" data-team="A"><span class="team-lbl">🔵 A팀</span> <b class="team-cnt" id="cnt-A">(0/8명)</b></button>
+          <button type="button" class="team-opt" data-team="B"><span class="team-lbl">🟠 B팀</span> <b class="team-cnt" id="cnt-B">(0/8명)</b></button>
+          <button type="button" class="team-opt" data-team="C"><span class="team-lbl">🟢 C팀</span> <b class="team-cnt" id="cnt-C">(0/8명)</b></button>
+          <button type="button" class="team-opt" data-team="D"><span class="team-lbl">🟣 D팀</span> <b class="team-cnt" id="cnt-D">(0/8명)</b></button>
         </div>
       </div>
-      <div class="team-pick" id="unit-pick" role="group" aria-label="기하 단원 선택">
-        <span class="team-pick-label">기하 단원 선택</span>
+      <div class="team-pick" id="unit-pick" role="group" aria-label="2022 개정 기하 3단원 선택">
+        <span class="team-pick-label">2022 개정 기하 3단원 벡터</span>
         <div class="team-pick-row">
-          <button type="button" class="unit-opt" data-unit="1">Ⅰ. 이차곡선</button>
+          <button type="button" class="unit-opt on" data-unit="3-1">3-1. 벡터의 연산</button>
+          <button type="button" class="unit-opt" data-unit="3-2">3-2. 성분과 내적</button>
+          <button type="button" class="unit-opt" data-unit="3-3">3-3. 도형의 방정식</button>
+        </div>
+      </div>
           <button type="button" class="unit-opt on" data-unit="2">Ⅱ. 평면벡터</button>
           <button type="button" class="unit-opt" data-unit="3">Ⅲ. 공간도형·좌표</button>
         </div>

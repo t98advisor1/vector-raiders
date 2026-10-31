@@ -59,12 +59,32 @@ intro.cardArt().then((art) => {
   $("#art-class").src = art.class;
 });
 
+let typingTimer = null;
+function runHeroTyping() {
+  const el = document.querySelector(".class-hero-lead");
+  if (!el) return;
+  if (typingTimer) clearInterval(typingTimer);
+  const fullText = "선생님이 연 탐험에 반 친구들과 함께 실시간으로 도전해요! 🚀";
+  el.textContent = "";
+  let idx = 0;
+  typingTimer = setInterval(() => {
+    if (idx < fullText.length) {
+      el.textContent += fullText[idx++];
+      if (idx % 2 === 0) sound.sfx("key"); // 타자 소리 모션
+    } else {
+      clearInterval(typingTimer);
+      typingTimer = null;
+    }
+  }, 55);
+}
+
 function showScreen(which) {
   $("#splash").hidden = which !== "splash";
   $("#menu").hidden = which === "splash";
   $("#join-form").hidden = which !== "name";
   $("#settings-sheet").hidden = which !== "settings";
   intro.showRunners(which === "splash");
+  if (which === "menu") runHeroTyping();
 }
 
 const touch = () => {
@@ -96,16 +116,43 @@ $("#sheet-back").onclick = () => showScreen("menu");
 $("#open-settings").onclick = () => { sound.sfx("open"); showScreen("settings"); };
 $("#settings-close").onclick = () => showScreen("menu");
 
-// 팀 선택: 기본은 자동 배정(""). 고르면 입장할 때 서버에 함께 보낸다.
+// 팀 선택: 자동 배정은 제외, A·B·C·D 중 선택(팀당 최대 8명)
+S.team = load("vr-team") || "A";
+function selectTeam(team) {
+  S.team = team;
+  store("vr-team", team);
+  document.querySelectorAll(".team-opt[data-team]").forEach((o) => o.classList.toggle("on", o.dataset.team === team));
+}
 document.querySelectorAll(".team-opt[data-team]").forEach((b) => {
   b.onclick = () => {
-    S.team = b.dataset.team;
-    document.querySelectorAll(".team-opt[data-team]").forEach((o) => o.classList.toggle("on", o === b));
+    if (b.disabled) return;
+    selectTeam(b.dataset.team);
     sound.sfx("open");
   };
 });
+selectTeam(S.team);
 
-// 수업 채널 선택(1~5): URL의 ?ch=가 있으면 그 채널로 정해지고 선택기는 감춘다.
+function updateTeamCounts(counts) {
+  if (!counts) return;
+  const max = counts.max ?? 8;
+  for (const team of ["A", "B", "C", "D"]) {
+    const cnt = counts[team] ?? 0;
+    const el = $(`#cnt-${team}`);
+    const btn = document.querySelector(`.team-opt[data-team="${team}"]`);
+    if (el) el.textContent = `(${cnt}/${max}명${cnt >= max ? " · 마감" : ""})`;
+    if (btn) {
+      const full = cnt >= max;
+      btn.disabled = full;
+      btn.classList.toggle("full", full);
+      if (full && S.team === team) {
+        const available = ["A", "B", "C", "D"].find((t) => (counts[t] ?? 0) < max);
+        if (available) selectTeam(available);
+      }
+    }
+  }
+}
+
+// 수업 채널 선택(1~7): URL의 ?ch=가 있으면 그 채널로 정해지고 선택기는 감춘다.
 document.querySelectorAll(".ch-opt[data-ch]").forEach((b) => {
   b.classList.toggle("on", b.dataset.ch === S.ch);
   b.onclick = () => {
@@ -117,17 +164,19 @@ document.querySelectorAll(".ch-opt[data-ch]").forEach((b) => {
 });
 if (CH) $("#channel-pick").hidden = true;
 
-// 기하 단원 선택(1: 이차곡선, 2: 평면벡터, 3: 공간도형·공간좌표)
-S.unit = load("vr-unit") || "2";
-document.querySelectorAll(".unit-opt[data-unit]").forEach((b) => {
-  b.classList.toggle("on", b.dataset.unit === S.unit);
-  b.onclick = () => {
-    S.unit = b.dataset.unit;
-    store("vr-unit", S.unit);
-    document.querySelectorAll(".unit-opt[data-unit]").forEach((o) => o.classList.toggle("on", o === b));
-    sound.sfx("open");
-  };
+// 2022 개정 기하 3단원 벡터(3-1, 3-2, 3-3) 선택 동기화
+S.unit = load("vr-unit") || "3-1";
+function selectUnit(u) {
+  S.unit = u;
+  store("vr-unit", u);
+  document.querySelectorAll(".unit-opt[data-unit], .unit-btn[data-unit]").forEach((b) => {
+    b.classList.toggle("on", b.dataset.unit === u);
+  });
+}
+document.querySelectorAll(".unit-opt[data-unit], .unit-btn[data-unit]").forEach((b) => {
+  b.onclick = () => { selectUnit(b.dataset.unit); sound.sfx("open"); };
 });
+selectUnit(S.unit);
 
 // 탐험 난이도 선택(low: 초심자용, mid: 기본형, high: 심화 수능형)
 S.diff = load("vr-diff") || "mid";
@@ -261,6 +310,7 @@ function onMessage(msg) {
     const before = S.cls;
     S.cls = msg;
     if (msg.visitors) renderVisitorStats(msg.visitors);
+    if (msg.teamCounts) updateTeamCounts(msg.teamCounts);
     S.game?.setRoster(msg.players ?? []);
     announceRelics(before, msg);
     if (!before || before.stage !== msg.stage) onStage(msg.stage);

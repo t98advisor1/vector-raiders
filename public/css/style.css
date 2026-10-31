@@ -421,6 +421,27 @@ body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #
   background: #fff; border-radius: 999px; cursor: pointer; transition: all 0.15s ease; }
 .team-opt.on, .unit-opt.on, .diff-opt.on { border-color: var(--teal); background: var(--teal-soft); color: #0f766e; }
 
+/* 2022 개정 기하 3단원 상단 선택 바 */
+.unit-bar-top { margin-bottom: 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.unit-tag { font-size: 0.82rem; font-weight: 800; color: #5eead4; text-shadow: 0 0 8px rgba(94, 234, 212, 0.6); }
+.unit-buttons { display: flex; gap: 6px; background: rgba(17, 24, 39, 0.85); padding: 4px 6px; border-radius: 999px;
+  border: 1px solid rgba(94, 234, 212, 0.35); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); flex-wrap: wrap; justify-content: center; }
+.unit-btn { font: inherit; font-size: 0.88rem; font-weight: 700; padding: 6px 14px; border: 0; background: transparent; color: #94a3b8; border-radius: 999px; cursor: pointer; transition: all 0.2s ease; }
+.unit-btn.on { background: var(--teal); color: #fff; box-shadow: 0 0 12px rgba(45, 212, 191, 0.5); }
+
+/* 수업 참가 모드 강조 및 타이핑 모션 */
+.class-hero { border: 2px solid #5eead4 !important; box-shadow: 0 0 20px rgba(94, 234, 212, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4) !important; transform: scale(1.02); }
+.class-hero-title { font-size: 1.4rem !important; color: #5eead4 !important; display: block; text-shadow: 0 0 10px rgba(94, 234, 212, 0.5); margin-bottom: 3px; }
+.class-hero-lead { font-size: 0.95rem !important; color: #fde68a !important; font-weight: 600; min-height: 1.4em; }
+
+/* 7개 채널 및 팀 선택 8명 정원 그리드 */
+.ch-row-7 { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; width: 100%; }
+.team-row-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; width: 100%; }
+.team-opt { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; }
+.team-cnt { font-size: 0.82rem; color: #64748b; font-weight: 700; margin-left: 6px; }
+.team-opt.on .team-cnt { color: #0f766e; }
+.team-opt.full { opacity: 0.45; cursor: not-allowed; background: #f1f5f9; border-color: #cbd5e1; }
+
 /* 방문자 집계 칩 */
 .visitor-chip { margin-top: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
   background: rgba(17, 24, 39, 0.75); border: 1px solid rgba(94, 234, 212, 0.35); border-radius: 999px;

@@ -7,8 +7,8 @@ import { ROOMS, BRIDGES, roomAt } from "./game.js";
 import { DIAGRAMS } from "./diagrams.js";
 
 const $ = (s) => document.querySelector(s);
-// 수업 채널 1~5: 채널마다 완전히 분리된 수업 유적(Durable Object class:1~5)이다.
-const CHANNELS = ["1", "2", "3", "4", "5"];
+// 수업 채널 1~7: 채널마다 완전히 분리된 수업 유적(Durable Object class:1~7)이다.
+const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
 const STAGE_TEXT = { lobby: "⏸ 대기", play: "▶ 탐험 중", done: "■ 탐험 끝" };
 let net = null, last = null, answers = null;
 const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)

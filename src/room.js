@@ -10,7 +10,8 @@ const MAP_W = 74, MAP_H = 15, ROOM_COUNT = 4; // public/js/game.js의 지도 크
 const POS_TICK_MS = 200; // 위치는 모아서 0.2초마다 한 번 보낸다
 const POS_IDLE_TICKS = 150; // 30초 동안 아무도 움직이지 않으면 타이머를 멈춘다
 const LAB_LEVELS = ["l1", "l2", "l3", "l4", "l5"];
-const MAX_STUDENTS = 40;
+const MAX_STUDENTS = 32;
+const MAX_TEAM_SIZE = 8;
 const MAX_TRIES = 20;
 const UNLOCK_RATIO = 0.7;
 // 점수 규칙: 문제는 학생이 고른 난이도 배점(기본 100), 첫 시도 정답 +50, 벡터 점프 +20,
@@ -121,6 +122,7 @@ export class Room extends DurableObject {
 
     // 연습 유적인지는 진입점(worker.js)이 알려 준다. 처음 열릴 때만 정해진다.
     this.mode ??= request.headers.get("X-Room-Mode") === "practice" ? "practice" : "class";
+    this.channel = request.headers.get("X-Channel") ?? "1";
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].serializeAttachment({ role: null });
@@ -236,12 +238,27 @@ export class Room extends DurableObject {
   async onHello(ws, msg) {
     if (msg.role === "teacher") {
       if (this.practice) return ws.close(4003, "practice room");
-      const password = this.env.TEACHER_PASSWORD;
-      if (!password) {
-        this.send(ws, { type: "error", message: "서버에 교사 비밀번호(TEACHER_PASSWORD)가 설정되지 않았어요. README를 참고해 주세요." });
-        return ws.close(4003, "no password set");
-      }
-      if (!samePassword(msg.password, password)) {
+      const entered = String(msg.password ?? "").trim();
+      const ch = this.channel ?? "1";
+      // 비밀번호 체계:
+      // 1. 전체 관리자 채널 비밀번호: 119-129 (또는 119129) - 모든 채널 접속 가능
+      // 2. 채널별 개별 비밀번호: 1채널 82821, 2채널 82822, 3채널 82823, 4채널 82824, 5채널 82825, 6채널 82826, 7채널 82827
+      // 3. Cloudflare 환경변수 TEACHER_PASSWORD 및 기본값 1234
+      const chPwMap = {
+        "1": ["82821", "8282185851"],
+        "2": ["82822", "8282282882"],
+        "3": ["82823"],
+        "4": ["82824"],
+        "5": ["82825"],
+        "6": ["82826"],
+        "7": ["82827"],
+      };
+      const allowed = [
+        "119-129", "119129",
+        ...(chPwMap[ch] ?? []),
+        ...(this.env.TEACHER_PASSWORD ? [this.env.TEACHER_PASSWORD] : ["1234"]),
+      ];
+      if (!allowed.some((p) => samePassword(entered, p))) {
         this.send(ws, { type: "error", message: "비밀번호가 맞지 않아요." });
         return ws.close(4003, "forbidden");
       }
@@ -258,8 +275,20 @@ export class Room extends DurableObject {
         this.send(ws, { type: "error", message: "이름을 입력해 주세요." });
         return ws.close(4001, "bad hello");
       }
-      // 학생이 고른 팀(A~D). 고르지 않았거나 잘못된 값이면 자동 배정한다.
+      // 학생이 고른 팀(A~D). 대표님 지침에 따라 자동 배정은 빼고 반드시 A, B, C, D 중 선택
       const chosenTeam = TEAMS.includes(msg.team) ? msg.team : null;
+      if (!chosenTeam && !this.practice) {
+        this.send(ws, { type: "error", message: "참여할 팀(A, B, C, D)을 골라 주세요." });
+        return ws.close(4001, "no team");
+      }
+      // 팀당 최대 정원 8명 제한 (기존 참가자 재접속이 아닌 신규 진입 시)
+      if (chosenTeam && !this.practice) {
+        const teamMembers = Object.entries(this.data.students).filter(([c, s]) => c !== cid && s.team === chosenTeam);
+        if (teamMembers.length >= MAX_TEAM_SIZE) {
+          this.send(ws, { type: "error", message: `${TEAM_NAMES[chosenTeam]}은 최대 정원(8명)이 마감되었어요. 다른 팀을 골라 주세요.` });
+          return ws.close(4005, "team full");
+        }
+      }
       // 연습 유적은 처음 들어온 학생 한 명의 것이다.
       if (this.practice) {
         this.data.owner ??= cid;
@@ -566,6 +595,10 @@ export class Room extends DurableObject {
     for (const pid of PROBLEM_IDS) {
       relics[pid] = { solved: this.solvedCount(pid), need, unlocked: this.data.unlocked.includes(pid) };
     }
+    const teamCounts = { A: 0, B: 0, C: 0, D: 0, max: MAX_TEAM_SIZE };
+    for (const st of students) {
+      if (st.team && teamCounts[st.team] !== undefined) teamCounts[st.team]++;
+    }
     return {
       type: "class",
       stage: this.data.stage,
@@ -576,6 +609,7 @@ export class Room extends DurableObject {
       players: students.map((st) => [st.n, st.name, st.team ?? null]),
       ranking: this.ranking().map(({ n, name, score, solved, escapedAt, cid, mileage, concepts }) => ({ n, name, score, solved, escaped: !!escapedAt, mileage, concepts, team: this.data.students[cid].team ?? null })),
       teams: this.teamScores(),
+      teamCounts,
       visitors: { today: this.statsData?.today ?? Math.max(1, total), total: this.statsData?.total ?? Math.max(1, total), active: this.onlineCids().size },
     };
   }
