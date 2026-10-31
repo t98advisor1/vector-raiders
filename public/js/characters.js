@@ -40,7 +40,7 @@ OUTLINE.onBeforeCompile = (shader) => {
 };
 
 // 장면에 놓을 캐릭터 하나: { model, mixer, action(name) }
-export function makeCharacter(gltf, { outline = true } = {}) {
+export function makeCharacter(gltf, { outline = true, n = 0 } = {}) {
   const model = SkeletonUtils.clone(gltf.scene);
   const meshes = [];
   let headBone = null;
@@ -49,40 +49,15 @@ export function makeCharacter(gltf, { outline = true } = {}) {
     if (o.isMesh) {
       meshes.push(o);
       o.material = o.material.clone();
-      o.material.roughness = 0.18;
+      o.material.roughness = 0.16;
       o.material.metalness = 0.05;
     }
   });
 
-  // 카트라이더 스타일: 동글동글한 헬멧과 귀여운 동물 귀, 핑크빛 볼터치 장착
+  // 5대 기하 수학자별 고유 캐릭터 외형 (데카르트, 페르마, 오일러, 가우스, 유클리드)
   if (headBone) {
-    const helmetMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      roughness: 0.14,
-      metalness: 0.1,
-    });
-    // 1. 동글동글 헬멧 돔
-    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 20), helmetMat);
-    helmet.scale.set(1.18, 1.15, 1.18);
-    helmet.position.set(0, 0.14, 0.02);
-    helmet.castShadow = true;
-    headBone.add(helmet);
-
-    // 2. 동글동글 레이싱 고글/바이저
-    const visorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.7 });
-    const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.12, 24, 1, false, -Math.PI / 3, (Math.PI * 2) / 3), visorMat);
-    visor.position.set(0, 0.13, 0.06);
-    headBone.add(visor);
-
-    // 3. 귀여운 동글동글 동물 귀 (곰/고양이 귀)
-    const earMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2 });
-    const earL = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), earMat);
-    earL.position.set(-0.24, 0.38, 0);
-    const earR = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), earMat);
-    earR.position.set(0.24, 0.38, 0);
-    headBone.add(earL, earR);
-
-    // 4. 귀여운 핑크빛 볼터치
+    const mType = Math.abs(Number(n) || 0) % 5;
+    // 핑크빛 볼터치는 공통 장착
     const cheekMat = new THREE.MeshBasicMaterial({ color: 0xf472b6, transparent: true, opacity: 0.75 });
     const cheekL = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), cheekMat);
     cheekL.scale.set(1, 0.6, 0.2);
@@ -91,6 +66,96 @@ export function makeCharacter(gltf, { outline = true } = {}) {
     cheekR.scale.set(1, 0.6, 0.2);
     cheekR.position.set(0.2, -0.02, 0.29);
     headBone.add(cheekL, cheekR);
+
+    if (mType === 0) {
+      // 0. 데카르트 (Descartes): 웨이브 흑발, 프렌치 콧수염 & 화이트 레이스 칼라
+      const hairMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.2 });
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.33, 20, 16), hairMat);
+      hair.scale.set(1.15, 1.1, 1.15);
+      hair.position.set(0, 0.14, 0.01);
+      headBone.add(hair);
+      const stacheMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+      const stacheL = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.04, 0.12, 8), stacheMat);
+      stacheL.rotation.z = Math.PI / 3;
+      stacheL.position.set(-0.06, -0.07, 0.31);
+      const stacheR = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.04, 0.12, 8), stacheMat);
+      stacheR.rotation.z = -Math.PI / 3;
+      stacheR.position.set(0.06, -0.07, 0.31);
+      headBone.add(stacheL, stacheR);
+      const collarMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 });
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.07, 12, 24), collarMat);
+      collar.rotation.x = Math.PI / 2;
+      collar.position.set(0, -0.18, 0.05);
+      headBone.add(collar);
+    } else if (mType === 1) {
+      // 1. 페르마 (Fermat): 플럼 학사 베레모와 둥근 금테 안경
+      const beretMat = new THREE.MeshStandardMaterial({ color: 0x4a044e, roughness: 0.25 });
+      const beret = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.32, 0.14, 24), beretMat);
+      beret.position.set(0, 0.32, 0);
+      beret.rotation.z = 0.1;
+      const beretTop = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), new THREE.MeshStandardMaterial({ color: 0xf59e0b }));
+      beretTop.position.set(0, 0.4, 0);
+      headBone.add(beret, beretTop);
+      const glassMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.1, metalness: 0.8 });
+      const gL = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 8, 16), glassMat);
+      gL.position.set(-0.11, 0.08, 0.31);
+      const gR = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 8, 16), glassMat);
+      gR.position.set(0.11, 0.08, 0.31);
+      const gBridge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 8), glassMat);
+      gBridge.rotation.z = Math.PI / 2;
+      gBridge.position.set(0, 0.08, 0.31);
+      headBone.add(gL, gR, gBridge);
+    } else if (mType === 2) {
+      // 2. 오일러 (Euler): 실크 터번 캡과 골드 모노클
+      const turbanMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2 });
+      const turban = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 16), turbanMat);
+      turban.scale.set(1.18, 1.15, 1.2);
+      turban.position.set(0, 0.16, 0.02);
+      const brim = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.06, 12, 24), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+      brim.rotation.x = Math.PI / 2;
+      brim.position.set(0, 0.12, 0.02);
+      headBone.add(turban, brim);
+      const monocleMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.1, metalness: 0.85 });
+      const monocle = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.016, 8, 16), monocleMat);
+      monocle.position.set(0.11, 0.08, 0.32);
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.15, 6), monocleMat);
+      chain.position.set(0.18, 0.02, 0.3);
+      headBone.add(monocle, chain);
+    } else if (mType === 3) {
+      // 3. 가우스 (Gauss): 벨벳 학사모와 화이트 깃펜
+      const capMat = new THREE.MeshStandardMaterial({ color: 0x164e63, roughness: 0.2 });
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.32, 0.16, 20), capMat);
+      cap.position.set(0, 0.32, 0);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.03, 8, 20), new THREE.MeshStandardMaterial({ color: 0xfde68a, metalness: 0.6 }));
+      band.rotation.x = Math.PI / 2;
+      band.position.set(0, 0.24, 0);
+      headBone.add(cap, band);
+      const quillMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 });
+      const quill = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.28, 8), quillMat);
+      quill.rotation.z = -0.4;
+      quill.position.set(-0.25, 0.38, 0);
+      headBone.add(quill);
+    } else {
+      // 4. 유클리드 (Euclid): 황금 월계관과 고대 현자의 턱수염
+      const wreathMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.15, metalness: 0.85 });
+      const wreath = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.035, 12, 24), wreathMat);
+      wreath.rotation.x = Math.PI / 2 + 0.15;
+      wreath.position.set(0, 0.2, 0.02);
+      for (let i = 0; i < 8; i++) {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), wreathMat);
+        leaf.scale.set(0.5, 1.8, 0.3);
+        const ang = (i / 8) * Math.PI * 2;
+        leaf.position.set(Math.cos(ang) * 0.34, 0.2, Math.sin(ang) * 0.34);
+        leaf.rotation.y = -ang;
+        headBone.add(leaf);
+      }
+      headBone.add(wreath);
+      const beardMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.5 });
+      const beard = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), beardMat);
+      beard.scale.set(1.1, 1.4, 0.9);
+      beard.position.set(0, -0.16, 0.24);
+      headBone.add(beard);
+    }
   }
 
   for (const m of meshes) {

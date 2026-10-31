@@ -73,7 +73,7 @@ const MOVE_KEYS = {
   KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1],
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
 };
-const ACT_KEYS = new Set(["KeyE", "Enter"]);
+const ACT_KEYS = new Set(["KeyE", "KeyF", "Enter"]);
 
 // 지도 글자: # 벽, . 바닥, ~ 물, ^ 절벽, ! 용암, 1~3 문, a~e 다리 자리, o 상자류, @ 제단
 export function buildGrid() {
@@ -137,7 +137,7 @@ export class Game {
     if (tag === "INPUT" || tag === "TEXTAREA" || this.h.paused()) return;
     if (MOVE_KEYS[e.code]) { this.keys.add(e.code); this.taps.add(e.code); e.preventDefault(); }
     else if (e.code === "Space" && !e.repeat) { e.preventDefault(); this.jump(); }
-    else if (e.code === "KeyG" && !e.repeat) { e.preventDefault(); this.shoot(); }
+    else if ((e.code === "KeyG" || e.code === "KeyC" || e.code === "KeyZ") && !e.repeat) { e.preventDefault(); this.shoot(); }
     else if (ACT_KEYS.has(e.code) && !e.repeat) {
       e.preventDefault();
       if (this.focus) this.h.onInteract(this.focus);

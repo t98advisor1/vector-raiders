@@ -116,7 +116,7 @@ function runners(canvas) {
   const SPOTS = [[-2.6, -1.4], [-1.4, -0.6], [-0.2, 0.1], [1.0, 0.7], [2.2, 1.3]];
   SPOTS.forEach(([x, z], i) => {
     loadCharacter(i * 2 + (i % 2)).then((gltf) => {
-      const { model, mixer, action } = makeCharacter(gltf, { outline: !low });
+      const { model, mixer, action } = makeCharacter(gltf, { outline: !low, n: i });
       model.scale.setScalar(1.45);
       model.position.set(x, 0, z);
       model.rotation.y = -Math.PI / 2 + 0.35; // 화면 오른쪽(+x)으로 달린다
@@ -186,7 +186,7 @@ async function portrait(chars, { size = 320, bg = null } = {}) {
   camera.lookAt(0, 0.85, 0);
   for (const [n, x, z, pose] of chars) {
     const gltf = await loadCharacter(n);
-    const { model, mixer, action } = makeCharacter(gltf);
+    const { model, mixer, action } = makeCharacter(gltf, { n });
     model.scale.setScalar(1.6);
     model.position.set(x, 0, z);
     model.rotation.y = x * -0.35; // 가운데를 보게 살짝 돌린다

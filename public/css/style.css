@@ -88,6 +88,19 @@ form input, .expr input {
   border: 1px solid rgba(94, 234, 212, 0.25); text-shadow: 0 0 8px rgba(94, 234, 212, 0.3); }
 .hud-card b { color: #fde68a; }
 .hud-btn { pointer-events: auto; border: 0; background: rgba(255, 255, 255, 0.15); color: #fff; font-size: 1.05rem; border-radius: 8px; padding: 2px 8px; cursor: pointer; }
+.hud-map-btn {
+  background: rgba(15, 118, 110, 0.85) !important;
+  border: 1.5px solid #5eead4 !important;
+  padding: 4px 10px !important;
+  font-family: 'BMJUA', sans-serif !important;
+  font-size: 0.95rem !important;
+  box-shadow: 0 0 10px rgba(94, 234, 212, 0.3) !important;
+  transition: all 0.15s ease !important;
+}
+.hud-map-btn:hover {
+  background: var(--teal) !important;
+  transform: scale(1.05) !important;
+}
 .hud-relics span { font-size: 1.3rem; filter: grayscale(1) opacity(0.4); transition: filter 0.4s; }
 .hud-relics span.on { filter: none; }
 .hud-right { display: grid; gap: 8px; justify-items: end; align-content: start; }
@@ -771,6 +784,28 @@ body.touch-device .chat-toggle { left: 50%; bottom: 12px; transform: translateX(
 .name-label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; font-size: 0.95rem; }
 .name-label input { font: inherit; font-size: 1.05rem; padding: 10px 14px; border: 2px solid var(--line); border-radius: 12px; }
 .launch-btn { font-size: 1.15rem !important; }
+
+/* 채널 선택 전용 큼직한 카드 그리드 */
+.ch-grid-large { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+.ch-card-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 14px 10px;
+  background: #fff; border: 2.5px solid var(--line); border-radius: 18px; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+.ch-card-btn .ch-badge { font-size: 0.75rem; background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: 999px; font-weight: 800; }
+.ch-card-btn b { font-size: 1.15rem; color: #1e1b4b; font-family: 'BMJUA', sans-serif; }
+.ch-card-btn small { font-size: 0.78rem; color: #94a3b8; font-family: Pretendard, sans-serif; }
+.ch-card-btn.on, .ch-card-btn:hover { border-color: var(--teal); background: var(--teal-soft); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15, 118, 110, 0.2); }
+.ch-card-btn.on .ch-badge { background: var(--teal); color: #fff; }
+.ch-card-btn.on b { color: #0f766e; }
+
+/* 팀 선택 전용 큼직한 카드 그리드 */
+.team-grid-large { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 8px 0 16px; }
+.team-card-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 14px 12px;
+  background: #fff; border: 2.5px solid var(--line); border-radius: 18px; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+.team-card-btn .team-icon { font-size: 1.8rem; }
+.team-card-btn b { font-size: 1.15rem; color: #1e1b4b; font-family: 'BMJUA', sans-serif; }
+.team-card-btn .team-cnt { font-size: 0.85rem; color: #64748b; font-weight: 700; }
+.team-card-btn.on, .team-card-btn:hover { border-color: var(--teal); background: var(--teal-soft); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15, 118, 110, 0.2); }
+.team-card-btn.on b { color: #0f766e; }
+.team-card-btn.full { opacity: 0.45; cursor: not-allowed; background: #f8fafc; border-color: #e2e8f0; transform: none; }
 
 /* 설정 및 게임 매뉴얼 캐러셀 */
 .settings-manual-sheet { width: min(520px, calc(100% - 24px)); max-height: 90vh; overflow-y: auto; }
