@@ -128,6 +128,17 @@ function runners(canvas) {
     });
   });
 
+  // 3차원 기하 벡터 좌표계 및 벡터 합성 홀로그램
+  const vectorGroup = new THREE.Group();
+  vectorGroup.position.set(-1.8, 2.8, -1.5);
+  scene.add(vectorGroup);
+  const xArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1.5, 0xef4444, 0.35, 0.2);
+  const yArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1.5, 0x22c55e, 0.35, 0.2);
+  const zArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), 1.5, 0x3b82f6, 0.35, 0.2);
+  const vecA = new THREE.ArrowHelper(new THREE.Vector3(0.8, 0, 0.5).normalize(), new THREE.Vector3(0, 0, 0), 1.2, 0x5eead4, 0.3, 0.16);
+  const vecSum = new THREE.ArrowHelper(new THREE.Vector3(0.8, 0.8, 0.5).normalize(), new THREE.Vector3(0, 0, 0), 1.8, 0xfde68a, 0.4, 0.22);
+  vectorGroup.add(xArrow, yArrow, zArrow, vecA, vecSum);
+
   const resize = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
@@ -144,6 +155,8 @@ function runners(canvas) {
     const dt = Math.min(0.05, clock.getDelta()), t = clock.elapsedTime;
     for (const m of mixers) m.update(dt);
     ground.position.x = -((t * 3.2) % 3); // 바닥과 기둥이 뒤로 흐른다(기둥 간격 3칸마다 되풀이)
+    vectorGroup.rotation.y = t * 0.5;
+    vectorGroup.rotation.x = Math.sin(t * 0.6) * 0.15;
     relic.rotation.z = t * 0.6;
     relic.position.y = 2.4 + Math.sin(t * 1.8) * 0.12;
     relic.children.forEach((c, i) => { if (i > 0) c.rotation.y = t * 2 + i; });

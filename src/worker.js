@@ -5,7 +5,7 @@
 export { Room } from "./room.js";
 
 const CID_RE = /^[a-z0-9]{8,32}$/;
-const CH_RE = /^[1-5]$/;
+const CH_RE = /^[1-7]$/;
 
 export default {
   async fetch(request, env) {
@@ -26,9 +26,11 @@ export default {
       forwarded.headers.set("X-Room-Mode", "practice");
       return env.ROOM.get(env.ROOM.idFromName(`practice:${cid}`)).fetch(forwarded);
     }
-    // 수업 채널: ch(또는 channel) 파라미터로 1~5채널을 고른다. 없으면 1채널.
+    // 수업 채널: ch(또는 channel) 파라미터로 1~7채널을 고른다. 없으면 1채널.
     const raw = url.searchParams.get("ch") ?? url.searchParams.get("channel") ?? "1";
     const ch = CH_RE.test(raw) ? raw : "1";
-    return env.ROOM.get(env.ROOM.idFromName(`class:${ch}`)).fetch(request);
+    const forwarded = new Request(request);
+    forwarded.headers.set("X-Channel", ch);
+    return env.ROOM.get(env.ROOM.idFromName(`class:${ch}`)).fetch(forwarded);
   },
 };

@@ -43,12 +43,20 @@
 
     <!-- 타이틀: TOUCH TO START -->
     <div id="splash" class="splash">
+      <div id="unit-bar-top" class="unit-bar-top" role="group" aria-label="2022 개정 기하 3단원 선택">
+        <span class="unit-tag">2022 개정 교육과정 기하 Ⅲ. 벡터</span>
+        <div class="unit-buttons">
+          <button type="button" class="unit-btn on" data-unit="3-1">3-1. 벡터의 연산</button>
+          <button type="button" class="unit-btn" data-unit="3-2">3-2. 성분과 내적</button>
+          <button type="button" class="unit-btn" data-unit="3-3">3-3. 도형의 방정식</button>
+        </div>
+      </div>
       <div class="title-block">
         <span class="title-tag">기하 방탈출</span>
         <h1 class="game-title"><span class="t1">벡터</span><span class="t2">유적 탈출</span></h1>
       </div>
       <button id="touch" class="touch-btn" type="button">TOUCH TO START</button>
-      <p class="credit">기하 3개 단원(이차곡선·벡터·공간도형) · 난이도 3단계 · <a class="teacher-link" href="/teacher.html" target="_blank" rel="noopener">🧑‍🏫 교사 관리 화면</a></p>
+      <p class="credit">2022 개정 기하 3단원 벡터(3-1, 3-2, 3-3) · 7개 채널 · <a class="teacher-link" href="/teacher.html" target="_blank" rel="noopener">🧑‍🏫 교사 관리 화면</a></p>
     </div>
 
     <!-- 메뉴: 카드 세 장 -->
@@ -59,9 +67,9 @@
           <span class="art"><img id="art-practice" alt=""></span>
           <span class="label"><b>연습 모드</b><small>혼자 언제든 · 기록은 나만 봐요</small></span>
         </button>
-        <button class="mcard class" type="button" data-mode="class">
+        <button class="mcard class class-hero" type="button" data-mode="class">
           <span class="art"><img id="art-class" alt=""></span>
-          <span class="label"><b>수업 참가</b><small>선생님이 연 탐험에 반 친구들과 함께</small></span>
+          <span class="label"><b class="class-hero-title">수업 참가하기</b><small class="class-hero-lead typing-lead">선생님이 연 탐험에 반 친구들과 함께!</small></span>
         </button>
         <button class="mcard settings" type="button" id="open-settings">
           <span class="art gear" aria-hidden="true">⚙</span>
@@ -79,61 +87,193 @@
       <p id="join-error" class="error menu-error" role="alert"></p>
     </div>
 
-    <!-- 이름 적기 -->
-    <form id="join-form" class="sheet" autocomplete="off" hidden>
-      <h2 id="sheet-title"></h2>
-      <p id="sheet-lead" class="muted"></p>
-      <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
-      <div class="team-pick" id="channel-pick" role="group" aria-label="수업 채널 선택">
-        <span class="team-pick-label">수업 채널 고르기 <small class="muted">선생님이 알려 준 번호</small></span>
-        <div class="team-pick-row">
-          <button type="button" class="ch-opt on" data-ch="1">1채널</button>
-          <button type="button" class="ch-opt" data-ch="2">2채널</button>
-          <button type="button" class="ch-opt" data-ch="3">3채널</button>
-          <button type="button" class="ch-opt" data-ch="4">4채널</button>
-          <button type="button" class="ch-opt" data-ch="5">5채널</button>
+    <!-- 수업 참가 / 연습 모드 단계별 팝업 모달 (Step Wizard) -->
+    <div id="join-wizard" class="sheet wizard-sheet" hidden>
+      <!-- Step 1: 팀 & 채널 선택 팝업 -->
+      <div id="step-1" class="wizard-step">
+        <div class="step-head">
+          <span class="step-badge">1단계 / 3</span>
+          <h2 class="step-title">🚩 팀과 채널을 골라주세요</h2>
+          <p class="muted small">팀당 최대 8명까지 참가할 수 있어요</p>
+        </div>
+        <div class="team-pick" id="channel-pick" role="group" aria-label="수업 채널 선택">
+          <span class="team-pick-label">수업 채널</span>
+          <div class="team-pick-row ch-row-7">
+            <button type="button" class="ch-opt on" data-ch="1">① 1채널</button>
+            <button type="button" class="ch-opt" data-ch="2">② 2채널</button>
+            <button type="button" class="ch-opt" data-ch="3">③ 3채널</button>
+            <button type="button" class="ch-opt" data-ch="4">④ 4채널</button>
+            <button type="button" class="ch-opt" data-ch="5">⑤ 5채널</button>
+            <button type="button" class="ch-opt" data-ch="6">⑥ 6채널</button>
+            <button type="button" class="ch-opt" data-ch="7">⑦ 7채널</button>
+          </div>
+        </div>
+        <div class="team-pick" role="group" aria-label="팀 선택">
+          <span class="team-pick-label">내 팀 선택</span>
+          <div class="team-pick-row team-row-grid">
+            <button type="button" class="team-opt on" data-team="A"><span class="team-lbl">🔵 A팀</span> <b class="team-cnt" id="cnt-A">(0/8명)</b></button>
+            <button type="button" class="team-opt" data-team="B"><span class="team-lbl">🟠 B팀</span> <b class="team-cnt" id="cnt-B">(0/8명)</b></button>
+            <button type="button" class="team-opt" data-team="C"><span class="team-lbl">🟢 C팀</span> <b class="team-cnt" id="cnt-C">(0/8명)</b></button>
+            <button type="button" class="team-opt" data-team="D"><span class="team-lbl">🟣 D팀</span> <b class="team-cnt" id="cnt-D">(0/8명)</b></button>
+          </div>
+        </div>
+        <div class="sheet-buttons">
+          <button id="step1-back" class="btn" type="button">← 뒤로</button>
+          <button id="step1-next" class="btn primary big" type="button">다음: 단원 선택 ➔</button>
         </div>
       </div>
-      <div class="team-pick" role="group" aria-label="팀 선택">
-        <span class="team-pick-label">내 팀 고르기</span>
-        <div class="team-pick-row">
-          <button type="button" class="team-opt on" data-team="">🎲 자동 배정</button>
-          <button type="button" class="team-opt" data-team="A">🔵 A팀 (여우)</button>
-          <button type="button" class="team-opt" data-team="B">🟠 B팀 (고양이)</button>
-          <button type="button" class="team-opt" data-team="C">🟢 C팀 (곰)</button>
-          <button type="button" class="team-opt" data-team="D">🟣 D팀 (토끼)</button>
-        </div>
-      </div>
-      <div class="team-pick" id="unit-pick" role="group" aria-label="기하 단원 선택">
-        <span class="team-pick-label">기하 단원 선택</span>
-        <div class="team-pick-row">
-          <button type="button" class="unit-opt" data-unit="1">Ⅰ. 이차곡선</button>
-          <button type="button" class="unit-opt on" data-unit="2">Ⅱ. 평면벡터</button>
-          <button type="button" class="unit-opt" data-unit="3">Ⅲ. 공간도형·좌표</button>
-        </div>
-      </div>
-      <div class="team-pick" id="diff-pick" role="group" aria-label="탐험 난이도 선택">
-        <span class="team-pick-label">탐험 난이도 선택</span>
-        <div class="team-pick-row">
-          <button type="button" class="diff-opt" data-diff="low">🟢 초심자용</button>
-          <button type="button" class="diff-opt on" data-diff="mid">🟡 기본형</button>
-          <button type="button" class="diff-opt" data-diff="high">🔴 심화 수능형</button>
-        </div>
-      </div>
-      <div class="sheet-buttons">
-        <button id="sheet-back" class="btn" type="button">← 뒤로</button>
-        <button class="btn primary big" type="submit">탐험 시작</button>
-      </div>
-      <button id="start-btn" class="link-btn" type="button" hidden>🔑 선생님: 수업 탐험 시작</button>
-    </form>
 
-    <!-- 설정 -->
-    <div id="settings-sheet" class="sheet" hidden>
-      <h2>설정</h2>
-      <div class="setting-row"><span>🎵 배경음악</span><button class="toggle" type="button" data-key="music"></button></div>
-      <div class="setting-row"><span>🔔 효과음 · 타자 소리</span><button class="toggle" type="button" data-key="sfx"></button></div>
-      <div class="setting-row"><span>🖥️ 그래픽 품질</span><button class="toggle" type="button" data-key="quality"></button></div>
-      <p class="muted small">크롬북에서 화면이 끊기면 그래픽 품질을 '낮음'으로 바꿔 보세요.</p>
+      <!-- Step 2: 2022 개정 기하 3단원 벡터 선택 팝업 -->
+      <div id="step-2" class="wizard-step" hidden>
+        <div class="step-head">
+          <span class="step-badge">2단계 / 3</span>
+          <h2 class="step-title">📜 기하 3단원 벡터 선택</h2>
+          <p class="muted small">2022 개정 교육과정 기준 탐험 단원</p>
+        </div>
+        <div class="wizard-list">
+          <button type="button" class="wizard-item on" data-unit="3-1">
+            <div class="item-title">3-1. 벡터의 연산</div>
+            <div class="item-desc">벡터의 덧셈·뺄셈과 실수배, 위치벡터 기초</div>
+          </button>
+          <button type="button" class="wizard-item" data-unit="3-2">
+            <div class="item-title">3-2. 벡터의 성분과 내적</div>
+            <div class="item-desc">평면벡터의 성분과 두 벡터의 내적, 각의 크기</div>
+          </button>
+          <button type="button" class="wizard-item" data-unit="3-3">
+            <div class="item-title">3-3. 도형의 방정식</div>
+            <div class="item-desc">직선의 방정식과 원의 방정식, 기하 활용</div>
+          </button>
+        </div>
+        <div class="sheet-buttons">
+          <button id="step2-back" class="btn" type="button">← 이전</button>
+          <button id="step2-next" class="btn primary big" type="button">다음: 난이도 선택 ➔</button>
+        </div>
+      </div>
+
+      <!-- Step 3: 난이도 선택 & 이름 입력 후 출발 -->
+      <form id="step-3" class="wizard-step" autocomplete="off" hidden>
+        <div class="step-head">
+          <span class="step-badge">3단계 / 3</span>
+          <h2 class="step-title">⚔️ 탐험 난이도 & 이름 입력</h2>
+          <p class="muted small">이름을 적고 출발 버튼을 눌러주세요</p>
+        </div>
+        <div class="diff-pick-row">
+          <button type="button" class="diff-btn" data-diff="low">
+            <span class="diff-icon">🟢</span>
+            <b>초심자용</b>
+            <small>개념 탐색 (+70점)</small>
+          </button>
+          <button type="button" class="diff-btn on" data-diff="mid">
+            <span class="diff-icon">🟡</span>
+            <b>기본형</b>
+            <small>중단원 표준 (+100점)</small>
+          </button>
+          <button type="button" class="diff-btn" data-diff="high">
+            <span class="diff-icon">🔴</span>
+            <b>심화 수능형</b>
+            <small>수능 4점 기출 (+150점)</small>
+          </button>
+        </div>
+        <label class="name-label">내 이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
+        <div class="sheet-buttons">
+          <button id="step3-back" class="btn" type="button">← 이전</button>
+          <button class="btn primary big launch-btn" type="submit">🚀 탐험 시작!</button>
+        </div>
+        <button id="start-btn" class="link-btn" type="button" hidden>🔑 선생님: 수업 탐험 시작</button>
+      </form>
+    </div>
+
+    <!-- 설정 및 사용 설명서 매뉴얼 -->
+    <div id="settings-sheet" class="sheet settings-manual-sheet" hidden>
+      <div class="settings-tabs">
+        <button type="button" class="s-tab on" data-stab="manual">📖 게임 설명서</button>
+        <button type="button" class="s-tab" data-stab="options">⚙️ 환경 설정</button>
+      </div>
+
+      <!-- 캐러셀 게임 매뉴얼 -->
+      <div id="tab-manual" class="stab-content">
+        <div class="carousel-container">
+          <div class="carousel-track" id="carousel-track">
+            <!-- 슬라이드 1: 기본 조작 및 벡터 이동 -->
+            <div class="carousel-slide on" data-slide="1">
+              <div class="slide-visual">
+                <div class="visual-badge">🕹️ 1. 조작 가이드</div>
+                <div class="visual-diagram">
+                  <div class="diagram-key">WASD / 가상 D-패드 : 3D 이동</div>
+                  <div class="diagram-key">Space / 🦘 : 점프 & 오비 발판</div>
+                  <div class="diagram-key">G / 🎯 : 네온 벡터 탄환 사격</div>
+                  <div class="diagram-key">E / 🔍 : 유물 조사 & 퀴즈 열기</div>
+                </div>
+              </div>
+              <h3 class="slide-title">입체 이동과 벡터 조작</h3>
+              <p class="slide-desc">PC 키보드 및 태블릿 터치로 유적을 탐험하세요. 발밑에 표시되는 방향 벡터 화살표로 방향을 맞추고 점프 발판을 건널 수 있습니다.</p>
+            </div>
+
+            <!-- 슬라이드 2: 퀴즈 풀이와 개념 카드 -->
+            <div class="carousel-slide" data-slide="2">
+              <div class="slide-visual">
+                <div class="visual-badge">🏺 2. 퀴즈 & 개념 카드</div>
+                <div class="visual-diagram">
+                  <div class="diagram-key">💎 수정체 10발 사격 ➔ 개념 카드 해금</div>
+                  <div class="diagram-key">📐 슬라이더 직접 조작 ➔ +50점 획득</div>
+                  <div class="diagram-key">🗝️ 유적 상자 퀴즈 정답 ➔ 황금 열쇠 획득</div>
+                </div>
+              </div>
+              <h3 class="slide-title">유물 퀴즈와 개념 인터랙티브</h3>
+              <p class="slide-desc">수정체에 벡터 탄환을 10발 맞히면 개념 카드가 열립니다. 마우스나 터치로 벡터를 직접 조작해 보며 원리를 익히고 점수를 얻으세요.</p>
+            </div>
+
+            <!-- 슬라이드 3: 4개 팀전과 3인 협동 레이드 -->
+            <div class="carousel-slide" data-slide="3">
+              <div class="slide-visual">
+                <div class="visual-badge">🤝 3. 팀 레이드 & 채팅</div>
+                <div class="visual-diagram">
+                  <div class="diagram-key">🚩 A(여우) · B(고양이) · C(곰) · D(토끼)</div>
+                  <div class="diagram-key">⚖️ 세 벡터 합 평형 레이드 (a+b+c=0)</div>
+                  <div class="diagram-key">💬 하단 중앙 실시간 채팅 협동</div>
+                </div>
+              </div>
+              <h3 class="slide-title">팀별 랭킹과 3인 협동 레이드</h3>
+              <p class="slide-desc">팀당 최대 8명이 힘을 모아 점수를 합산합니다. 3인 이상이 동시에 발판을 밟아 벡터의 합을 맞추는 협동 레이드 관문을 돌파하세요!</p>
+            </div>
+
+            <!-- 슬라이드 4: 교사 대시보드 & 인쇄 기능 -->
+            <div class="carousel-slide" data-slide="4">
+              <div class="slide-visual">
+                <div class="visual-badge">🧑‍🏫 4. 교사용 관제 시스템</div>
+                <div class="visual-diagram">
+                  <div class="diagram-key">🌐 1~7개 독립 수업 채널 분리 운영</div>
+                  <div class="diagram-key">📄 A4 수능형 2단 해설지 & 도해 인쇄</div>
+                  <div class="diagram-key">📊 학생별 정답률 & 채팅 CSV 다운로드</div>
+                </div>
+              </div>
+              <h3 class="slide-title">1~7채널 독립 수업과 해설지 출력</h3>
+              <p class="slide-desc">선생님은 1~7채널로 반별 수업을 열고 학생 진도를 모니터링할 수 있습니다. 교사용 해설지 버튼을 누르면 2단 편집 시험지가 즉시 출력됩니다.</p>
+            </div>
+          </div>
+
+          <!-- 캐러셀 네비게이션 -->
+          <div class="carousel-nav">
+            <button type="button" id="car-prev" class="car-arrow" aria-label="이전 설명">‹</button>
+            <div class="car-dots">
+              <span class="dot on" data-idx="1"></span>
+              <span class="dot" data-idx="2"></span>
+              <span class="dot" data-idx="3"></span>
+              <span class="dot" data-idx="4"></span>
+            </div>
+            <button type="button" id="car-next" class="car-arrow" aria-label="다음 설명">›</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 환경 설정 탭 -->
+      <div id="tab-options" class="stab-content" hidden>
+        <div class="setting-row"><span>🎵 배경음악</span><button class="toggle" type="button" data-key="music"></button></div>
+        <div class="setting-row"><span>🔔 효과음 · 타자 소리</span><button class="toggle" type="button" data-key="sfx"></button></div>
+        <div class="setting-row"><span>🖥️ 그래픽 품질</span><button class="toggle" type="button" data-key="quality"></button></div>
+        <p class="muted small">크롬북에서 화면이 끊기면 그래픽 품질을 '낮음'으로 바꿔 보세요.</p>
+      </div>
+
       <div class="sheet-buttons"><button id="settings-close" class="btn primary" type="button">닫기</button></div>
     </div>
   </section>

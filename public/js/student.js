@@ -3,6 +3,7 @@ import { fmt, watchMath } from "./mathtext.js";
 import { LAB_LEVELS } from "./lab.js";
 import { PROBLEMS, DIFFICULTY } from "./problems.js";
 import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
+import { MATHEMATICIANS, mathematicianCard } from "./mathematicians.js";
 import { renderClassBar } from "./classbar.js";
 import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, ALTAR, roomAt, W, H, buildGrid, DOOR_COLS, DOOR_ROWS } from "./game.js";
 import { World3D } from "./world3d.js";
@@ -14,8 +15,8 @@ const $ = (s, root = document) => root.querySelector(s);
 const STAGE_NAME = { lobby: "대기 중", play: "탐험 중", done: "탐험 끝" };
 // 팀전: 팀 이름·색은 서버(src/room.js)와 짝을 이룬다.
 const TEAMS = { A: { name: "A팀", color: "#ef4444" }, B: { name: "B팀", color: "#3b82f6" }, C: { name: "C팀", color: "#22c55e" }, D: { name: "D팀", color: "#a855f7" } };
-// 수업 채널: URL의 ?ch=1~5. 없으면 입장 화면에서 고르고, 그것도 없으면 1채널.
-const CHANNELS = ["1", "2", "3", "4", "5"];
+// 수업 채널: URL의 ?ch=1~7. 없으면 입장 화면에서 고르고, 그것도 없으면 1채널.
+const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
 const urlCh = new URLSearchParams(location.search).get("ch");
 const CH = CHANNELS.includes(urlCh) ? urlCh : null;
 const CLOSE_REASON = {
@@ -59,12 +60,32 @@ intro.cardArt().then((art) => {
   $("#art-class").src = art.class;
 });
 
+let typingTimer = null;
+function runHeroTyping() {
+  const el = document.querySelector(".class-hero-lead");
+  if (!el) return;
+  if (typingTimer) clearInterval(typingTimer);
+  const fullText = "선생님이 연 탐험에 반 친구들과 함께 실시간으로 도전해요! 🚀";
+  el.textContent = "";
+  let idx = 0;
+  typingTimer = setInterval(() => {
+    if (idx < fullText.length) {
+      el.textContent += fullText[idx++];
+      if (idx % 2 === 0) sound.sfx("key"); // 타자 소리 모션
+    } else {
+      clearInterval(typingTimer);
+      typingTimer = null;
+    }
+  }, 55);
+}
+
 function showScreen(which) {
   $("#splash").hidden = which !== "splash";
   $("#menu").hidden = which === "splash";
-  $("#join-form").hidden = which !== "name";
+  $("#join-wizard").hidden = which !== "name";
   $("#settings-sheet").hidden = which !== "settings";
   intro.showRunners(which === "splash");
+  if (which === "menu") runHeroTyping();
 }
 
 const touch = () => {
@@ -76,36 +97,125 @@ const touch = () => {
 $("#touch").onclick = touch;
 window.addEventListener("keydown", (e) => { if (!$("#join").hidden && (e.key === "Enter" || e.key === " ")) touch(); });
 
-const SHEET = {
-  practice: ["🎯 연습 모드", "혼자 언제든 탐험해요. 기록은 나만 보고, 언제든 처음부터 다시 할 수 있어요."],
-  class: ["🏫 수업 참가", "반 친구들과 같은 유적에 들어가요. 선생님이 탐험을 시작하면 상자가 열려요."],
-};
+// 캐슬풍 단계별 팝업 모달 제어 (1단계: 팀·채널 ➔ 2단계: 단원 ➔ 3단계: 난이도·이름)
+let currentStep = 1;
+function showWizardStep(step) {
+  if (step === "menu") return showScreen("menu");
+  currentStep = step;
+  $("#step-1").hidden = step !== 1;
+  $("#step-2").hidden = step !== 2;
+  $("#step-3").hidden = step !== 3;
+  sound.sfx("open");
+  if (step === 3) $("#join-name").focus();
+}
+
 document.querySelectorAll(".mcard[data-mode]").forEach((b) => {
   b.onclick = () => {
     S.pendingMode = b.dataset.mode;
-    const [title, lead] = SHEET[S.pendingMode];
-    $("#sheet-title").textContent = title;
-    $("#sheet-lead").textContent = lead;
     $("#start-btn").hidden = S.pendingMode !== "class";
     sound.sfx("open");
     showScreen("name");
-    $("#join-name").focus();
+    // 수업 참가: 1단계(팀·채널)부터 / 연습 모드: 2단계(단원)부터 시작
+    showWizardStep(S.pendingMode === "class" ? 1 : 2);
   };
 });
-$("#sheet-back").onclick = () => showScreen("menu");
-$("#open-settings").onclick = () => { sound.sfx("open"); showScreen("settings"); };
-$("#settings-close").onclick = () => showScreen("menu");
 
-// 팀 선택: 기본은 자동 배정(""). 고르면 입장할 때 서버에 함께 보낸다.
-document.querySelectorAll(".team-opt[data-team]").forEach((b) => {
+$("#step1-back").onclick = () => showScreen("menu");
+$("#step1-next").onclick = () => showWizardStep(2);
+$("#step2-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "menu" : 1);
+$("#step2-next").onclick = () => showWizardStep(3);
+$("#step3-back").onclick = () => showWizardStep(2);
+
+// 단원 카드 클릭 시 선택 & 3단계로 자동 진행
+document.querySelectorAll(".wizard-item[data-unit]").forEach((b) => {
   b.onclick = () => {
-    S.team = b.dataset.team;
-    document.querySelectorAll(".team-opt[data-team]").forEach((o) => o.classList.toggle("on", o === b));
+    selectUnit(b.dataset.unit);
+    document.querySelectorAll(".wizard-item[data-unit]").forEach((o) => o.classList.toggle("on", o === b));
+    sound.sfx("open");
+    setTimeout(() => showWizardStep(3), 160);
+  };
+});
+
+// 난이도 버튼 클릭
+document.querySelectorAll(".diff-btn[data-diff]").forEach((b) => {
+  b.onclick = () => {
+    S.diff = b.dataset.diff;
+    store("vr-diff", S.diff);
+    document.querySelectorAll(".diff-btn[data-diff]").forEach((o) => o.classList.toggle("on", o === b));
     sound.sfx("open");
   };
 });
 
-// 수업 채널 선택(1~5): URL의 ?ch=가 있으면 그 채널로 정해지고 선택기는 감춘다.
+// 설정 창 탭 (📖 설명서 vs ⚙️ 옵션)
+document.querySelectorAll(".s-tab[data-stab]").forEach((b) => {
+  b.onclick = () => {
+    const tab = b.dataset.stab;
+    document.querySelectorAll(".s-tab[data-stab]").forEach((o) => o.classList.toggle("on", o === b));
+    $("#tab-manual").hidden = tab !== "manual";
+    $("#tab-options").hidden = tab !== "options";
+    sound.sfx("open");
+  };
+});
+
+// 게임 설명서 캐러셀 슬라이더
+let curSlide = 1;
+const TOTAL_SLIDES = 4;
+function showSlide(idx) {
+  curSlide = Math.max(1, Math.min(TOTAL_SLIDES, idx));
+  document.querySelectorAll(".carousel-slide").forEach((s) => {
+    s.classList.toggle("on", Number(s.dataset.slide) === curSlide);
+  });
+  document.querySelectorAll(".car-dots .dot").forEach((d) => {
+    d.classList.toggle("on", Number(d.dataset.idx) === curSlide);
+  });
+  sound.sfx("key");
+}
+$("#car-prev").onclick = () => showSlide(curSlide - 1);
+$("#car-next").onclick = () => showSlide(curSlide + 1);
+document.querySelectorAll(".car-dots .dot").forEach((d) => {
+  d.onclick = () => showSlide(Number(d.dataset.idx));
+});
+
+$("#open-settings").onclick = () => { sound.sfx("open"); showScreen("settings"); };
+$("#settings-close").onclick = () => showScreen("menu");
+
+// 팀 선택: 자동 배정은 제외, A·B·C·D 중 선택(팀당 최대 8명)
+S.team = load("vr-team") || "A";
+function selectTeam(team) {
+  S.team = team;
+  store("vr-team", team);
+  document.querySelectorAll(".team-opt[data-team]").forEach((o) => o.classList.toggle("on", o.dataset.team === team));
+}
+document.querySelectorAll(".team-opt[data-team]").forEach((b) => {
+  b.onclick = () => {
+    if (b.disabled) return;
+    selectTeam(b.dataset.team);
+    sound.sfx("open");
+  };
+});
+selectTeam(S.team);
+
+function updateTeamCounts(counts) {
+  if (!counts) return;
+  const max = counts.max ?? 8;
+  for (const team of ["A", "B", "C", "D"]) {
+    const cnt = counts[team] ?? 0;
+    const el = $(`#cnt-${team}`);
+    const btn = document.querySelector(`.team-opt[data-team="${team}"]`);
+    if (el) el.textContent = `(${cnt}/${max}명${cnt >= max ? " · 마감" : ""})`;
+    if (btn) {
+      const full = cnt >= max;
+      btn.disabled = full;
+      btn.classList.toggle("full", full);
+      if (full && S.team === team) {
+        const available = ["A", "B", "C", "D"].find((t) => (counts[t] ?? 0) < max);
+        if (available) selectTeam(available);
+      }
+    }
+  }
+}
+
+// 수업 채널 선택(1~7): URL의 ?ch=가 있으면 그 채널로 정해지고 선택기는 감춘다.
 document.querySelectorAll(".ch-opt[data-ch]").forEach((b) => {
   b.classList.toggle("on", b.dataset.ch === S.ch);
   b.onclick = () => {
@@ -117,17 +227,19 @@ document.querySelectorAll(".ch-opt[data-ch]").forEach((b) => {
 });
 if (CH) $("#channel-pick").hidden = true;
 
-// 기하 단원 선택(1: 이차곡선, 2: 평면벡터, 3: 공간도형·공간좌표)
-S.unit = load("vr-unit") || "2";
-document.querySelectorAll(".unit-opt[data-unit]").forEach((b) => {
-  b.classList.toggle("on", b.dataset.unit === S.unit);
-  b.onclick = () => {
-    S.unit = b.dataset.unit;
-    store("vr-unit", S.unit);
-    document.querySelectorAll(".unit-opt[data-unit]").forEach((o) => o.classList.toggle("on", o === b));
-    sound.sfx("open");
-  };
+// 2022 개정 기하 3단원 벡터(3-1, 3-2, 3-3) 선택 동기화
+S.unit = load("vr-unit") || "3-1";
+function selectUnit(u) {
+  S.unit = u;
+  store("vr-unit", u);
+  document.querySelectorAll(".unit-opt[data-unit], .unit-btn[data-unit]").forEach((b) => {
+    b.classList.toggle("on", b.dataset.unit === u);
+  });
+}
+document.querySelectorAll(".unit-opt[data-unit], .unit-btn[data-unit]").forEach((b) => {
+  b.onclick = () => { selectUnit(b.dataset.unit); sound.sfx("open"); };
 });
+selectUnit(S.unit);
 
 // 탐험 난이도 선택(low: 초심자용, mid: 기본형, high: 심화 수능형)
 S.diff = load("vr-diff") || "mid";
@@ -182,7 +294,7 @@ onSettings(() => {
 
 const session = store("vr-session");
 $("#join-name").value = session?.name ?? "";
-$("#join-form").addEventListener("submit", (e) => {
+$("#step-3").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = $("#join-name").value.trim();
   if (!name) return showJoinError("이름을 입력해 주세요.");
@@ -261,6 +373,7 @@ function onMessage(msg) {
     const before = S.cls;
     S.cls = msg;
     if (msg.visitors) renderVisitorStats(msg.visitors);
+    if (msg.teamCounts) updateTeamCounts(msg.teamCounts);
     S.game?.setRoster(msg.players ?? []);
     announceRelics(before, msg);
     if (!before || before.stage !== msg.stage) onStage(msg.stage);
@@ -299,11 +412,11 @@ const hooks = {
   onMove: (x, y, room) => S.net?.send({ type: "pos", x, y, room }) ?? false,
   onInteract,
   onShoot: () => { S.world?.shoot(); sound.sfx("shoot"); },
-  // 표적 10발 완성: 그 구역의 핵심 개념 카드가 자동으로 열리고 해금된다 (+50점)
+  // 표적 10발 완성: 그 구역의 핵심 개념 카드가 자동으로 열리고, 이어 기하 수학자 카드가 해금된다!
   onTargetHit: (t) => {
     sound.sfx("target");
     toast(`🎯 표적 10발 완성! '${CONCEPTS[t.concept]?.title ?? ""}' 개념 카드가 해금되었어요.`, "ok");
-    showConcept(t.concept, closeModal, "problem");
+    showConcept(t.concept, () => triggerMathematicianEvent(closeModal), "problem");
   },
 };
 
@@ -905,6 +1018,29 @@ const awardConcept = (key) => {
   conceptSent.add(key);
   S.net?.send({ type: "concept", key }); // 개념 학습 포인트 +50 (문제 풀이보다 작지만 학습 자체가 점수가 돼요)
 };
+
+// 기하를 빛낸 위대한 수학자 히든 카드 이벤트 팝업
+let mathCardIdx = 0;
+function triggerMathematicianEvent(next = closeModal) {
+  const m = MATHEMATICIANS[mathCardIdx % MATHEMATICIANS.length];
+  mathCardIdx++;
+  showMathematicianCard(m, next);
+}
+
+function showMathematicianCard(m, next) {
+  const body = openModal();
+  sound.sfx("found");
+  body.innerHTML = `
+    ${mathematicianCard(m)}
+    <div class="summary-actions" style="margin-top: 14px;">
+      <button class="btn primary big" type="button" id="math-card-ok">기하 탐험 계속하기 ➔</button>
+    </div>`;
+  $("#math-card-ok", body).onclick = () => {
+    awardConcept(`math_${m.id}`);
+    toast(`🎁 ${m.name} 카드 해금! 보너스 마일리지 +${m.bonus}점 획득!`, "ok");
+    next();
+  };
+}
 
 // 개념 카드 팝업: 학습을 돕는다. 직접 조작하다가 '학습 완료'(+50점) 또는 '문제 풀기'를 누른다.
 function showConcept(key, next, kind) {
