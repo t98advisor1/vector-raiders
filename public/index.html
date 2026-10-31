@@ -76,6 +76,16 @@
       <h2 id="sheet-title"></h2>
       <p id="sheet-lead" class="muted"></p>
       <label>이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
+      <div class="team-pick" id="channel-pick" role="group" aria-label="수업 채널 선택">
+        <span class="team-pick-label">수업 채널 고르기 <small class="muted">선생님이 알려 준 번호</small></span>
+        <div class="team-pick-row">
+          <button type="button" class="ch-opt on" data-ch="1">1채널</button>
+          <button type="button" class="ch-opt" data-ch="2">2채널</button>
+          <button type="button" class="ch-opt" data-ch="3">3채널</button>
+          <button type="button" class="ch-opt" data-ch="4">4채널</button>
+          <button type="button" class="ch-opt" data-ch="5">5채널</button>
+        </div>
+      </div>
       <div class="team-pick" role="group" aria-label="팀 선택">
         <span class="team-pick-label">내 팀 고르기</span>
         <div class="team-pick-row">
@@ -124,6 +134,7 @@
           <b id="hud-room"></b>
           <span id="hud-keys" title="열쇠 조각 (푼 문제)"></span>
           <span id="hud-jumps" title="벡터 점프 (건넌 장애물)"></span>
+          <span id="hud-mile" title="활동 마일리지 (이동·점프·사격·개념 학습)"></span>
           <button id="map-btn" class="hud-btn" type="button" aria-label="유적 전체 지도 (탭)">🗺️</button>
           <button id="sound-btn" class="hud-btn" type="button" aria-label="소리 끄기 (M)">🔊</button>
           <button id="restart-btn" class="hud-btn" type="button" hidden>↺ 처음부터</button>
@@ -144,26 +155,29 @@
       <!-- 학생 간 실시간 채팅 -->
       <button id="chat-toggle" class="chat-toggle" type="button" aria-label="채팅 열기">💬<b id="chat-unread" class="chat-unread" hidden></b></button>
       <div id="chat-panel" class="chat-panel" hidden>
-        <div class="chat-head"><b>💬 채팅</b><button id="chat-close" class="hud-btn" type="button" aria-label="채팅 닫기">✕</button></div>
+        <div id="chat-head" class="chat-head" title="여기를 끌어 채팅창을 옮길 수 있어요"><b>💬 채팅</b><button id="chat-close" class="hud-btn" type="button" aria-label="채팅 닫기">✕</button></div>
         <div id="chat-log" class="chat-log" aria-live="polite"></div>
         <form id="chat-form" class="chat-form" autocomplete="off">
           <input id="chat-input" maxlength="100" placeholder="메시지를 입력하세요 (100자)" aria-label="채팅 메시지">
           <button class="btn" type="submit">보내기</button>
         </form>
       </div>
-      <!-- 터치 기기용 가상 조작판: 왼쪽 D-패드, 오른쪽 점프·열기 버튼 -->
+      <!-- 터치 기기용 가상 조작판: 왼쪽 D-패드, 오른쪽 점프·열기·사격 버튼. 핸들(⠿)을 끌어 위치를 옮길 수 있어요 -->
       <div id="touch-dpad" class="touch-dpad" hidden>
+        <button id="dpad-handle" class="pad-handle" type="button" aria-label="조작판 이동">⠿</button>
         <button id="dpad-up" class="dpad-btn dpad-up" type="button" aria-label="위로 이동">⬆️</button>
         <button id="dpad-left" class="dpad-btn dpad-left" type="button" aria-label="왼쪽으로 이동">⬅️</button>
         <button id="dpad-down" class="dpad-btn dpad-down" type="button" aria-label="아래로 이동">⬇️</button>
         <button id="dpad-right" class="dpad-btn dpad-right" type="button" aria-label="오른쪽으로 이동">➡️</button>
       </div>
       <div id="touch-actions" class="touch-actions" hidden>
+        <button id="actions-handle" class="pad-handle" type="button" aria-label="버튼 이동">⠿</button>
+        <button id="touch-shoot" class="touch-btn-round" type="button" aria-label="사격 (G)">🎯<small>사격</small></button>
         <button id="touch-jump" class="touch-btn-round" type="button" aria-label="점프">🦘<small>점프</small></button>
         <button id="touch-act" class="touch-btn-round" type="button" aria-label="열기 또는 조사">✋<small>열기</small></button>
       </div>
       <div id="loading" class="loading" hidden>🏺 유적을 불러오는 중…</div>
-      <div class="help">WASD·방향키 이동 · <kbd>E</kbd> 또는 클릭: 열기 · <kbd>M</kbd> 소리</div>
+      <div class="help">WASD·방향키 이동 · <kbd>E</kbd> 또는 클릭: 열기 · <kbd>G</kbd>: 사격 · <kbd>Space</kbd>: 점프 · <kbd>M</kbd> 소리</div>
     </div>
   </section>
 

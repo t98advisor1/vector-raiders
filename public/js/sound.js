@@ -188,6 +188,16 @@ class Sound {
       case "found": // 다른 친구가 유물 조각을 발견
         notes([79, 84, 88], 0.06, "triangle", 0.25, 0.08);
         break;
+      case "shoot": // 네온 벡터 탄환 발사: 촤악 레이저 소리
+        this.osc("sawtooth", 880, t, 0.12, out, { peak: 0.14, slide: 1760, filter: 3200 });
+        this.noise(t, 0.06, out, { type: "bandpass", freq: 3200, peak: 0.12, q: 3 });
+        break;
+      case "hit": // 표적 명중: 맑은 금속성 소리
+        notes([88, 93], 0.05, "triangle", 0.18, 0.12);
+        break;
+      case "target": // 표적 10발 완성: 팡파레
+        notes([72, 76, 79, 84, 88], 0.08, "square", 0.3, 0.12);
+        break;
       case "start": // 탐험 시작 신호
         notes([60, 67, 72], 0.14, "sawtooth", 0.25, 0.1);
         for (const n of [60, 64, 67, 72]) this.osc("sawtooth", midi(n), t + 0.45, 0.8, out, { peak: 0.07, attack: 0.03, filter: 2800 });

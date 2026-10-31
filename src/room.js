@@ -6,14 +6,21 @@ import { checkAnswer, PROBLEM_IDS, ANSWER_TEXT } from "./answers.js";
 import { SheetLog } from "./sheets.js";
 
 const STAGES = ["lobby", "play", "done"];
-const MAP_W = 58, MAP_H = 13, ROOM_COUNT = 4; // public/js/game.js의 지도 크기
+const MAP_W = 74, MAP_H = 15, ROOM_COUNT = 4; // public/js/game.js의 지도 크기
 const POS_TICK_MS = 200; // 위치는 모아서 0.2초마다 한 번 보낸다
 const POS_IDLE_TICKS = 150; // 30초 동안 아무도 움직이지 않으면 타이머를 멈춘다
 const LAB_LEVELS = ["l1", "l2", "l3", "l4", "l5"];
 const MAX_STUDENTS = 40;
 const MAX_TRIES = 20;
 const UNLOCK_RATIO = 0.7;
-const SCORE = { solve: 100, firstTry: 50, jump: 20 };
+// 점수 규칙: 문제는 학생이 고른 난이도 배점(기본 100), 첫 시도 정답 +50, 벡터 점프 +20,
+// 개념 카드 학습 +50, 조작 활동(이동·점프·사격) 마일리지는 활동량에 비례해 최대 200점.
+const SCORE = { solve: 100, firstTry: 50, jump: 20, concept: 50 };
+const DIFF_POINTS = { high: 150, mid: 100, low: 70 };
+const MILEAGE_CAP = 200;
+const ACTIVITY_LIMIT = { dist: 60, jumps: 15, shots: 30 }; // 5초마다 오는 활동 보고의 최대값(어뷰ing 방지)
+// 개념 카드 점수를 매길 수 있는 key: 문제(p1~p7)와 벡터 실험실 단계(l1~l5)
+const CONCEPT_KEYS = [...PROBLEM_IDS, ...LAB_LEVELS];
 // 팀전: 학생이 들어올 때마다 가장 사람이 적은 팀에 한 명씩 나눠 담는다.
 const TEAMS = ["A", "B", "C", "D"];
 const TEAM_NAMES = { A: "A팀", B: "B팀", C: "C팀", D: "D팀" };
@@ -26,6 +33,16 @@ const MAX_MESSAGE = 2048;
 
 // mode: "class"(반 전체가 함께하는 수업 유적) 또는 "practice"(학생 한 명의 연습 유적, 바로 탐험 시작)
 const freshData = (mode = "class") => ({ mode, createdAt: Date.now(), stage: mode === "practice" ? "play" : "lobby", students: {}, unlocked: [] });
+
+const clampNum = (v, min, max) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(max, Math.max(0, n)) : 0;
+};
+const clampInt = (v, min, max) => Math.floor(clampNum(v, min, max));
+
+// 활동 마일리지: 이동 10칸마다 2점, 점프 1점, 사격 5발마다 1점. 최대 200점.
+const mileageOf = (a) =>
+  Math.min(MILEAGE_CAP, Math.floor((a?.dist ?? 0) / 10) * 2 + Math.floor(a?.jumps ?? 0) + Math.floor((a?.shots ?? 0) / 5));
 
 // 비밀번호 비교: 길이가 같으면 글자마다 모두 비교한다.
 function samePassword(a, b) {
@@ -213,7 +230,7 @@ export class Room extends DurableObject {
         // n: 지도 위 캐릭터 번호(색). 위치 메시지를 짧게 하려고 cid 대신 쓴다.
         // 강퇴된 번호가 나중에 다시 쓰이지 않게, 기존 번호 최댓값 다음부터 준다.
         const nextN = Object.values(this.data.students).reduce((m, s) => Math.max(m, s.n + 1), 0);
-        st = { n: nextN, name, team: chosenTeam ?? this.pickTeam(), joinedAt: Date.now(), lab: [], probs: {} };
+        st = { n: nextN, name, team: chosenTeam ?? this.pickTeam(), joinedAt: Date.now(), lab: [], probs: {}, concepts: [], activity: { dist: 0, jumps: 0, shots: 0 } };
         this.data.students[cid] = st;
       } else {
         st.name = name;
@@ -314,7 +331,7 @@ export class Room extends DurableObject {
 
     if (msg.type === "restart" && this.practice) {
       // 연습 모드 '처음부터 다시': 내 기록만 지우고 이름은 남긴다.
-      Object.assign(st, { lab: [], probs: {}, lastAt: undefined, escapedAt: undefined });
+      Object.assign(st, { lab: [], probs: {}, concepts: [], activity: { dist: 0, jumps: 0, shots: 0 }, lastAt: undefined, escapedAt: undefined });
       this.data.unlocked = [];
       this.lastPos.delete(cid);
       await this.save();
@@ -335,6 +352,31 @@ export class Room extends DurableObject {
       return this.broadcast({ type: "chat", from: st.n, name: st.name, team: st.team ?? null, text });
     }
 
+    if (msg.type === "concept") {
+      // 개념 카드 학습 기록: 카드를 처음 학습하면 +50점. 같은 카드는 한 번만 점수를 준다.
+      if (!CONCEPT_KEYS.includes(msg.key)) return;
+      st.concepts ??= [];
+      if (!st.concepts.includes(msg.key)) {
+        st.concepts.push(msg.key);
+        st.lastAt = Date.now();
+        await this.save();
+        this.log({ type: "개념 학습", name: st.name, detail: msg.key });
+        this.scheduleBroadcast();
+      }
+      return this.send(ws, { type: "me", me: st });
+    }
+
+    if (msg.type === "activity") {
+      // 조작 활동 마일리지: 학생 화면이 5초마다 모아 보낸 이동·점프·사격량을 누적한다.
+      const a = (st.activity ??= { dist: 0, jumps: 0, shots: 0 });
+      a.dist = Math.round((a.dist + clampNum(msg.dist, 0, ACTIVITY_LIMIT.dist)) * 10) / 10;
+      a.jumps += clampInt(msg.jumps, 0, ACTIVITY_LIMIT.jumps);
+      a.shots += clampInt(msg.shots, 0, ACTIVITY_LIMIT.shots);
+      st.lastAt = Date.now();
+      await this.save();
+      return;
+    }
+
     if (msg.type === "hint" && PROBLEM_IDS.includes(msg.pid)) {
       // 힌트를 본 기록. 힌트를 보고 맞히면 첫 시도 보너스는 주지 않는다.
       const p = (st.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
@@ -353,6 +395,8 @@ export class Room extends DurableObject {
       const p = (st.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
       if (p.solved) return this.send(ws, { type: "result", pid: msg.pid, ok: true, tries: p.tries, already: true });
       if (p.tries >= MAX_TRIES) return this.send(ws, { type: "error", message: "도전 횟수를 다 썼어요. 선생님께 도움을 요청하세요." });
+      // 상자를 열 때 고른 난이도(상 150 / 중 100 / 하 70). 고르지 않으면 기본 100점.
+      if (DIFF_POINTS[msg.diff]) p.diff = msg.diff;
       const result = checkAnswer(msg.pid, msg.answer);
       if (!result) return this.send(ws, { type: "result", pid: msg.pid, invalid: true, tries: p.tries });
       p.tries += 1;
@@ -416,16 +460,21 @@ export class Room extends DurableObject {
     }
   }
 
-  // 점수: 문제 100점, 첫 시도 정답 50점 더, 벡터 점프 20점. 같으면 먼저 도달한 학생이 앞선다.
+  // 점수: 난이도별 문제 배점(상150/중100/하70) + 첫 시도 정답 +50 + 벡터 점프 +20
+  //      + 개념 카드 학습 +50 + 활동 마일리지(최대 200). 같으면 먼저 도달한 학생이 앞선다.
   ranking() {
     return Object.entries(this.data.students)
       .map(([cid, st]) => {
         const probs = Object.values(st.probs);
         const solved = probs.filter((p) => p.solved).length;
         const first = probs.filter((p) => p.firstTry).length;
+        st.concepts ??= [];
+        st.activity ??= { dist: 0, jumps: 0, shots: 0 };
+        const solveScore = probs.filter((p) => p.solved).reduce((s, p) => s + (DIFF_POINTS[p.diff] ?? SCORE.solve), 0);
+        const mileage = mileageOf(st.activity);
         return {
-          cid, n: st.n, name: st.name, solved, first, lab: st.lab.length,
-          score: solved * SCORE.solve + first * SCORE.firstTry + st.lab.length * SCORE.jump,
+          cid, n: st.n, name: st.name, solved, first, lab: st.lab.length, concepts: st.concepts.length, mileage,
+          score: solveScore + first * SCORE.firstTry + st.lab.length * SCORE.jump + st.concepts.length * SCORE.concept + mileage,
           lastAt: st.lastAt ?? Infinity, escapedAt: st.escapedAt ?? null,
         };
       })
@@ -481,7 +530,7 @@ export class Room extends DurableObject {
       energy: total ? labDone / (total * LAB_LEVELS.length) : 0,
       relics,
       players: students.map((st) => [st.n, st.name, st.team ?? null]),
-      ranking: this.ranking().map(({ n, name, score, solved, escapedAt, cid }) => ({ n, name, score, solved, escaped: !!escapedAt, team: this.data.students[cid].team ?? null })),
+      ranking: this.ranking().map(({ n, name, score, solved, escapedAt, cid, mileage, concepts }) => ({ n, name, score, solved, escaped: !!escapedAt, mileage, concepts, team: this.data.students[cid].team ?? null })),
       teams: this.teamScores(),
     };
   }
@@ -492,7 +541,7 @@ export class Room extends DurableObject {
       const st = this.data.students[r.cid];
       return {
         cid: r.cid, name: st.name, online: online.has(r.cid), lab: st.lab.length, probs: st.probs, team: st.team ?? null,
-        joinedAt: st.joinedAt, escapedAt: st.escapedAt ?? null, rank: r.rank, score: r.score,
+        joinedAt: st.joinedAt, escapedAt: st.escapedAt ?? null, rank: r.rank, score: r.score, mileage: r.mileage, concepts: r.concepts,
         room: this.pos.get(r.cid)?.room ?? null,
       };
     });

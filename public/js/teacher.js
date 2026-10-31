@@ -6,7 +6,16 @@ import { renderClassBar } from "./classbar.js";
 import { ROOMS, BRIDGES, roomAt } from "./game.js";
 
 const $ = (s) => document.querySelector(s);
+// 수업 채널 1~5: 채널마다 완전히 분리된 수업 유적(Durable Object class:1~5)이다.
+const CHANNELS = ["1", "2", "3", "4", "5"];
+const STAGE_TEXT = { lobby: "⏸ 대기", play: "▶ 탐험 중", done: "■ 탐험 끝" };
 let net = null, last = null, answers = null;
+const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)
+const pwByCh = {}; // 채널 번호 → 로그인 비밀번호 (joined 뒤 기억해 두기)
+const dashByCh = {}; // 채널 번호 → 마지막 받은 대시보드 (통합 뷰용)
+const chatLog = []; // 학생 채팅 누적: { at, ch, name, team, text }
+let activeCh = (() => { try { return sessionStorage.getItem("vr-teacher-ch") ?? "1"; } catch { return "1"; } })();
+if (!CHANNELS.includes(activeCh)) activeCh = "1";
 const expanded = new Set(); // 펼쳐 본 학생
 const STAGE_NAME = { lobby: "⏸ 대기 중", play: "▶ 탐험 중", done: "■ 탐험 끝" };
 watchMath();
@@ -31,6 +40,35 @@ $("#reset").onclick = () => {
 };
 
 $("#csv").onclick = () => { if (last) downloadCsv(last); };
+
+// 학생 채팅 기록 다운로드: 지금까지 받은 모든 채팅을 UTF-8 BOM CSV로 내려 준다.
+$("#chat-download").onclick = () => {
+  if (!chatLog.length) return alert("아직 받은 채팅이 없어요. 수업이 시작되면 학생들의 채팅이 여기에 쌓여요.");
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const head = ["시각", "채널", "팀", "이름", "내용"];
+  const rows = chatLog.map((c) => [
+    new Date(c.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    `${c.ch}채널`, c.team ? `${c.team}팀` : "", c.name, c.text,
+  ]);
+  const csv = "\ufeff" + [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `학생채팅기록_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// 진행 제어: 이 채널의 탐험을 시작·대기·종료한다.
+for (const btn of document.querySelectorAll(".stage-ctl[data-stage]"))
+  btn.onclick = () => net?.send({ type: "stage", stage: btn.dataset.stage });
+
+// 학생 초대 링크 복사: 지금 보고 있는 채널의 접속 주소를 클립보드에 넣는다.
+$("#invite-copy").onclick = async () => {
+  const url = `${location.origin}/?ch=${activeCh}`;
+  try { await navigator.clipboard.writeText(url); $("#invite-copy").textContent = "✅ 복사했어요"; }
+  catch { prompt("아래 주소를 복사해 학생들에게 알려 주세요.", url); }
+  setTimeout(() => { $("#invite-copy").textContent = "📋 학생 초대 링크 복사"; }, 1500);
+};
 
 // 교사용 문제·정답·해설 PDF: 인쇄 창에 'PDF로 저장'하면 파일로 내려받는다.
 $("#print-sheet-btn").onclick = () => {
@@ -79,22 +117,51 @@ function printSheet() {
 
 function start(password) {
   net?.close();
+  for (const ch of CHANNELS) openChannel(ch, password);
   $("#setup-error").textContent = "";
-  $("#join-url").textContent = `${location.origin}/`;
-  net = connect(() => ({ type: "hello", role: "teacher", password }), (msg) => {
-    if (msg.type === "joined") {
-      remember(password);
-      answers = msg.answers ?? null;
-      $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
-      buildAnswerSheet(); // 문제·정답 일람표도 정답을 받은 뒤에 그린다
-      $("#setup").hidden = true;
-      $("#dash").hidden = false;
-    }
-    onMessage(msg);
-  }, onStatus);
+  $("#join-url").textContent = `${location.origin}/?ch=${activeCh}`;
+  buildChannelTabs();
 }
 
-function onStatus(kind, code) {
+// 채널 하나와 연결한다. 5개 채널을 모두 연결해 두면 통합 대시보드에서 활성 학생 수를 실시간으로 볼 수 있다.
+function openChannel(ch, password) {
+  conns[ch]?.close();
+  pwByCh[ch] = password;
+  conns[ch] = connect(
+    () => ({ type: "hello", role: "teacher", password }),
+    (msg) => onChannelMessage(ch, msg),
+    (kind, code) => onChannelStatus(ch, kind, code),
+    `?ch=${ch}`,
+  );
+  if (ch === activeCh) net = conns[ch];
+}
+
+function onChannelMessage(ch, msg) {
+  if (msg.type === "joined") {
+    remember(pwByCh[ch] ?? null); // 비밀번호는 탭을 닫을 때까지 기억한다
+    answers = msg.answers ?? null;
+    $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
+    buildAnswerSheet(); // 문제·정답 일람표도 정답을 받은 뒤에 그린다
+    $("#setup").hidden = true;
+    $("#dash").hidden = false;
+  } else if (msg.type === "dashboard") {
+    dashByCh[ch] = msg;
+    if (ch === activeCh) { last = msg; $("#stage-chip").textContent = STAGE_NAME[msg.stage] ?? ""; renderTeams(msg.teams); renderKpis(msg); renderDash(msg); }
+    renderOverview();
+  } else if (msg.type === "class") {
+    if (ch === activeCh) renderClassBar($("#class-bar"), msg, { showEnergy: true, showShelf: true });
+  } else if (msg.type === "chat") {
+    // 학생 채팅 누적 (모든 채널) — [💬 학생 채팅 기록 다운로드]로 내려받는다
+    chatLog.push({ at: Date.now(), ch, name: msg.name, team: msg.team, text: msg.text });
+    if (chatLog.length > 3000) chatLog.splice(0, chatLog.length - 3000);
+    $("#chat-download").textContent = `💬 학생 채팅 기록 다운로드 (${chatLog.length})`;
+  } else if (msg.type === "error") {
+    $("#setup-error").textContent = msg.message;
+  }
+}
+
+function onChannelStatus(ch, kind, code) {
+  if (ch !== activeCh) return;
   $("#conn-chip").textContent = kind === "open" ? "🟢 연결됨" : kind === "retry" ? "🟡 다시 연결 중" : "🔴 연결 끊김";
   if (kind === "final") {
     $("#dash").hidden = true;
@@ -104,16 +171,74 @@ function onStatus(kind, code) {
   }
 }
 
-function onMessage(msg) {
-  if (msg.type === "dashboard") {
-    last = msg;
-    $("#stage-chip").textContent = STAGE_NAME[msg.stage] ?? "";
-    renderTeams(msg.teams);
-    renderDash(msg);
-  } else if (msg.type === "class") {
-    renderClassBar($("#class-bar"), msg, { showEnergy: true, showShelf: true });
-  } else if (msg.type === "error") {
-    $("#setup-error").textContent = msg.message;
+// ---------- 채널 전환 탭 · 통합 대시보드 ----------
+function buildChannelTabs() {
+  const tabs = $("#ch-tabs");
+  tabs.replaceChildren();
+  for (const ch of CHANNELS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `ch-tab${ch === activeCh ? " on" : ""}`;
+    b.textContent = `${ch}채널`;
+    b.onclick = () => switchChannel(ch);
+    tabs.appendChild(b);
+  }
+}
+
+function switchChannel(ch) {
+  if (ch === activeCh) return;
+  activeCh = ch;
+  try { sessionStorage.setItem("vr-teacher-ch", ch); } catch {}
+  net = conns[ch] ?? null;
+  buildChannelTabs();
+  $("#join-url").textContent = `${location.origin}/?ch=${ch}`;
+  last = dashByCh[ch] ?? null;
+  if (last) { renderTeams(last.teams); renderKpis(last); renderDash(last); }
+  else { $("#team-bar").hidden = true; $("#kpi-row").hidden = true; $("#roster").replaceChildren(); $("#problems").replaceChildren(); }
+  renderOverview();
+}
+
+// ---------- 상단 KPI 카드: 접속 인원 · 팀 점수 게이지 · 평균 점수·정답률 · 탐험 상태 ----------
+function renderKpis(d) {
+  const row = $("#kpi-row");
+  row.hidden = false;
+  const online = d.students.filter((s) => s.online).length;
+  const total = d.students.length;
+  const avg = total ? Math.round(d.students.reduce((s, x) => s + x.score, 0) / total) : 0;
+  let tried = 0, solved = 0;
+  for (const p of PROBLEMS) { tried += d.stats[p.id]?.tried ?? 0; solved += d.stats[p.id]?.solved ?? 0; }
+  const acc = tried ? Math.round((solved / tried) * 100) : null;
+  $("#kpi-people").innerHTML = `<span class="kpi-icon">👥</span><b>${online}<small>/${total}</small></b><small>접속 중 / 총 학생</small>`;
+  $("#kpi-avg").innerHTML = `<span class="kpi-icon">📊</span><b>${avg}<small>점</small></b><small>평균 점수 · 정답률 ${acc === null ? "–" : `${acc}%`}</small>`;
+  $("#kpi-stage").innerHTML = `<span class="kpi-icon">🧭</span><b>${STAGE_TEXT[d.stage] ?? "–"}</b><small>${activeCh}채널 탐험 상태</small>`;
+  const teams = d.teams ?? [];
+  const top = Math.max(1, ...teams.map((t) => t.score));
+  const tb = $("#kpi-teams");
+  tb.innerHTML = `<span class="kpi-icon">🚩</span><div class="kpi-team-bars">${
+    ["A", "B", "C", "D"].map((k) => {
+      const t = teams.find((x) => x.team === k);
+      const score = t?.score ?? 0;
+      return `<div class="kpi-team-row"><span class="team-dot" style="background:${TEAM_COLORS[k]}"></span><i class="kpi-bar"><b style="width:${Math.round((score / top) * 100)}%;background:${TEAM_COLORS[k]}"></b></i><em>${score}</em></div>`;
+    }).join("")
+  }</div><small>팀별 실시간 점수</small>`;
+}
+
+// 5개 채널의 활성 학생 수와 진행 상태를 한눈에 둘러보는 미니 대시보드
+function renderOverview() {
+  const box = $("#ch-overview");
+  if (!box) return;
+  box.replaceChildren();
+  for (const ch of CHANNELS) {
+    const d = dashByCh[ch];
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `ch-card${ch === activeCh ? " on" : ""}`;
+    const top = d?.teams?.[0];
+    card.innerHTML = `<b>${ch}채널${ch === activeCh ? " · 보는 중" : ""}</b>
+      <small>${STAGE_TEXT[d?.stage] ?? "–"} · 접속 ${d?.students?.filter((s) => s.online).length ?? 0}명</small>
+      <small>${top ? `🥇 ${top.name} ${top.score}점` : "기록 없음"}</small>`;
+    card.onclick = () => switchChannel(ch);
+    box.appendChild(card);
   }
 }
 
@@ -143,6 +268,7 @@ function buildProblems() {
       <header><span class="p-icon">${p.icon}</span><div><b>${i + 1}. ${p.relic}</b><small>${p.level} · 교과서 ${p.source}</small></div></header>
       <p class="ptext">${fmt(p.text)}</p>
       <p class="pans">정답: ${fmt(answers?.[p.id] ?? "–")}</p>
+      <div class="pgauge" title="정답률"><i></i><span class="pgauge-label"></span></div>
       <dl class="pstats"></dl>
       <p class="pwrong"></p>`;
     box.appendChild(card);
@@ -179,13 +305,15 @@ function renderTeams(teams) {
   box.replaceChildren();
   if (!teams?.length) { box.hidden = true; return; }
   box.hidden = false;
+  const top = Math.max(1, ...teams.map((t) => t.score));
   for (const t of teams) {
     const card = document.createElement("div");
     card.className = "team-card";
     card.style.setProperty("--team", TEAM_COLORS[t.team] ?? "#94a3b8");
     card.innerHTML = `<span class="team-badge">${t.team}</span>
       <div><b>${t.name}</b><small>${t.members}명 · 맞힌 문제 ${t.solved}개${t.escaped ? " · 🏁 탈출" : ""}</small></div>
-      <b class="team-score">${t.score}점</b>`;
+      <b class="team-score">${t.score}점</b>
+      <i class="team-gbar" style="width:${Math.round((t.score / top) * 100)}%"></i>`;
     box.appendChild(card);
   }
 }
@@ -197,21 +325,30 @@ function renderDash(d) {
   PROBLEMS.forEach((p) => {
     const s = d.stats[p.id];
     const card = $(`.pcard[data-pid="${p.id}"]`);
-    const rate = s.tried ? Math.round((s.first / s.tried) * 100) : null;
+    const rate = s.tried ? Math.round((s.solved / s.tried) * 100) : null;
+    // 문제별 정답률 게이지
+    const gauge = card.querySelector(".pgauge");
+    gauge.querySelector("i").style.width = `${rate ?? 0}%`;
+    gauge.querySelector(".pgauge-label").textContent = rate === null ? "아직 응답 없음" : `정답률 ${rate}% (${s.solved}/${s.tried})`;
+    gauge.classList.toggle("low", rate !== null && rate < 50);
     const dl = card.querySelector(".pstats");
     dl.replaceChildren();
-    for (const [k, v, warn] of [["도전", `${s.tried}명`], ["정답", `${s.solved}명`], ["첫 시도 정답률", rate === null ? "–" : `${rate}%`, rate !== null && rate < 50]]) {
+    for (const [k, v, warn] of [["도전", `${s.tried}명`], ["정답", `${s.solved}명`], ["첫 시도", rate === null ? "–" : `${Math.round((s.first / s.tried) * 100)}%`, rate !== null && rate < 50]]) {
       const dt = cell("dt", k);
       const dd = cell("dd", v, warn ? "warn-cell" : "");
       dl.append(dt, dd);
     }
-    card.querySelector(".pwrong").textContent = s.topWrong.length ? `자주 나온 오답: ${s.topWrong.map(([w, n]) => `${w} (${n}명)`).join(", ")}` : "";
+    // 빈출 오답: 많이 나온 오답부터 작은 칩으로 표시
+    const wrong = card.querySelector(".pwrong");
+    wrong.innerHTML = s.topWrong.length
+      ? `<span class="wrong-title">자주 나온 오답</span>${s.topWrong.map(([w, n]) => `<span class="wrong-chip">${fmt(w)}<b>${n}명</b></span>`).join("")}`
+      : "";
   });
 
   const roster = $("#roster");
   roster.replaceChildren();
   const rh = document.createElement("tr");
-  for (const h of ["순위", "이름", "점수", "맞힌 문제", "접속", "들어온 시각", "탈출 시각", "위치", "벡터 점프", "관리"]) rh.appendChild(cell("th", h));
+  for (const h of ["순위", "이름", "팀", "점수", "맞힌 문제", "오답", "접속", "들어온 시각", "탈출 시각", "위치", "벡터 점프", "활동", "관리"]) rh.appendChild(cell("th", h));
   PROBLEMS.forEach((p, i) => {
     const th = cell("th", `${i + 1}`);
     th.title = `${i + 1}. ${p.relic}`;
@@ -221,7 +358,7 @@ function renderDash(d) {
   if (!d.students.length) {
     const tr = document.createElement("tr");
     const td = cell("td", "아직 수업에 참여한 학생이 없어요. 학생들에게 접속 주소를 알려 주세요.", "empty");
-    td.colSpan = 10 + PROBLEMS.length;
+    td.colSpan = 13 + PROBLEMS.length;
     tr.appendChild(td);
     roster.appendChild(tr);
   }
@@ -243,13 +380,17 @@ function renderDash(d) {
     nameBtn.onclick = () => { expanded.has(st.cid) ? expanded.delete(st.cid) : expanded.add(st.cid); renderDash(last); };
     nameTd.appendChild(nameBtn);
     tr.appendChild(nameTd);
+    tr.appendChild(cell("td", st.team ? `${st.team}팀` : "–"));
     tr.appendChild(cell("td", `${st.score}점`));
     tr.appendChild(cell("td", `${solvedIdx.length}/${PROBLEMS.length}`));
+    const wrongTries = Object.values(st.probs).reduce((n, p) => n + (p.tries ?? 0), 0) - Object.values(st.probs).filter((p) => p.solved).length;
+    tr.appendChild(cell("td", `${Math.max(0, wrongTries)}번`, wrongTries >= 5 ? "mark bad" : ""));
     tr.appendChild(cell("td", st.online ? "🟢" : "⚪"));
     tr.appendChild(cell("td", clock(st.joinedAt)));
     tr.appendChild(cell("td", st.escapedAt ? `🏁 ${clock(st.escapedAt)}` : "–"));
     tr.appendChild(cell("td", st.room === null ? "–" : ROOMS[st.room].name));
     tr.appendChild(cell("td", `${st.lab}/${d.labLevels}`));
+    tr.appendChild(cell("td", `🏃 ${st.mileage ?? 0}`));
     for (const p of PROBLEMS) {
       const [mark, cls] = probMark(st.probs[p.id]);
       tr.appendChild(cell("td", mark, `mark ${cls}`));
@@ -264,7 +405,7 @@ function renderDash(d) {
     kickTd.appendChild(kickBtn);
     tr.appendChild(kickTd);
     roster.appendChild(tr);
-    if (expanded.has(st.cid)) roster.appendChild(detailRow(st, 10 + PROBLEMS.length));
+    if (expanded.has(st.cid)) roster.appendChild(detailRow(st, 13 + PROBLEMS.length));
   }
 }
 
@@ -298,7 +439,7 @@ function clock(ms) {
 
 function downloadCsv(d) {
   const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
-  const head = ["순위", "이름", "점수", "들어온 시각", "탈출 시각", "벡터 점프", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`)];
+  const head = ["순위", "이름", "팀", "점수", "들어온 시각", "탈출 시각", "벡터 점프", "활동 마일리지", "개념 학습", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`)];;;
   const rows = d.students.map((st) => {
     const marks = PROBLEMS.map((p) => {
       const r = st.probs[p.id];
@@ -307,7 +448,7 @@ function downloadCsv(d) {
       return r.solved ? `정답(${r.tries}회${hint})` : `오답(${r.tries}회${hint})`;
     });
     const wrongs = PROBLEMS.map((p) => (st.probs[p.id]?.wrongs ?? []).join(" / "));
-    return [st.rank, st.name, st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, ...marks, ...wrongs];
+    return [st.rank, st.name, st.team ?? "", st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, st.mileage ?? 0, st.concepts ?? 0, ...marks, ...wrongs];
   });
   const csv = "﻿" + [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n");
   const a = document.createElement("a");

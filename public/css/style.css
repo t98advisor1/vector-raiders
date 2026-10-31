@@ -101,11 +101,14 @@ form input, .expr input {
 .team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; flex: none;
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.5); vertical-align: middle; }
 .team-chip { --team: #64748b; background: var(--team) !important; color: #fff !important; font-weight: 800 !important; }
-.hud-teams { display: grid; gap: 2px; margin: 0; padding: 8px 12px; list-style: none; min-width: 200px; font-size: 0.92rem; }
+.hud-teams { display: grid; gap: 3px; margin: 0; padding: 10px 14px; list-style: none; min-width: 240px; font-size: 1rem; }
 .hud-teams[hidden] { display: none; }
-.hud-teams li { display: flex; gap: 8px; align-items: center; }
-.hud-teams .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hud-teams .sc { font-variant-numeric: tabular-nums; color: #fde68a; }
+.hud-teams li { display: flex; gap: 8px; align-items: center; position: relative; padding: 3px 2px; overflow: hidden; border-radius: 8px; }
+/* 팀 컬러 점수 바: 글자 뒤에 깔리는 채우기 바 */
+.hud-teams li .tbar { position: absolute; left: 0; bottom: 0; top: auto; height: 4px; width: var(--w, 0%);
+  background: var(--team, #94a3b8); border-radius: 99px; box-shadow: 0 0 8px var(--team, #94a3b8); transition: width 0.5s; }
+.hud-teams .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.hud-teams .sc { font-variant-numeric: tabular-nums; color: #fde68a; font-weight: 800; }
 .hud-teams li.mine { color: #5eead4; }
 
 /* 미니맵 */
@@ -119,12 +122,16 @@ form input, .expr input {
 /* 개념 학습 카드 */
 .concept-card { border: 2px solid #c9b287; background: linear-gradient(160deg, #fffdf4, #f6ecd2); border-radius: 18px; padding: 18px 20px; }
 .concept-head { display: flex; align-items: center; gap: 10px; }
-.concept-head h2 { font-size: 1.4rem; }
+.concept-head h2 { font-size: 1.5rem; }
 .concept-badge { background: var(--teal); color: #fff; font-weight: 800; font-size: 0.85rem; border-radius: 999px; padding: 3px 12px; }
-.concept-tagline { font-size: 1.1rem; font-weight: 600; color: #3f3222; margin: 10px 0 12px; }
+.concept-tagline { font-size: 1.18rem; font-weight: 600; color: #3f3222; margin: 10px 0 12px; }
 .concept-body { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.concept-fig { flex: none; background: #fff; border: 1.5px solid var(--line); border-radius: 12px; }
-.concept-points { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 1.02rem; }
+/* 인터랙티브 개념 위젯: 손잡이를 끌거나 슬라이더로 직접 조작한다 */
+.concept-widget { flex: none; width: min(320px, 100%); background: #fff; border: 1.5px solid var(--line);
+  border-radius: 12px; overflow: hidden; padding-bottom: 6px; }
+.concept-widget .slider { justify-content: center; padding: 2px 10px 0; margin: 0; }
+.concept-widget .btn { margin: 6px 10px 0; }
+.concept-points { margin: 0; padding-left: 1.2em; display: grid; gap: 7px; font-size: 1.12rem; }
 .concept-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
 .link-card-btn { border: 0; background: none; font: inherit; font-size: 0.85rem; color: var(--teal); text-decoration: underline; cursor: pointer; padding: 0; }
 .summary-actions { margin-top: 12px; display: flex; justify-content: center; }
@@ -189,22 +196,24 @@ svg.board.rotatable { cursor: grab; }
 .card-b { color: var(--b); border-color: var(--b); }
 .ghost { position: fixed; transform: translate(-50%, -50%) rotate(-4deg); pointer-events: none; z-index: 1000; opacity: 0.9; box-shadow: var(--shadow); }
 
-/* 문제 */
+/* 문제: 태블릿·모바일에서 시원하게 읽히도록 글씨를 크게 */
 .p-head { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; padding-right: 40px; }
-.p-icon { font-size: 2.4rem; }
-.p-text { font-size: 1.12rem; margin: 8px 0 12px; }
+.p-icon { font-size: 2.6rem; }
+.p-head h2 { font-size: 1.5rem; }
+.p-head small { font-size: 1.02rem; }
+.p-text { font-size: 1.35rem; margin: 8px 0 12px; line-height: 1.7; }
 .tool { background: #fbf8f1; border: 1.5px dashed var(--line); border-radius: 14px; padding: 12px; }
-.tool-help { font-size: 0.95rem; color: #5b4a2a; margin-bottom: 8px; }
+.tool-help { font-size: 1.08rem; color: #5b4a2a; margin-bottom: 8px; }
 .tool .board-wrap { max-width: 600px; margin: 0 auto; }
-.tool-info { margin-top: 8px; font-size: 0.98rem; min-height: 1.5em; text-align: center; }
+.tool-info { margin-top: 8px; font-size: 1.12rem; min-height: 1.5em; text-align: center; }
 .tool-ctrl { justify-content: center; }
-.slider { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.slider { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; }
 .slider input { width: min(320px, 60vw); accent-color: var(--teal); }
 .legend { display: flex; gap: 10px; font-weight: 600; }
 .answer { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1 1 100%; }
-.chips-label { font-weight: 700; color: #5b4a2a; margin-right: 4px; }
-.chip-btn { font: inherit; font-size: 1.15rem; min-width: 64px; padding: 8px 12px; border: 2px solid var(--line); background: #fff; border-radius: 12px; cursor: pointer; }
+.chips-label { font-weight: 700; color: #5b4a2a; margin-right: 4px; font-size: 1.15rem; }
+.chip-btn { font: inherit; font-size: 1.35rem; font-weight: 600; min-width: 84px; padding: 12px 16px; border: 2px solid var(--line); background: #fff; border-radius: 12px; cursor: pointer; }
 .chip-btn.on { border-color: var(--teal); background: var(--teal-soft); }
 .expr { display: grid; gap: 8px; flex: 1 1 320px; }
 .expr label { font-weight: 700; }
@@ -214,7 +223,7 @@ svg.board.rotatable { cursor: grab; }
 .feedback.ok { color: var(--ok); }
 .feedback.bad { color: var(--bad); }
 .feedback.warn { color: #b45309; }
-mjx-container { font-size: 108% !important; }
+mjx-container { font-size: 125% !important; }
 .hint { margin-top: 8px; padding: 10px 12px; background: var(--amber-soft); border-radius: 10px; }
 .solved-badge { background: var(--ok-soft); color: #14532d; font-weight: 700; padding: 10px 14px; border-radius: 12px; flex: 1 1 100%; }
 .done { text-align: center; }
@@ -251,6 +260,76 @@ mjx-container { font-size: 108% !important; }
 .mark.bad { color: var(--bad); font-weight: 700; }
 .mark.none { color: #c7bfae; }
 .warn-cell { background: var(--bad-soft); font-weight: 700; }
+
+/* 교사 화면: 다크 네이비 · 인디고 실시간 대시보드 테마 */
+body.teacher { background: linear-gradient(160deg, #0b1020, #121a36 55%, #18204a); color: #e5e9f5; }
+body.teacher .topbar { background: rgba(13, 18, 40, 0.95); border-bottom: 1px solid rgba(129, 140, 248, 0.35); }
+body.teacher .chip.soft { background: rgba(129, 140, 248, 0.22); color: #dbe1ff; }
+body.teacher .panel { background: rgba(19, 26, 54, 0.92); border: 1px solid rgba(129, 140, 248, 0.28);
+  box-shadow: 0 10px 34px rgba(3, 7, 18, 0.5); color: #e5e9f5; }
+body.teacher small, body.teacher .muted { color: #93a0c4; }
+body.teacher .legend-line { color: #93a0c4; }
+body.teacher .btn { background: #1b2347; border-color: rgba(129, 140, 248, 0.45); color: #e5e9f5; }
+body.teacher .btn:hover { background: #232c58; }
+body.teacher .btn.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+body.teacher .btn.primary:hover { background: #4f52e0; }
+body.teacher .btn.danger { border-color: #f87171; color: #fca5a5; }
+body.teacher .table th { background: #1b2347; color: #c7d2fe; }
+body.teacher .table th, body.teacher .table td { border-bottom-color: rgba(129, 140, 248, 0.18); }
+body.teacher .table tr.detail td { background: rgba(99, 102, 241, 0.08); }
+body.teacher .name-btn { color: #e5e9f5; }
+body.teacher .join-url.big { color: #a5b4fc; }
+body.teacher .mark.none { color: #4d5878; }
+body.teacher .answer-sheet-table .as-answer { color: #6ee7b7; }
+body.teacher .pcard { background: #161d3c; border-color: rgba(129, 140, 248, 0.28); color: #e5e9f5; }
+body.teacher .pcard .ptext { color: #dbe1ff; }
+body.teacher .kick-btn { background: #2a1220; }
+body.teacher .toggle { background: #1b2347; color: #93a0c4; }
+body.teacher .team-card { background: #161d3c; color: #e5e9f5; }
+body.teacher .ch-card { background: #161d3c; color: #e5e9f5; }
+body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #6366f1; }
+
+/* 상단 KPI 카드 */
+.kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.kpi-row[hidden] { display: none; }
+.kpi-card { background: linear-gradient(150deg, rgba(99, 102, 241, 0.18), rgba(19, 26, 54, 0.9)); border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 16px; padding: 14px 16px; display: grid; gap: 2px; box-shadow: 0 8px 26px rgba(3, 7, 18, 0.4); }
+.kpi-card .kpi-icon { font-size: 1.3rem; }
+.kpi-card b { font-size: 1.7rem; color: #fff; }
+.kpi-card b small { font-size: 0.95rem; color: #93a0c4; font-weight: 600; }
+.kpi-card small { color: #93a0c4; }
+.kpi-team-bars { display: grid; gap: 4px; margin-top: 2px; }
+.kpi-team-row { display: flex; align-items: center; gap: 6px; }
+.kpi-team-row .team-dot { margin: 0; }
+.kpi-team-row .kpi-bar { flex: 1; height: 8px; background: rgba(129, 140, 248, 0.15); border-radius: 99px; overflow: hidden; }
+.kpi-team-row .kpi-bar b { display: block; height: 100%; border-radius: 99px; transition: width 0.5s; }
+.kpi-team-row em { font-style: normal; font-weight: 700; color: #c7d2fe; min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 팀 카드 점수 게이지 · 문제 카드 정답률 게이지 · 빈출 오답 칩 */
+.team-card { position: relative; overflow: hidden; }
+.team-card .team-gbar { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--team);
+  box-shadow: 0 0 10px var(--team); transition: width 0.5s; }
+.pgauge { height: 12px; background: rgba(129, 140, 248, 0.15); border-radius: 99px; overflow: hidden; position: relative; }
+.pgauge i { display: block; height: 100%; background: linear-gradient(90deg, #34d399, #0f766e); border-radius: 99px; transition: width 0.5s; }
+.pgauge.low i { background: linear-gradient(90deg, #fbbf24, #dc2626); }
+.pgauge .pgauge-label { position: absolute; right: 8px; top: -1.45em; font-size: 0.78rem; font-weight: 700; color: #93a0c4; }
+.wrong-title { display: block; font-weight: 700; color: #93a0c4; margin-bottom: 4px; }
+.wrong-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(220, 38, 38, 0.14); border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fecaca; border-radius: 999px; padding: 3px 10px; margin: 0 6px 6px 0; font-size: 1rem; }
+.wrong-chip b { color: #fff; font-size: 0.85rem; }
+
+/* 교사 화면: 채널 전환 탭 · 통합 대시보드 */
+.ch-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.ch-tab { font: inherit; font-weight: 700; font-size: 0.85rem; border: 0; cursor: pointer; border-radius: 999px;
+  padding: 3px 12px; background: rgba(255, 255, 255, 0.18); color: #fff; }
+.ch-tab.on { background: var(--amber); color: #3b2500; }
+.ch-overview { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.ch-card { font: inherit; text-align: left; display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px;
+  border: 2px solid var(--line); background: var(--paper); cursor: pointer; box-shadow: var(--shadow); }
+.ch-card.on { border-color: var(--teal); background: var(--teal-soft); }
+.ch-card b { font-size: 0.95rem; }
+.ch-card small { color: var(--muted); }
+@media (max-width: 820px) { .ch-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); } .diff-row { grid-template-columns: 1fr; } }
 
 /* 교사 화면: 팀 랭킹 · 문제·정답 일람표 */
 .team-bar { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -309,7 +388,9 @@ mjx-container { font-size: 108% !important; }
   background: rgba(17, 24, 39, 0.88); border: 1px solid rgba(94, 234, 212, 0.35); border-radius: 14px;
   color: #fff; display: flex; flex-direction: column; max-height: min(46vh, 320px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
-.chat-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-size: 0.9rem; }
+.chat-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-size: 0.9rem;
+  cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
+.chat-head:active { cursor: grabbing; }
 .chat-log { flex: 1; overflow-y: auto; display: grid; gap: 4px; padding: 4px 10px 8px; font-size: 0.88rem; align-content: start; }
 .chat-row { display: flex; gap: 6px; align-items: baseline; }
 .chat-row .chat-team { flex: none; font-size: 0.68rem; font-weight: 800; color: #fff; border-radius: 6px; padding: 1px 5px; align-self: center; }
@@ -333,6 +414,11 @@ mjx-container { font-size: 108% !important; }
 .dpad-right { grid-area: right; }
 .touch-actions { position: absolute; right: 14px; bottom: 64px; z-index: 25; display: grid; gap: 10px; touch-action: none; }
 .touch-actions[hidden] { display: none; }
+/* 조작판·버튼 그룹의 드래그 핸들: ⠿를 끌면 그룹이 움직인다 */
+.pad-handle { position: absolute; top: -12px; right: -8px; z-index: 2; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid rgba(94, 234, 212, 0.5); background: rgba(17, 24, 39, 0.85); color: #a7f3d0; font-size: 0.9rem;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; padding: 0; line-height: 1; }
+.pad-handle.dragging { cursor: grabbing; background: rgba(94, 234, 212, 0.5); color: #0f172a; }
 .touch-btn-round { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(94, 234, 212, 0.5);
   background: rgba(17, 24, 39, 0.7); color: #fff; font-size: 1.4rem; display: grid; place-items: center;
   touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -341,6 +427,16 @@ mjx-container { font-size: 108% !important; }
 /* 터치 기기에서는 키보드 도움말 대신 패드가 있다 */
 body.touch-device .help { display: none; }
 body.touch-device .chat-toggle { bottom: 84px; }
+
+/* 문제 난이도 선택: 상(150점)·중(100점)·하(70점) */
+.diff-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.diff-btn { font: inherit; display: grid; gap: 2px; justify-items: center; padding: 14px 10px; border-radius: 14px;
+  border: 2px solid var(--line); background: #fff; cursor: pointer; }
+.diff-btn:hover { border-color: var(--teal); background: var(--teal-soft); }
+.diff-btn b { font-size: 1.3rem; }
+.diff-btn small { color: var(--muted); }
+.diff-btn .diff-pts { font-weight: 800; color: var(--teal); }
+.diff-chip { color: var(--teal); }
 
 /* 문제 문장 타자 효과 */
 .p-text.typing { cursor: pointer; min-height: 3.2em; }

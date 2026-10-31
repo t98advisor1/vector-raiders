@@ -1,8 +1,8 @@
 import { connect, store } from "./net.js";
 import { fmt, watchMath } from "./mathtext.js";
 import { LAB_LEVELS } from "./lab.js";
-import { PROBLEMS } from "./problems.js";
-import { conceptCard, CONCEPTS } from "./concepts.js";
+import { PROBLEMS, DIFFICULTY } from "./problems.js";
+import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
 import { renderClassBar } from "./classbar.js";
 import { Game, ROOMS, DOORS, BRIDGES, OBJECTS, ALTAR, roomAt, W, H, buildGrid, DOOR_COLS, DOOR_ROWS } from "./game.js";
 import { World3D } from "./world3d.js";
@@ -14,6 +14,10 @@ const $ = (s, root = document) => root.querySelector(s);
 const STAGE_NAME = { lobby: "대기 중", play: "탐험 중", done: "탐험 끝" };
 // 팀전: 팀 이름·색은 서버(src/room.js)와 짝을 이룬다.
 const TEAMS = { A: { name: "A팀", color: "#ef4444" }, B: { name: "B팀", color: "#3b82f6" }, C: { name: "C팀", color: "#22c55e" }, D: { name: "D팀", color: "#a855f7" } };
+// 수업 채널: URL의 ?ch=1~5. 없으면 입장 화면에서 고르고, 그것도 없으면 1채널.
+const CHANNELS = ["1", "2", "3", "4", "5"];
+const urlCh = new URLSearchParams(location.search).get("ch");
+const CH = CHANNELS.includes(urlCh) ? urlCh : null;
 const CLOSE_REASON = {
   4000: "지난 수업 기록이 정리되었어요. 다시 들어와 주세요.",
   4001: "이름을 확인해 주세요.",
@@ -29,7 +33,8 @@ if (typeof cid !== "string" || !/^[a-z0-9]{8,32}$/.test(cid)) {
   store("vr-cid", cid);
 }
 
-const S = { net: null, name: null, me: null, cls: null, game: null, world: null, modal: null, waiting: false, team: "" };
+const S = { net: null, name: null, me: null, cls: null, game: null, world: null, modal: null, waiting: false, team: "", ch: CH ?? store("vr-ch") ?? "1" };
+if (!CHANNELS.includes(S.ch)) S.ch = "1";
 if (["127.0.0.1", "localhost"].includes(location.hostname)) window.__vr = S; // 이 컴퓨터에서 개발할 때만 점검용으로 연다
 
 const solved = (pid) => !!S.me?.probs[pid]?.solved;
@@ -100,6 +105,18 @@ document.querySelectorAll(".team-opt[data-team]").forEach((b) => {
   };
 });
 
+// 수업 채널 선택(1~5): URL의 ?ch=가 있으면 그 채널로 정해지고 선택기는 감춘다.
+document.querySelectorAll(".ch-opt[data-ch]").forEach((b) => {
+  b.classList.toggle("on", b.dataset.ch === S.ch);
+  b.onclick = () => {
+    S.ch = b.dataset.ch;
+    store("vr-ch", S.ch);
+    document.querySelectorAll(".ch-opt[data-ch]").forEach((o) => o.classList.toggle("on", o === b));
+    sound.sfx("open");
+  };
+});
+if (CH) $("#channel-pick").hidden = true;
+
 const SETTING_TEXT = { music: ["켜짐", "꺼짐"], sfx: ["켜짐", "꺼짐"], quality: ["높음", "낮음"] };
 document.querySelectorAll(".toggle[data-key]").forEach((b) => {
   b.onclick = () => {
@@ -137,7 +154,7 @@ function join(name, mode) {
   S.name = name;
   S.mode = mode;
   showJoinError("");
-  const query = mode === "practice" ? `?mode=practice&cid=${cid}` : "";
+  const query = mode === "practice" ? `?mode=practice&cid=${cid}` : `?ch=${S.ch}`;
   S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, team: S.team || undefined }), onMessage, onStatus, query);
 }
 
@@ -150,7 +167,7 @@ function askStart() {
   const code = prompt("수업 탐험을 시작할 선생님 비밀번호를 입력하세요.");
   if (!code) return;
   if (S.net && S.mode === "class") return S.net.send({ type: "start", code: code.trim() });
-  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?ch=${S.ch}`);
   ws.onopen = () => ws.send(JSON.stringify({ type: "start", code: code.trim() }));
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
@@ -180,7 +197,7 @@ function onMessage(msg) {
     intro.pause(); // 첫 화면 연출을 멈춰 크롬북 자원을 게임에 돌린다
     $("#game").hidden = false;
     $("#me-chip").textContent = `👤 ${msg.name}`;
-    $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : "🏫 수업 참여";
+    $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : `🏫 수업 참여 · ${S.ch}채널`;
     $("#restart-btn").hidden = S.mode !== "practice";
     if (!S.game) startWorld();
     S.game.setMe(msg.n, msg.name);
@@ -233,6 +250,13 @@ const hooks = {
   paused: () => !!S.modal,
   onMove: (x, y, room) => S.net?.send({ type: "pos", x, y, room }) ?? false,
   onInteract,
+  onShoot: () => { S.world?.shoot(); sound.sfx("shoot"); },
+  // 표적 10발 완성: 그 구역의 핵심 개념 카드가 자동으로 열리고 해금된다 (+50점)
+  onTargetHit: (t) => {
+    sound.sfx("target");
+    toast(`🎯 표적 10발 완성! '${CONCEPTS[t.concept]?.title ?? ""}' 개념 카드가 해금되었어요.`, "ok");
+    showConcept(t.concept, closeModal, "problem");
+  },
 };
 
 function startWorld() {
@@ -300,6 +324,7 @@ function openChat(open) {
   if (open) {
     chatUnread = 0;
     $("#chat-unread").hidden = true;
+    setupChatDragging(); // 저장된 위치 복원 (드래그 핸들 = 채팅창 헤더)
     $("#chat-input").focus();
   }
 }
@@ -338,7 +363,86 @@ function setupTouchControls() {
       btn.addEventListener(ev, (e) => { e.preventDefault(); held.delete(id); apply(); }, { passive: false });
   }
   $("#touch-jump").addEventListener("touchstart", (e) => { e.preventDefault(); S.game?.jump(); }, { passive: false });
-  $("#touch-act").addEventListener("touchstart", (e) => { e.preventDefault(); S.game?.touchInteract(); }, { passive: false });
+  // 열기 버튼: 터치·펜·마우스 어디서든 확실히 먹도록 touchstart·pointerdown·click을 모두 연동한다.
+  // 먼저 열린 조작으로 창이 열리면 paused()가 되어 두 번째 조작은 무시된다.
+  const act = () => S.game?.touchInteract();
+  for (const ev of ["touchstart", "pointerdown", "click"])
+    $("#touch-act").addEventListener(ev, (e) => { e.preventDefault(); act(); }, { passive: false });
+  // 🎯 사격 버튼: G키와 같다.
+  const shoot = () => S.game?.shoot();
+  for (const ev of ["touchstart", "pointerdown"])
+    $("#touch-shoot").addEventListener(ev, (e) => { e.preventDefault(); shoot(); }, { passive: false });
+  setupPadDragging();
+}
+
+// ---------- 가상 조작판·채팅창 드래그 이동 ----------
+// 핸들을 드래그하면 그룹(#touch-dpad, #touch-actions, #chat-panel)이 움직인다.
+// 뷰포트 밖으로 나가지 않게 경계를 확인하고, 위치는 localStorage에 저장해 새로고침에도 유지한다.
+function clampPos(el, x, y) {
+  const w = el.offsetWidth, h = el.offsetHeight;
+  return {
+    x: Math.min(Math.max(4, x), window.innerWidth - w - 4),
+    y: Math.min(Math.max(4, y), window.innerHeight - h - 4),
+  };
+}
+
+function makeDraggable(el, handle, key) {
+  if (el.__vrDrag) return; // 두 번 붙이면 드래그가 겹치므로 한 번만
+  el.__vrDrag = true;
+  // 저장된 위치가 있으면 복원한다
+  const saved = store(key);
+  const restore = () => {
+    if (!saved || !el.isConnected) return;
+    const pos = clampPos(el, saved.x, saved.y);
+    el.style.left = `${pos.x}px`;
+    el.style.top = `${pos.y}px`;
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+  };
+  el.__vrRestore = restore;
+  window.addEventListener("resize", () => {
+    if (el.style.left) {
+      const pos = clampPos(el, parseFloat(el.style.left), parseFloat(el.style.top));
+      el.style.left = `${pos.x}px`;
+      el.style.top = `${pos.y}px`;
+    }
+  });
+  let off = null;
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handle.setPointerCapture?.(e.pointerId);
+    const r = el.getBoundingClientRect();
+    off = { x: e.clientX - r.left, y: e.clientY - r.top };
+    handle.classList.add("dragging");
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!off) return;
+    const pos = clampPos(el, e.clientX - off.x, e.clientY - off.y);
+    el.style.left = `${pos.x}px`;
+    el.style.top = `${pos.y}px`;
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+  });
+  const end = () => {
+    if (!off) return;
+    off = null;
+    handle.classList.remove("dragging");
+    if (el.style.left) store(key, { x: parseFloat(el.style.left), y: parseFloat(el.style.top) });
+  };
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+}
+
+function setupPadDragging() {
+  makeDraggable($("#touch-dpad"), $("#dpad-handle"), "vr-dpad-pos");
+  makeDraggable($("#touch-actions"), $("#actions-handle"), "vr-actions-pos");
+}
+
+function setupChatDragging() {
+  makeDraggable($("#chat-panel"), $("#chat-head"), "vr-chat-pos");
+  $("#chat-panel").__vrRestore?.(); // 열릴 때마다 저장된 위치로
 }
 setupTouchControls();
 
@@ -350,6 +454,9 @@ function updateHud() {
   const keys = PROBLEMS.filter((p) => solved(p.id)).length;
   $("#hud-keys").textContent = `🗝️ ${keys}/${PROBLEMS.length}`;
   $("#hud-jumps").textContent = `✨ ${S.me?.lab.length ?? 0}/${LAB_LEVELS.length}`;
+  const myRow = (S.cls?.ranking ?? []).find((r) => r.n === S.game.me.n);
+  $("#hud-mile").textContent = `🏃 ${myRow?.mileage ?? 0}`;
+  $("#hud-mile").title = "활동 마일리지 (이동·점프·사격·개념 학습)";
   const relics = $("#hud-relics");
   relics.replaceChildren();
   for (const p of PROBLEMS) {
@@ -370,7 +477,7 @@ function updateHud() {
 }
 setInterval(updateHud, 500); // 방 이름은 움직일 때 바뀐다
 
-// 팀전: 내 팀 뱃지(상단바)와 팀 랭킹(오른쪽 위)
+// 팀전: 내 팀 뱃지(상단바)와 팀 랭킹(오른쪽 위) — 팀 컬러 바와 순위 메달로 크고 직관적으로
 function renderTeamChip() {
   const chip = $("#team-chip");
   if (S.mode === "practice") { chip.hidden = true; return; }
@@ -396,6 +503,7 @@ function renderTeamRanking() {
   title.className = "rank-title";
   title.textContent = "🚩 팀 랭킹";
   box.appendChild(title);
+  const top = Math.max(1, ...list.map((t) => t.score)); // 점수 바의 기준 (1등 팀 = 100%)
   for (const t of list) {
     const li = document.createElement("li");
     const mine = teamOf(S.game?.me.n) === t.team;
@@ -403,13 +511,18 @@ function renderTeamRanking() {
     const badge = document.createElement("span");
     badge.className = "team-dot";
     badge.style.background = TEAMS[t.team]?.color ?? "#94a3b8";
+    const medal = ["🥇", "🥈", "🥉"][t.rank - 1] ?? `${t.rank}.`;
     const nm = document.createElement("span");
     nm.className = "nm";
-    nm.textContent = `${TEAMS[t.team]?.name ?? t.team}팀 · ${t.members}명${t.escaped ? " 🏁" : ""}`;
+    nm.textContent = `${medal} ${TEAMS[t.team]?.name ?? t.team} · ${t.members}명${t.escaped ? " 🏁" : ""}`;
     const sc = document.createElement("span");
     sc.className = "sc";
     sc.textContent = `${t.score}점`;
-    li.append(badge, nm, sc);
+    const bar = document.createElement("i"); // 팀 컬러 점수 바 (li 전체 폭 기준)
+    bar.className = "tbar";
+    bar.style.setProperty("--w", `${Math.max(6, Math.round((t.score / top) * 100))}%`);
+    bar.style.setProperty("--team", TEAMS[t.team]?.color ?? "#94a3b8");
+    li.append(badge, nm, sc, bar);
     box.appendChild(li);
   }
 }
@@ -454,6 +567,13 @@ function renderRanking() {
     box.appendChild(li);
   }
 }
+
+// 조작 활동 마일리지: 5초마다 게임이 모아 둔 이동·점프·사격량을 서버에 보낸다.
+setInterval(() => {
+  const a = S.game?.drainActivity?.();
+  if (!a || (!a.dist && !a.jumps && !a.shots)) return;
+  S.net?.send({ type: "activity", dist: Math.round(a.dist * 10) / 10, jumps: a.jumps, shots: a.shots });
+}, 5000);
 
 // 누군가 유물 조각을 발견하면 모두에게 팝업. 한꺼번에 많이 오면 줄을 세워 하나씩 보여 준다.
 const foundQueue = [];
@@ -702,28 +822,62 @@ function openBridgeBody(br) {
   });
 }
 
-// 상자: 문제. 열면 먼저 개념 학습 카드(세션에서 한 번씩), 이어서 문제 본문이 나온다.
+// 상자: 문제. 열면 먼저 개념 학습 카드(세션에서 한 번씩), 이어서 난이도를 골라 문제 본문이 나온다.
 function openProblem(pid) {
   const mine = S.me?.probs[pid];
-  // 이미 푼 상자를 다시 열 때는 바로 본문으로. 안 푼 상자는 세션에서 처음 열 때만 개념 카드를 먼저 보여 준다.
-  if (!mine?.solved && !conceptSeen.has(pid) && CONCEPTS[pid]) return showConcept(pid, () => openProblemBody(pid), "problem");
-  return openProblemBody(pid);
+  // 이미 푼 상자를 다시 열 때는 바로 본문으로. 안 푼 상자는 개념 카드 → 난이도 선택 → 본문 순서.
+  if (mine?.solved) return openProblemBody(pid);
+  if (!conceptSeen.has(pid) && CONCEPTS[pid]) return showConcept(pid, () => showDifficulty(pid), "problem");
+  return showDifficulty(pid);
+}
+
+// 난이도 선택: 상(150점)·중(100점)·하(70점) 중 고른다. 정답을 맞히면 그 배점대로 점수를 준다.
+function showDifficulty(pid) {
+  const obj = OBJECTS.find((o) => o.pid === pid);
+  const body = openModal();
+  body.innerHTML = `
+    <div class="p-head"><span class="p-icon">${obj.icon}</span>
+      <div><h2>난이도를 고르세요</h2><small>높은 난이도를 고를수록 받는 점수가 커져요. 문제는 같고 배점만 달라요.</small></div></div>
+    <div class="diff-row">
+      ${DIFFICULTY.map((d) => `
+        <button class="diff-btn" type="button" data-diff="${d.key}">
+          <b>${d.name}</b><small>${d.desc}</small><span class="diff-pts">${d.points}점</span>
+        </button>`).join("")}
+    </div>`;
+  sound.sfx("open");
+  for (const btn of body.querySelectorAll(".diff-btn"))
+    btn.onclick = () => { S.diff = btn.dataset.diff; sound.sfx("open"); openProblemBody(pid); };
 }
 
 const conceptSeen = new Set(); // 이 세션에서 개념 카드를 본 문제·실험
+const conceptSent = new Set(); // 학습 점수(+50)를 서버에 알린 카드 (서버도 한 번만 매긴다)
+const awardConcept = (key) => {
+  if (conceptSent.has(key)) return;
+  conceptSent.add(key);
+  S.net?.send({ type: "concept", key }); // 개념 학습 포인트 +50 (문제 풀이보다 작지만 학습 자체가 점수가 돼요)
+};
 
-// 개념 카드 팝업: 학습을 돕는다. next는 '문제 풀기'를 눌렀을 때 이어서 열 함수.
+// 개념 카드 팝업: 학습을 돕는다. 직접 조작하다가 '학습 완료'(+50점) 또는 '문제 풀기'를 누른다.
 function showConcept(key, next, kind) {
   conceptSeen.add(key);
+  const goLabel = next === closeModal ? "계속 탐험하기 →" : kind === "bridge" ? "도전하기 →" : "문제 풀기 →";
   const body = openModal();
   body.innerHTML = `
     ${conceptCard(null, key, { fmt })}
     <div class="concept-actions">
       <button class="btn" type="button" data-reopen="1">📚 카드 다시 보기</button>
-      <button class="btn primary big" type="button" id="concept-go">${kind === "bridge" ? "도전하기 →" : "문제 풀기 →"}</button>
+      <button class="btn" type="button" id="concept-done">💡 학습 완료 +50</button>
+      <button class="btn primary big" type="button" id="concept-go">${goLabel}</button>
     </div>`;
   sound.sfx("open");
-  $("#concept-go", body).onclick = next;
+  mountConceptWidget(key, $(".concept-widget", body));
+  $("#concept-done", body).onclick = () => {
+    awardConcept(key);
+    toast("💡 개념 학습 +50점! 팀 점수에도 더해졌어요.", "ok");
+    sound.sfx("found");
+    next();
+  };
+  $("#concept-go", body).onclick = () => { awardConcept(key); next(); };
   $("[data-reopen]", body).onclick = () => showConcept(key, next, kind);
 }
 
@@ -731,13 +885,14 @@ function openProblemBody(pid) {
   const p = PROBLEMS.find((x) => x.id === pid);
   const obj = OBJECTS.find((o) => o.pid === pid);
   const idx = PROBLEMS.indexOf(p);
+  const diff = DIFFICULTY.find((d) => d.key === S.diff);
   const body = openModal();
   sound.sfx("open");
   S.pid = pid;
   S.waiting = false;
   body.innerHTML = `
     <div class="p-head"><span class="p-icon">${obj.icon}</span>
-      <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}</h2><small>${p.level} · 교과서 ${p.source} · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각${CONCEPTS[pid] ? ` · <button class="link-card-btn" type="button" data-concept="${pid}">📚 개념 카드</button>` : ""}</small></div></div>
+      <div><h2>${obj.name}을(를) 열었더니… 문제 ${idx + 1}</h2><small>${p.level} · 교과서 ${p.source}${diff ? ` · <b class="diff-chip">${diff.name} 난이도 ${diff.points}점</b>` : ""} · 맞히면 🗝️ 열쇠 조각과 ${p.icon} ${p.relic} 조각${CONCEPTS[pid] ? ` · <button class="link-card-btn" type="button" data-concept="${pid}">📚 개념 카드</button>` : ""}</small></div></div>
     <p class="p-text"></p>
     <div class="tool">
       <div class="tool-help">🔍 ${fmt(p.toolHelp)}</div>
@@ -751,8 +906,10 @@ function openProblemBody(pid) {
   p.tool({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: true });
   typeText($(".p-text", body), p.text); // 모든 문제: 타자 소리와 함께 한 글자씩
   const mine = S.me?.probs[pid];
-  if (mine?.solved) lockSolved(body);
-  else {
+  if (mine?.solved) {
+    S.diff = null; // 이미 푼 상자를 다시 보는 것이므로 난이도 배점은 다시 매기지 않는다
+    lockSolved(body);
+  } else {
     buildAnswer(p, $(".answer", body));
     if (mine?.tries >= 2 || mine?.hinted) showHint(body, p);
   }
@@ -867,7 +1024,7 @@ function buildAnswer(p, root) {
 
 function send(pid, answer) {
   if (S.waiting) return;
-  if (!S.net.send({ type: "submit", pid, answer })) return feedback("연결이 끊겼어요. 잠시 후 다시 제출해 주세요.", "warn");
+  if (!S.net.send({ type: "submit", pid, answer, diff: S.diff })) return feedback("연결이 끊겼어요. 잠시 후 다시 제출해 주세요.", "warn");
   S.waiting = true;
   setTimeout(() => { S.waiting = false; }, 4000);
 }

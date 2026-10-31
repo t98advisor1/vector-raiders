@@ -4,9 +4,11 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { loadCharacter, makeCharacter } from "./characters.js";
 import { settings } from "./settings.js";
-import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR } from "./game.js";
+import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR, PLATFORMS, TARGETS } from "./game.js";
 
 const DUNGEON = ["floor", "floor-detail", "wall", "gate", "chest", "pot", "barrel", "coin", "key", "stairs", "banner", "column"];
+const BOLT_SPEED = 9; // 사격 탄환의 속도(초당 칸) — game.js의 규칙과 짝을 이룬다
+const BOLT_TTL = 1.5; // 탄환이 사라지기까지의 시간(초)
 const HAZARD = {
   "~": { color: 0x3b9be0, y: -0.12, opacity: 0.88, emissive: 0x0a2a4a },
   "^": { color: 0x0b0812, y: -0.9, opacity: 1, emissive: 0x000000 },
@@ -111,6 +113,9 @@ export class World3D {
     // 뒤쪽에서 비추는 차가운 빛: 캐릭터와 물체 가장자리가 반짝여 입체감이 산다
     this.rim = new THREE.DirectionalLight(0xa8d8ff, 1.3);
     this.scene.add(this.rim, this.rim.target);
+    // 정면 보조광(필 라이트): 캐릭터 얼굴이 어둡게 묻히지 않게 카메라 쪽에서 밝혀 준다
+    this.fill = new THREE.DirectionalLight(0xfff2dd, 1.25);
+    this.scene.add(this.fill, this.fill.target);
 
     this.mixers = [];
     this.avatars = new Map(); // n(나는 "me") → 캐릭터
@@ -119,6 +124,8 @@ export class World3D {
     this.bridges = new Map(); // lab → { planks, marker, done }
     this.hazards = [];
     this.coins = [];
+    this.bolts = []; // 사격 탄환(네온 벡터 탄)
+    this.targets = new Map(); // zone → { t, crystal, ring, label, hits, done, flash }
     this.prompt = null;
     this.promptText = "";
 
@@ -143,6 +150,11 @@ export class World3D {
     this.buildObjects(models);
     this.buildBridges();
     this.buildAltar(models);
+    this.buildPlatforms();
+    this.buildTargets();
+    // 사격 탄환용 공용 지오메트리·재료 (네온 벡터 탄)
+    this.boltGeo = new THREE.SphereGeometry(0.16, 10, 10);
+    this.boltMat = new THREE.MeshBasicMaterial({ color: 0x7dfcff });
   }
 
   start() {
@@ -298,6 +310,48 @@ export class World3D {
     this.scene.add(this.coinRing);
   }
 
+  // 로블록스풍 수직 발판: 점프로 딛고 올라가는 계단·부유 디딤돌·기둥 블록
+  buildPlatforms() {
+    const sideMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.85 });
+    const topMat = new THREE.MeshStandardMaterial({ color: 0xb0906a, roughness: 0.65 });
+    for (const [key, ph] of PLATFORMS) {
+      const [x, y] = key.split(",").map(Number);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.96, ph, 0.96), [sideMat, sideMat, topMat, sideMat, sideMat, sideMat]);
+      box.position.set(x + 0.5, ph / 2, y + 0.5);
+      box.castShadow = box.receiveShadow = true;
+      this.scene.add(box);
+    }
+  }
+
+  // 사격 표적(네온 수정체): 구역마다 하나, 10발을 맞히면 그 구역의 핵심 개념 카드가 열린다
+  buildTargets() {
+    const geo = new THREE.OctahedronGeometry(0.34);
+    const ringGeo = new THREE.RingGeometry(0.36, 0.52, 32);
+    for (const t of TARGETS) {
+      const crystal = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xff8ad8, emissive: 0xff2fb3, emissiveIntensity: 1.5 }));
+      crystal.position.set(t.x, 1.05, t.y);
+      crystal.castShadow = true;
+      const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff6ad5, transparent: true, opacity: 0.5, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(t.x, 0.03, t.y);
+      this.scene.add(crystal, ring);
+      const label = makeLabel("🎯 0 / 10", { bg: "rgba(87,16,64,0.9)", fg: "#ffd6f5", size: 26, height: 0.3 });
+      label.position.set(t.x, 1.9, t.y);
+      this.scene.add(label);
+      this.targets.set(t.zone, { t, crystal, ring, label, labelCount: 0, hits: 0, done: false, flash: 0 });
+    }
+  }
+
+  // 사격: 전방(me.dir)으로 네온 벡터 탄환을 하나 쏜다. 명중·소멸은 sync에서 처리한다.
+  shoot() {
+    const g = this.game;
+    const dir = g.me.dir, len = Math.hypot(dir[0], dir[1]) || 1;
+    const mesh = new THREE.Mesh(this.boltGeo, this.boltMat.clone());
+    mesh.position.set(g.me.x, 0.9, g.me.y);
+    this.scene.add(mesh);
+    this.bolts.push({ mesh, vx: (dir[0] / len) * BOLT_SPEED, vz: (dir[1] / len) * BOLT_SPEED, ttl: 1.5 });
+  }
+
   // ---------- 캐릭터 ----------
   avatar(key, n) {
     let av = this.avatars.get(key);
@@ -326,7 +380,7 @@ export class World3D {
     av.current = name;
   }
 
-  placeAvatar(av, x, y, dir, moving, name, isMe, jumpY = 0) {
+  placeAvatar(av, x, y, dir, moving, name, isMe, jumpY = 0, air = false) {
     av.group.position.set(x, jumpY, y);
     if (moving) {
       // 모델은 기본 회전(0°)에서 전면(+Z, 카메라 쪽)을 향한다.
@@ -337,7 +391,7 @@ export class World3D {
       av.group.rotation.y += d * 0.3;
     }
     // 공중에 떠 있으면 점프 애니메이션, 아니면 걷기·대기 (인사 중일 때는 건드리지 않는다)
-    if (jumpY > 0.02) this.setAnim(av, "jump");
+    if (air && jumpY > 0.02) this.setAnim(av, "jump");
     else if (av.current !== "yes") this.setAnim(av, moving ? "walk" : "idle");
     if (av.labelText !== name) {
       if (av.label) { av.group.remove(av.label); disposeLabel(av.label); }
@@ -365,7 +419,7 @@ export class World3D {
     // 나와 친구들
     if (g.me.n !== null) {
       const me = this.avatar("me", g.me.n);
-      this.placeAvatar(me, g.me.x, g.me.y, g.me.dir, g.me.moving, g.me.name, true, g.me.jumpY ?? 0);
+      this.placeAvatar(me, g.me.x, g.me.y, g.me.dir, g.me.moving, g.me.name, true, g.me.jumpY ?? 0, !!g.me.air);
       me.mixer?.update(dt);
     }
     for (const [n, o] of g.others) {
@@ -441,6 +495,49 @@ export class World3D {
     // 물결·용암 반짝임
     for (const hz of this.hazards) if (hz.kind !== "^") hz.mat.emissiveIntensity = hz.base * (0.8 + 0.25 * Math.sin(t * (hz.kind === "!" ? 3 : 1.5)));
 
+    // 사격 탄환: 앞으로 나아가고, 벽에 닿거나 시간이 다 되면 사라진다. 표적에 닿으면 명중!
+    for (const b of this.bolts) {
+      b.mesh.position.x += b.vx * dt;
+      b.mesh.position.z += b.vz * dt;
+      b.mesh.rotation.y += dt * 8;
+      b.ttl -= dt;
+      const ch = g.grid[Math.floor(b.mesh.position.z)]?.[Math.floor(b.mesh.position.x)];
+      if (b.ttl <= 0 || ch === undefined || ch === "#" || ch === "o" || ch === "@") { b.dead = true; continue; }
+      for (const tg of this.targets.values()) {
+        if (tg.done) continue;
+        if (Math.hypot(tg.t.x - b.mesh.position.x, tg.t.y - b.mesh.position.z) < 0.55) {
+          b.dead = true;
+          this.hitTarget(tg);
+          break;
+        }
+      }
+    }
+    this.bolts = this.bolts.filter((b) => {
+      if (!b.dead) return true;
+      this.scene.remove(b.mesh);
+      b.mesh.material.dispose();
+      return false;
+    });
+
+    // 표적: 반짝이고, 명중 횟수를 이름표에 새기고, 10발이 되면 깨진다
+    for (const tg of this.targets.values()) {
+      if (tg.done) continue;
+      tg.crystal.rotation.y = t * 1.6;
+      tg.crystal.position.y = 1.05 + Math.sin(t * 2.2) * 0.08;
+      tg.flash = Math.max(0, tg.flash - dt * 3);
+      const s = 1 + tg.flash * 0.6;
+      tg.crystal.scale.setScalar(s);
+      tg.ring.material.opacity = 0.3 + 0.25 * Math.sin(t * 3) + tg.flash * 0.4;
+      if (tg.labelCount !== tg.hits) {
+        tg.labelCount = tg.hits;
+        this.scene.remove(tg.label);
+        disposeLabel(tg.label);
+        tg.label = makeLabel(`🎯 ${tg.hits} / 10`, { bg: "rgba(87,16,64,0.9)", fg: "#ffd6f5", size: 26, height: 0.3 });
+        tg.label.position.set(tg.t.x, 1.9, tg.t.y);
+        this.scene.add(tg.label);
+      }
+    }
+
     // 제단의 유물
     const relics = this.h.relics();
     this.coinRing.rotation.y = t * 0.5;
@@ -467,17 +564,19 @@ export class World3D {
     }
     if (this.prompt) this.prompt.position.set(g.focus.x, 2.05 + Math.sin(t * 3) * 0.05, g.focus.y);
 
-    // 카메라: 비스듬히 위에서 나를 따라간다
+    // 카메라: 쿼터뷰(하이앵글)로 위에서 내려다본다 — 입체 고저차와 발판이 잘 보이게
     // 지도 밖 빈 공간을 비추지 않게: 화면 절반 폭(바닥 기준)만큼 안쪽에서 멈춘다. 좁은 화면일수록 덜 멈춘다.
-    const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 8.8 * this.camera.aspect;
+    const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 10.4 * this.camera.aspect;
     const camX = Math.min(W - halfW, Math.max(Math.min(halfW, W / 2), g.me.x));
-    const want = new THREE.Vector3(camX, 6.4, g.me.y + 5.6);
+    const want = new THREE.Vector3(camX, 9.2, g.me.y + 4.8);
     this.camera.position.lerp(want, this.ready ? 1 - Math.pow(0.002, dt) : 1);
-    this.camera.lookAt(this.camera.position.x, 0, this.camera.position.z - 6.1);
+    this.camera.lookAt(this.camera.position.x, 0, this.camera.position.z - 4.6);
     this.sun.position.set(g.me.x - 5, 12, g.me.y + 6);
     this.sun.target.position.set(g.me.x, 0, g.me.y);
     this.rim.position.set(g.me.x + 3, 5, g.me.y - 8);
     this.rim.target.position.set(g.me.x, 0, g.me.y);
+    this.fill.position.set(g.me.x, 4, g.me.y + 7);
+    this.fill.target.position.set(g.me.x, 1, g.me.y);
     // 서버에서 내 진행 상황을 받은 뒤부터는 상태 변화를 애니메이션으로 보여 준다.
     if (this.h.hasState()) this.ready = true;
   }
@@ -490,5 +589,18 @@ export class World3D {
     const r = this.cv.getBoundingClientRect();
     const sx = ((v.x + 1) / 2) * r.width + r.left, sy = ((1 - v.y) / 2) * r.height + r.top;
     if (Math.hypot(e.clientX - sx, e.clientY - sy) < 110) this.h.onInteract(f);
+  }
+
+  // 표적 명중 1발: 반짝이고, 10발이면 표적이 깨지며 개념 카드 팝업을 연다
+  hitTarget(tg) {
+    tg.hits++;
+    tg.flash = 1;
+    if (tg.hits < 10) return;
+    tg.done = true;
+    tg.crystal.visible = false;
+    tg.ring.visible = false;
+    this.scene.remove(tg.label);
+    disposeLabel(tg.label);
+    this.h.onTargetHit?.(tg.t);
   }
 }

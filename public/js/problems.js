@@ -6,6 +6,13 @@
 import { Board, C, el, add, sub, mul, dist } from "./svg.js";
 import { fmt } from "./mathtext.js";
 
+// 난이도 선택: 상자를 열 때 학생이 고른다. 배점은 서버(src/room.js의 DIFF_POINTS)와 짝을 이룬다.
+export const DIFFICULTY = [
+  { key: "high", name: "상", points: 150, desc: "도전! 스스로 풀이를 찾아요" },
+  { key: "mid", name: "중", points: 100, desc: "기본! 보통 수업 문제예요" },
+  { key: "low", name: "하", points: 70, desc: "차근차근 풀어요" },
+];
+
 export const PROBLEMS = [
   {
     id: "p1", relic: "육각 방패", icon: "🛡️", level: "기본", source: "중단원 01번 유사",
