@@ -45,6 +45,11 @@ export const ANSWER_TEXT = Object.fromEntries(
   Object.entries(ANSWERS).map(([pid, m]) => [pid, m.mid?.text ?? m.text ?? ""])
 );
 
+// 형성평가 답지용: 문제마다 난이도별 정답 글자 { p1: { low, mid, high }, ... }
+export const ANSWER_TEXT_BY_DIFF = Object.fromEntries(
+  Object.entries(ANSWERS).map(([pid, m]) => [pid, Object.fromEntries(["low", "mid", "high"].map((d) => [d, m[d]?.text ?? m.text ?? ""]))])
+);
+
 export const PROBLEM_IDS = Object.keys(ANSWERS);
 
 const EPS = 1e-6;

@@ -1074,3 +1074,29 @@ body.touch-device .chat-toggle { left: 10px; right: auto; top: 64px; bottom: aut
 .admin-msg.bad { color: #fca5a5; }
 .admin-banner[data-period]::after { content: attr(data-period); margin-left: 12px; color: #fde68a; font-weight: 700; }
 .admin-panel .panel-head h2 { white-space: nowrap; }
+
+/* 탐험 끝: 형성평가 출력 상자 */
+.print-box { margin: 14px 0 6px; padding: 12px 14px; border: 1.5px dashed #c9b287; border-radius: 14px; background: #fffaf0; display: grid; gap: 4px; text-align: left; }
+.print-box small { color: var(--muted); }
+.print-box .summary-actions { flex-wrap: wrap; gap: 8px; justify-content: flex-start; margin-top: 6px; }
+
+/* 형성평가 문제지·답지 (인쇄 전용) */
+@media print {
+  .fa-head h1 { display: flex; align-items: center; gap: 10px; }
+  .fa-tag { font-size: 11pt; border: 2px solid #111; border-radius: 6px; padding: 1px 10px; }
+  .fa-tag.ans { background: #111; color: #fff; }
+  .fa-name { margin-top: 6px !important; color: #111 !important; font-size: 11pt; }
+  .fa-guide { margin: 0 0 10px; color: #333; }
+  .fa-item { break-inside: avoid; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px dashed #bbb; }
+  .fa-item h3 { font-size: 11.5pt; margin: 0 0 4px; }
+  .fa-item h3 small { font-weight: 400; color: #555; }
+  .fa-item .pr-status { float: right; font-size: 9.5pt; font-weight: 700; color: #0f766e; }
+  .fa-body { display: flex; gap: 12px; align-items: flex-start; }
+  .fa-q { flex: 1; }
+  .fa-q .pr-text { white-space: pre-line; }
+  .fa-opts { margin: 4px 0; }
+  .fa-fig svg { width: 120px; height: auto; }
+  .fa-blank { margin: 10px 0 0; display: flex; align-items: center; gap: 8px; }
+  .fa-blank span { display: inline-block; width: 50%; border-bottom: 1.5px solid #111; height: 1.4em; }
+  .fa-check { margin: 4px 0 0; color: #555; font-size: 9.5pt; }
+}
