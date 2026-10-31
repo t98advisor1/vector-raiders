@@ -41,6 +41,20 @@
       <span>🧑‍🏫 <b>교사 관제 시스템</b>: 1~7채널 독립 수업 실시간 관제 중</span>
     </div>
     <div id="ch-overview" class="ch-overview" aria-label="채널 통합 현황"></div>
+    <!-- 전체 관리자 전용: 중간관리자(채널 교사) 비밀번호와 사용 기간 -->
+    <div id="admin-panel" class="panel admin-panel" hidden>
+      <div class="panel-head">
+        <h2>🛡️ 중간관리자 관리 <small class="muted">전체 관리자 전용</small></h2>
+        <small>채널마다 중간관리자 비밀번호와 사용 기간을 정해요. 기간 밖에는 그 채널의 중간관리자 로그인과 학생 수업 참가가 막혀요(연습 모드는 그대로). 날짜는 한국 시간, 그날 포함이에요.</small>
+      </div>
+      <div class="table-wrap">
+        <table class="table admin-table">
+          <thead><tr><th>채널</th><th>현재 비밀번호</th><th>새 비밀번호</th><th>시작일</th><th>종료일</th><th>상태</th><th></th></tr></thead>
+          <tbody id="admin-rows"></tbody>
+        </table>
+      </div>
+      <p id="admin-msg" class="admin-msg" role="status"></p>
+    </div>
     <div id="kpi-row" class="kpi-row" hidden>
       <div id="kpi-people" class="kpi-card"></div>
       <div id="kpi-visitors" class="kpi-card"></div>
