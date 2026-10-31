@@ -11,6 +11,7 @@ const $ = (s) => document.querySelector(s);
 const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
 const STAGE_TEXT = { lobby: "⏸ 대기", play: "▶ 탐험 중", done: "■ 탐험 끝" };
 let net = null, last = null, answers = null, isMaster = false;
+const joinedCh = new Set(); // 이 비밀번호로 들어간 채널 (중간관리자는 자기 채널만)
 const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)
 const pwByCh = {}; // 채널 번호 → 로그인 비밀번호 (joined 뒤 기억해 두기)
 const dashByCh = {}; // 채널 번호 → 마지막 받은 대시보드 (통합 뷰용)
@@ -161,6 +162,10 @@ function openChannel(ch, password) {
 function onChannelMessage(ch, msg) {
   if (msg.type === "joined") {
     remember(pwByCh[ch] ?? null); // 비밀번호는 탭을 닫을 때까지 기억한다
+    joinedCh.add(ch);
+    // 지금 보는 채널에 들어가지 못했으면(중간관리자) 들어간 채널로 옮겨서, 시작·종료 버튼이 그 채널에 먹게 한다
+    if (!joinedCh.has(activeCh)) switchChannel(ch);
+    else buildChannelTabs();
     if (msg.master && !isMaster) {
       // 전체 관리자: 중간관리자 관리 창을 열고 현재 설정을 받아 온다
       isMaster = true;
@@ -191,7 +196,8 @@ function onChannelMessage(ch, msg) {
     m.textContent = (msg.ok ? "✅ " : "⚠️ ") + msg.message;
     m.className = `admin-msg ${msg.ok ? "ok" : "bad"}`;
   } else if (msg.type === "error") {
-    $("#setup-error").textContent = msg.message;
+    // 중간관리자는 다른 채널에서 '비밀번호가 맞지 않아요'를 받는다. 이미 들어갔으면 무시한다.
+    if (!joinedCh.size) $("#setup-error").textContent = msg.message;
   }
 }
 
@@ -211,6 +217,7 @@ function buildChannelTabs() {
   const tabs = $("#ch-tabs");
   tabs.replaceChildren();
   for (const ch of CHANNELS) {
+    if (joinedCh.size && !joinedCh.has(ch)) continue; // 들어가지 못한 채널은 탭을 보이지 않는다
     const b = document.createElement("button");
     b.type = "button";
     b.className = `ch-tab${ch === activeCh ? " on" : ""}`;
@@ -267,6 +274,7 @@ function renderOverview() {
   if (!box) return;
   box.replaceChildren();
   for (const ch of CHANNELS) {
+    if (joinedCh.size && !joinedCh.has(ch)) continue;
     const d = dashByCh[ch];
     const card = document.createElement("button");
     card.type = "button";

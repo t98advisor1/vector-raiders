@@ -445,8 +445,9 @@ function onMessage(msg) {
     S.game.setMe(msg.n, msg.name);
     if (msg.pos) { S.game.me.x = msg.pos.x; S.game.me.y = msg.pos.y; } // 새로고침해도 하던 자리에서
     S.game.forceSend();
-    // 모바일/터치 기기에서는 지도로 조작 버튼이 가려지지 않도록 기본은 닫아 두고, 🗺️ 버튼을 눌렀을 때만 연다
-    $("#minimap").hidden = document.body.classList.contains("touch-device") || window.innerWidth <= 768;
+    // 지도는 마지막으로 켜고 끈 상태를 기억한다. 처음에는 컴퓨터에서 켜고, 휴대폰·태블릿에서는 조작 버튼을 가리지 않게 꺼 둔다.
+    const savedMap = store("vr-map");
+    setMap(savedMap === "on" ? true : savedMap === "off" ? false : !(document.body.classList.contains("touch-device") || window.innerWidth <= 768));
     $("#world").focus();
   } else if (msg.type === "me") {
     const before = S.me;
@@ -947,6 +948,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && S.modal) closeModal();
   const tag = e.target?.tagName;
   if (e.code === "KeyM" && tag !== "INPUT" && tag !== "TEXTAREA") sound.toggle();
+  if (e.code === "KeyN" && tag !== "INPUT" && tag !== "TEXTAREA" && !$("#game").hidden) setMap($("#minimap").hidden, true);
 });
 $("#sound-btn").onclick = () => sound.toggle();
 $("#restart-btn").onclick = () => {
@@ -961,16 +963,26 @@ sound.onChange((muted) => {
 const mapCanvas = $("#map-canvas");
 let mapGrid = null; // 벽·위험지대 그리기용 격자 (한 번만 만든다)
 
-$("#map-btn").onclick = () => { $("#minimap").hidden = !$("#minimap").hidden; if (!$("#minimap").hidden) drawMinimap(); };
-$("#minimap-close").onclick = () => { $("#minimap").hidden = true; };
+// 지도 켜기·끄기: 🗺️ 버튼, 지도 창의 ✕, N 키
+function setMap(on, remember = false) {
+  $("#minimap").hidden = !on;
+  $("#map-btn").classList.toggle("on", on);
+  $("#map-btn").setAttribute("aria-pressed", String(on));
+  const lbl = $("#map-btn .lbl");
+  if (lbl) lbl.textContent = on ? " 지도 끄기" : " 지도 켜기";
+  if (remember) store("vr-map", on ? "on" : "off");
+  if (on) drawMinimap();
+}
+$("#map-btn").onclick = () => setMap($("#minimap").hidden, true);
+$("#minimap-close").onclick = () => setMap(false, true);
 $("#rank-btn").onclick = () => { $(".hud-right")?.classList.toggle("open"); };
 
 function drawMinimap() {
   if ($("#minimap").hidden || !S.game) return;
   mapGrid ??= buildGrid();
-  const cell = 7; // 지도 한 칸의 픽셀 (지도 크기에 맞춰 화면에 맞춰 축소된다)
+  const cell = 12; // 지도 한 칸의 픽셀 (크게 그려 두고 화면 폭에 맞춰 줄인다)
   const c = mapCanvas;
-  const w = W * cell, h = H * cell + 14;
+  const w = W * cell, h = H * cell + 22;
   if (c.width !== w) { c.width = w; c.height = h; }
   const ctx = c.getContext("2d");
   ctx.clearRect(0, 0, c.width, c.height);
@@ -982,9 +994,9 @@ function drawMinimap() {
     ctx.fillStyle = ROOM_FILL[r];
     ctx.fillRect(x1 * cell, cell, (x2 - x1 + 1) * cell, (H - 2) * cell);
     ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = "bold 9px Pretendard, sans-serif";
+    ctx.font = `bold ${Math.round(cell * 1.05)}px Pretendard, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(ROOMS[r].name, (x1 + x2 + 1) / 2 * cell, H * cell + 10);
+    ctx.fillText(ROOMS[r].name, (x1 + x2 + 1) / 2 * cell, H * cell + 16);
   }
   // 벽
   ctx.fillStyle = "rgba(120,100,70,0.9)";
@@ -1016,15 +1028,15 @@ function drawMinimap() {
   const marker = (x, y, color, label, isMe) => {
     const px = x * cell, py = y * cell;
     ctx.beginPath();
-    ctx.arc(px, py, isMe ? 5 : 3.6, 0, Math.PI * 2);
+    ctx.arc(px, py, isMe ? cell * 0.62 : cell * 0.45, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.lineWidth = isMe ? 2 : 1;
+    ctx.lineWidth = isMe ? 3 : 1.5;
     ctx.strokeStyle = isMe ? "#5eead4" : "rgba(255,255,255,0.9)";
     ctx.stroke();
     if (isMe || !label) return;
     ctx.fillStyle = color;
-    ctx.font = "bold 8px Pretendard, sans-serif";
+    ctx.font = `bold ${Math.round(cell * 0.95)}px Pretendard, sans-serif`;
     ctx.fillText(label, px, py - 6);
   };
   for (const [n, o] of S.game.others) {
@@ -1129,6 +1141,8 @@ function showMathematicianCard(m, next) {
     <div class="summary-actions" style="margin-top: 14px;">
       <button class="btn primary big" type="button" id="math-card-ok">기하 탐험 계속하기 ➔</button>
     </div>`;
+  // 이야기는 타자 소리와 함께 한 글자씩 (누르면 바로 다 보임)
+  setTimeout(() => { const el = $(".math-story-text", body); if (el?.isConnected) typeText(el, m.story); }, 900);
   $("#math-card-ok", body).onclick = () => {
     awardConcept(`math_${m.id}`);
     toast(`🎁 ${m.name} 카드 해금! 보너스 마일리지 +${m.bonus}점 획득!`, "ok");
@@ -1235,6 +1249,8 @@ function openProblemBody(pid) {
 function typeText(el, src) {
   const tokens = String(src).match(/\$[^$]+\$|\[[A-Z]{1,3}\]|\{[a-z]\}|\^\d|[\s\S]/gu) ?? [];
   let i = 0, done = false;
+  // 긴 문제도 1.5초 안에 다 나오도록 글자 속도를 맞춘다 (짧으면 한 글자 30ms)
+  const speed = Math.max(8, Math.min(30, Math.round(1500 / Math.max(1, tokens.length))));
   el.classList.add("typing");
   const finish = () => {
     if (done) return;
@@ -1255,8 +1271,8 @@ function typeText(el, src) {
     } else {
       el.appendChild(document.createTextNode(tok));
     }
-    if (tok.trim()) sound.sfx("type");
-    setTimeout(tick, math ? 140 : /[,.]/.test(tok) ? 160 : 38);
+    if (tok.trim() && i % 2 === 0) sound.sfx("type"); // 타자 소리는 두 글자마다 (소리를 너무 많이 만들면 버벅인다)
+    setTimeout(tick, math ? 90 : /[,.]/.test(tok) ? 90 : speed);
   };
   setTimeout(tick, 300);
 }

@@ -226,6 +226,10 @@ export class World3D {
     this.renderer.setAnimationLoop(() => {
       const dt = Math.min(0.05, clock.getDelta());
       const t = clock.elapsedTime;
+      // 문제·개념 창이 열려 있는 동안은 3D 화면을 멈춘다 (화면에는 마지막 장면이 그대로 남는다).
+      // 크롬북에서 창이 뜰 때 버벅이던 원인: 창 뒤에서 3D를 계속 그리느라 수식 조판·그림이 늦어졌다.
+      if (this.ready && this.h.paused?.()) { this.wasPaused = true; return; }
+      if (this.wasPaused) { this.wasPaused = false; return; } // 창을 닫은 첫 프레임은 시간 간격을 버린다
       this.game.update(dt, t * 1000);
       this.sync(dt, t);
       this.renderer.render(this.scene, this.camera);
@@ -584,6 +588,23 @@ export class World3D {
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.02;
       group.add(shadow, ring);
+      // 엑스레이 실루엣: 비석·기둥·발판 뒤로 들어가 가려지면 캐릭터 윤곽이 팀 색으로 비쳐 보인다.
+      // 가려진 부분(깊이가 더 깊은 곳)에만 그려지는 재질을 같은 뼈대에 한 번 더 씌운다.
+      // 그리는 순서: 지형(0) → 실루엣(9) → 캐릭터(10). 실루엣은 지형에 가려진 곳에만 남고, 보이는 곳은 캐릭터가 덮는다.
+      const xray = new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(isMe ? 1 : 0.7), depthWrite: false, depthFunc: THREE.GreaterDepth });
+      const skinned = [];
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        o.renderOrder = 10;
+        if (o.isSkinnedMesh && o.material.side !== THREE.BackSide) skinned.push(o); // 윤곽선(뒷면)은 빼고
+      });
+      for (const m of skinned) {
+        const ghost = new THREE.SkinnedMesh(m.geometry, xray);
+        ghost.bind(m.skeleton, m.bindMatrix);
+        ghost.frustumCulled = false;
+        ghost.renderOrder = 9;
+        m.parent.add(ghost);
+      }
       Object.assign(av, { ring, shadow, muzzle, recoil: 0 });
       Object.assign(av, { model, mixer, actions: { idle: action("idle"), walk: action("walk"), yes: action("emote-yes"), jump: action("jump") } });
       av.actions.idle.play();
