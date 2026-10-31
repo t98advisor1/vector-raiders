@@ -99,13 +99,39 @@ function runHeroTyping() {
   }, 55);
 }
 
+// 글자 모션: 제목 글자를 한 자씩 떨어뜨리며 등장시킨다 (.fx-letters)
+function splitLetters(root = document) {
+  root.querySelectorAll(".fx-letters").forEach((el) => {
+    if (el.dataset.split) return;
+    el.dataset.split = "1";
+    el.setAttribute("aria-label", el.textContent);
+    const chars = [...el.textContent];
+    el.replaceChildren(...chars.map((c, i) => {
+      const span = document.createElement("span");
+      span.className = c === " " ? "ch sp" : "ch";
+      span.style.setProperty("--i", i);
+      span.setAttribute("aria-hidden", "true");
+      span.textContent = c === " " ? "\u00a0" : c;
+      return span;
+    }));
+  });
+}
+splitLetters();
+// 메뉴가 열릴 때마다 등장 모션을 처음부터 다시 재생한다
+function replayMenuMotion() {
+  const m = $("#menu");
+  m.classList.remove("play");
+  void m.offsetWidth;
+  m.classList.add("play");
+}
+
 function showScreen(which) {
   $("#splash").hidden = which !== "splash";
   $("#menu").hidden = which === "splash";
   $("#join-wizard").hidden = which !== "name";
   $("#settings-sheet").hidden = which !== "settings";
   intro.showRunners(which === "splash");
-  if (which === "menu") runHeroTyping();
+  if (which === "menu") { replayMenuMotion(); runHeroTyping(); }
 }
 
 const touch = () => {
@@ -568,6 +594,21 @@ function setupTouchControls() {
   const DIRS = {
     "dpad-up": [0, -1], "dpad-down": [0, 1], "dpad-left": [-1, 0], "dpad-right": [1, 0],
   };
+  // 모든 버튼을 포인터 이벤트 하나로 처리한다 (iPhone·안드로이드·크롬북 터치 모두 같은 방식).
+  // 누르는 순간 반응하고, 손가락이 버튼 밖으로 미끄러져도 뗄 때까지 눌린 상태를 지킨다.
+  const press = (el, down, up = () => {}) => {
+    el.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch {}
+      el.classList.add("pressed");
+      down();
+    });
+    for (const ev of ["pointerup", "pointercancel", "lostpointercapture"])
+      el.addEventListener(ev, () => { el.classList.remove("pressed"); up(); });
+    // 길게 눌러도 확대·글자 선택·메뉴가 뜨지 않게
+    el.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
+  };
   const held = new Map();
   const apply = () => {
     let x = 0, y = 0;
@@ -575,21 +616,11 @@ function setupTouchControls() {
     S.game?.setTouch(Math.sign(x), Math.sign(y));
   };
   for (const [id, dir] of Object.entries(DIRS)) {
-    const btn = document.getElementById(id);
-    btn.addEventListener("touchstart", (e) => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); held.set(id, dir); apply(); }, { passive: false });
-    for (const ev of ["touchend", "touchcancel"])
-      btn.addEventListener(ev, (e) => { e.preventDefault(); held.delete(id); apply(); }, { passive: false });
+    press(document.getElementById(id), () => { held.set(id, dir); apply(); }, () => { held.delete(id); apply(); });
   }
-  $("#touch-jump").addEventListener("touchstart", (e) => { e.preventDefault(); S.game?.jump(); }, { passive: false });
-  // 열기 버튼: 터치·펜·마우스 어디서든 확실히 먹도록 touchstart·pointerdown·click을 모두 연동한다.
-  // 먼저 열린 조작으로 창이 열리면 paused()가 되어 두 번째 조작은 무시된다.
-  const act = () => S.game?.touchInteract();
-  for (const ev of ["touchstart", "pointerdown", "click"])
-    $("#touch-act").addEventListener(ev, (e) => { e.preventDefault(); act(); }, { passive: false });
-  // 🎯 사격 버튼: G키와 같다.
-  const shoot = () => S.game?.shoot();
-  for (const ev of ["touchstart", "pointerdown"])
-    $("#touch-shoot").addEventListener(ev, (e) => { e.preventDefault(); shoot(); }, { passive: false });
+  press($("#touch-jump"), () => S.game?.jump());
+  press($("#touch-act"), () => S.game?.touchInteract());
+  press($("#touch-shoot"), () => S.game?.shoot());
   setupPadDragging();
 }
 

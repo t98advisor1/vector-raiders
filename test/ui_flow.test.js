@@ -15,7 +15,8 @@ test("학생 화면(index.html)에 4단계 위저드와 지도보기 버튼이 �
   assert.equal(html.includes('id="step-team"'), true, "2단계 팀 선택 컨테이너 존재");
   assert.equal(html.includes('id="step-unit"'), true, "3단계 단원 선택 컨테이너 존재");
   assert.equal(html.includes('id="step-launch"'), true, "4단계 난이도/이름 컨테이너 존재");
-  assert.equal(html.includes("🗺️ 지도보기"), true, "지도보기 버튼 레이블 존재");
+  // 휴대폰에서는 글자를 숨기고 🗺️ 아이콘만 보이도록 글자를 span으로 감싼다
+  assert.match(html, /id="map-btn"[^>]*>🗺️<span class="lbl"> 지도보기<\/span>/, "지도보기 버튼 레이블 존재");
 });
 
 test("채널 선택 및 팀 선택 분리 버튼 7개 및 4개 팀 구성 검증", () => {
