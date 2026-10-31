@@ -18,8 +18,12 @@
 <body class="teacher">
   <header class="topbar">
     <div class="brand">🏺 벡터 유적 탈출 · 교사 집계</div>
-    <div class="meta"><span id="stage-chip" class="chip"></span><span id="conn-chip" class="chip soft">연결 전</span>
-      <button id="print-sheet-btn" class="chip soft print-sheet-btn" type="button">📄 교사용 문제·정답·해설 PDF 다운로드</button></div>
+    <div class="meta">
+      <div id="ch-tabs" class="ch-tabs" role="tablist" aria-label="수업 채널 전환"></div>
+      <span id="stage-chip" class="chip"></span><span id="conn-chip" class="chip soft">연결 전</span>
+      <button id="chat-download" class="chip soft print-sheet-btn" type="button">💬 학생 채팅 기록 다운로드</button>
+      <button id="print-sheet-btn" class="chip soft print-sheet-btn" type="button">📄 교사용 문제·정답·해설 PDF 다운로드</button>
+    </div>
   </header>
 
   <section id="setup" class="panel setup">
@@ -33,13 +37,24 @@
   </section>
 
   <section id="dash" class="dash" hidden>
+    <div id="ch-overview" class="ch-overview" aria-label="채널 통합 현황"></div>
+    <div id="kpi-row" class="kpi-row" hidden>
+      <div id="kpi-people" class="kpi-card"></div>
+      <div id="kpi-teams" class="kpi-card"></div>
+      <div id="kpi-avg" class="kpi-card"></div>
+      <div id="kpi-stage" class="kpi-card"></div>
+    </div>
     <div class="panel code-panel">
       <div>
-        <small>학생 접속 주소 · 학생은 이름을 적고 '수업 참여하기'를 눌러요</small>
+        <small>학생 접속 주소 · 학생은 이름을 적고 '수업 참여하기'를 눌러요. 채널마다 주소가 달라요.</small>
         <div id="join-url" class="join-url big"></div>
-        <small>탐험 시작: 학생 화면의 '🔑 선생님: 수업 탐험 시작'에서 시작 비밀번호를 입력해요.</small>
+        <small>탐험 시작: 아래 '탐험 시작' 버튼 또는 학생 화면의 '🔑 선생님: 수업 탐험 시작'에서 시작 비밀번호를 입력해요.</small>
       </div>
       <div class="stage-buttons">
+        <button class="btn stage-ctl" type="button" data-stage="play">▶ 탐험 시작</button>
+        <button class="btn stage-ctl" type="button" data-stage="lobby">⏸ 대기로</button>
+        <button class="btn stage-ctl" type="button" data-stage="done">■ 탐험 종료</button>
+        <button id="invite-copy" class="btn" type="button">📋 학생 초대 링크 복사</button>
         <button id="csv" class="btn" type="button">CSV 내려받기</button>
         <button id="reset" class="btn danger" type="button">새 수업 시작 (기록 지우기)</button>
       </div>
@@ -56,7 +71,7 @@
     </div>
     <div class="panel">
       <div class="panel-head"><h2>학생별 집계</h2></div>
-      <p class="legend-line">★ 첫 시도 정답 · ✓ 정답 · ✗n 오답 n번 · 💡 힌트 봄 · – 미응시 · 이름을 누르면 문제별 답을 볼 수 있어요</p>
+      <p class="legend-line">★ 첫 시도 정답 · ✓ 정답 · ✗n 오답 n번 · 💡 힌트 봄 · 🏃 활동 마일리지 · – 미응시 · 이름을 누르면 문제별 답을 볼 수 있어요</p>
       <div class="table-wrap"><table id="roster" class="table"></table></div>
     </div>
   </section>
