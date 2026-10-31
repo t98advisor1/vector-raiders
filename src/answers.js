@@ -12,7 +12,7 @@ export const ANSWERS = {
   p2: {
     low: { type: "num", value: 2, text: "$2$" },
     mid: { type: "num", value: 4, text: "$4$" },
-    high: { type: "num", value: 8, text: "$8$" },
+    high: { type: "num", value: 8 * Math.SQRT2, text: "$8\\sqrt{2}$" },
   },
   p3: {
     low: { type: "num", value: 0, text: "$0$" },
@@ -32,7 +32,7 @@ export const ANSWERS = {
   p6: {
     low: { type: "num", value: 2, text: "$2$" },
     mid: { type: "num", value: -4, text: "$m=-4$" },
-    high: { type: "num", value: 12, text: "$12$" },
+    high: { type: "num", value: 8, text: "$8$" },
   },
   p7: {
     low: { type: "num", value: 3, text: "$3$" },

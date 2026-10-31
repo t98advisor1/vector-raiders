@@ -41,7 +41,7 @@ test("난이도별 서버 정답 채점 검증", () => {
   // p2
   assert.equal(checkAnswer("p2", "2", "low").ok, true);
   assert.equal(checkAnswer("p2", "4", "mid").ok, true);
-  assert.equal(checkAnswer("p2", "8", "high").ok, true);
+  assert.equal(checkAnswer("p2", "8√2", "high").ok, true); // |(8,8)| = 8√2
 
   // p3
   assert.equal(checkAnswer("p3", "0", "low").ok, true);
@@ -61,7 +61,7 @@ test("난이도별 서버 정답 채점 검증", () => {
   // p6
   assert.equal(checkAnswer("p6", "2", "low").ok, true);
   assert.equal(checkAnswer("p6", "-4", "mid").ok, true);
-  assert.equal(checkAnswer("p6", "12", "high").ok, true);
+  assert.equal(checkAnswer("p6", "8", "high").ok, true); // (2,2,2)·(2,2,0) = 8
 
   // p7
   assert.equal(checkAnswer("p7", "3", "low").ok, true);

@@ -68,7 +68,7 @@ export const PROBLEMS = [
         level: "심화 2인 협동 레이드", points: 150, source: "수능 기하 4점 변형 · 2인 협동", coop: true,
         text: "🤝 [2인 팀 협동 레이드] 같은 팀원 2명이 함께 이 상자 주변에 모여야 도전할 수 있습니다!\n\n한 변의 길이가 4인 정사각형 ABCD에서 두 팀원의 위치벡터를 각각 [p₁], [p₂]라 하자. 두 팀원이 변 BC와 CD 위를 각각 움직일 때, |[p₁]+[p₂]|의 최댓값을 구하시오. (단, 시점은 점 A)",
         answer: { kind: "expr", label: "최댓값 =" },
-        hint: "두 팀원이 점 C에서 만날 때 두 벡터의 합의 크기가 최대가 돼요. |2[AC]| = 2 × 4 = 8이에요.",
+        hint: "두 팀원이 점 C에서 만날 때 두 벡터의 합의 크기가 최대가 돼요. A를 원점으로 두면 [p₁]=(4, t), [p₂]=(s, 4)라서 [p₁]+[p₂]=(4+s, 4+t)예요. s=t=4일 때 (8, 8)이 되어 최댓값은 8√2예요.",
       },
     },
     text: "오른쪽 정사각형 ABCD에서 변 AB의 중점을 M, 변 AD의 중점을 N이라 하자. $|\\VV{MN}-\\VV{MB}|=2\\sqrt{5}$일 때, 이 정사각형의 한 변의 길이를 구하시오.",
@@ -150,7 +150,7 @@ export const PROBLEMS = [
       },
       high: {
         level: "심화 수능 기출", points: 150, source: "수능 기하 4점 기출 합답형",
-        text: "평면 위의 서로 다른 네 점 O, A, B, C에 대하여 <보기>에서 옳은 것만을 있는 대로 고른 것은?\n\n[보기]\nㄱ. [OC] = 1/3[OA] + 2/3[OB]이면 점 C는 선분 AB를 2:1로 내분한다.\nㄴ. 세 점 A, B, C가 한 직선 위에 있을 필요충분조건은 [OC]=s[OA]+t[OB]에서 s+t=1이다.\nㄷ. [OC]=2[OA]-[OB]이면 점 A는 선분 BC의 중점이다.",
+        text: "평면 위의 서로 다른 네 점 O, A, B, C에 대하여 <보기>에서 옳은 것만을 있는 대로 고른 것은?\n\n[보기]\nㄱ. [OC] = 1/3[OA] + 2/3[OB]이면 점 C는 선분 AB를 2:1로 내분한다.\nㄴ. 세 점 O, A, B가 한 직선 위에 있지 않을 때, 세 점 A, B, C가 한 직선 위에 있을 필요충분조건은 [OC]=s[OA]+t[OB]에서 s+t=1이다.\nㄷ. [OC]=2[OA]-[OB]이면 점 A는 선분 BC의 중점이다.",
         answer: { kind: "choice", options: ["① ㄱ", "② ㄱ, ㄴ", "③ ㄱ, ㄷ", "④ ㄴ, ㄷ", "⑤ ㄱ, ㄴ, ㄷ"], valueKey: ["1", "2", "3", "4", "5"] },
         hint: "ㄱ: 내분점 공식 m/(m+n)을 확인하세요. ㄴ: 계수 합=1 조건은 일직선 필요충분조건이에요. ㄷ: [OA]=([OB]+[OC])/2가 되므로 A는 중점이에요.",
       },
@@ -180,7 +180,7 @@ export const PROBLEMS = [
         level: "심화 수능 기출", points: 150, source: "수능 기하 4점 기출 공간도형",
         text: "한 모서리의 길이가 2인 정육면체 ABCD-EFGH에서 대각선 벡터 [AG]와 면 대각선 벡터 [AC]의 내적 [AG] · [AC]의 값을 구하시오.",
         answer: { kind: "expr", label: "내적 =" },
-        hint: "[AG]=[AC]+[CG]이고 [CG]는 밑면과 수직이므로 [AC] · [CG] = 0이에요. 따라서 [AG] · [AC] = |[AC]|² = 2² + 2² = 8...이 아니라 모서리 2,3,4 직육면체 연계!",
+        hint: "[AG]=[AC]+[CG]이고 [CG]는 밑면과 수직이므로 [AC] · [CG] = 0이에요. 따라서 [AG] · [AC] = |[AC]|² = 2² + 2² = 8이에요.",
       },
     },
     text: "다음 그림과 같은 직육면체 ABCD-EFGH에서 $\\VV{AG}+\\VV{BH}+\\VV{CE}+\\VV{DF}=m\\VV{GC}$를 만족시키는 실수 $m$의 값을 구하시오.",
@@ -253,173 +253,244 @@ function slider(parent, { min, max, step, value, label }, onInput) {
   return { input, set: (v) => { input.value = String(v); onInput(v); } };
 }
 
+// 문제 그림이 저절로 움직이는 모션: 학생이 그림이나 조절기를 만지면 멈춘다.
+function autoplay(ui, stepFn, ms = 900) {
+  if (!ui.autoplay) return;
+  let t = 0;
+  const id = setInterval(() => {
+    if (!ui.board.isConnected) return clearInterval(id);
+    stepFn(t++);
+  }, ms);
+  const stop = () => clearInterval(id);
+  for (const ev of ["pointerdown", "keydown"]) {
+    ui.board.addEventListener(ev, stop, { once: true });
+    ui.ctrl.addEventListener(ev, stop, { once: true });
+  }
+}
+
+// 1. 정육각형: [BC]를 평행이동해 같은 벡터 찾기
 function hexTool(ui) {
   const r3 = Math.sqrt(3) / 2;
-  const P = {
-    O: [0, 0], A: [-0.5, r3], B: [-1, 0], C: [-0.5, -r3],
-    D: [0.5, -r3], E: [1, 0], F: [0.5, r3],
-  };
-  const bd = new Board(ui.board, { xmin: -1.5, xmax: 1.5, ymin: -1.2, ymax: 1.2, width: 260 });
-  const poly = [P.A, P.B, P.C, P.D, P.E, P.F];
-  bd.poly(poly, { fill: C.roomHex, stroke: C.axis, width: 2 });
-  bd.seg(P.A, P.D, { stroke: C.axis, width: 1, dash: "3 3" });
-  bd.seg(P.B, P.E, { stroke: C.axis, width: 1, dash: "3 3" });
-  bd.seg(P.C, P.F, { stroke: C.axis, width: 1, dash: "3 3" });
+  const P = { O: [0, 0], A: [-0.5, r3], B: [-1, 0], C: [-0.5, -r3], D: [0.5, -r3], E: [1, 0], F: [0.5, r3] };
+  const bd = new Board(ui.board, { xmin: -1.6, xmax: 1.6, ymin: -1.3, ymax: 1.3, width: 300 });
+  const bg = bd.bg;
+  bd.polygon([P.A, P.B, P.C, P.D, P.E, P.F], { color: C.ink, width: 2, fill: "#fbf6ea", layer: bg });
+  for (const [u, v] of [["A", "D"], ["B", "E"], ["C", "F"]]) bd.line(P[u], P[v], { color: C.faint, width: 1, dash: "3 3", layer: bg });
   for (const [k, p] of Object.entries(P)) {
-    const dx = p[0] === 0 ? 0 : p[0] < 0 ? -12 : 12;
-    const dy = p[1] === 0 ? 12 : p[1] < 0 ? -12 : 12;
-    bd.point(p, { label: k, dx, dy });
+    const dx = p[0] === 0 ? 12 : p[0] < 0 ? -14 : 14;
+    const dy = p[1] === 0 ? -12 : p[1] < 0 ? 14 : -14;
+    bd.point(p, { label: k, dx, dy, layer: bg });
   }
-  bd.arrow(P.B, P.C, { color: C.ans, width: 3.5, label: "[BC]" });
-
-  let cur = P.B;
-  const ghost = bd.arrow(P.B, P.C, { color: C.ans, width: 2.5, dash: "5 3" });
-  const h = bd.handle(cur, { color: C.ans, r: 12 });
+  bd.arrow(P.B, P.C, { color: C.red, width: 3.5, label: "[BC]", labelSide: -1, layer: bg });
+  const d = sub(P.C, P.B);
+  const h = bd.handle(P.B, { color: C.red, r: 12 });
   const update = (p) => {
-    const d = sub(P.C, P.B);
-    ghost.setAttribute("x1", bd.toSvg(p)[0]);
-    ghost.setAttribute("y1", bd.toSvg(p)[1]);
-    const end = add(p, d);
-    ghost.setAttribute("x2", bd.toSvg(end)[0]);
-    ghost.setAttribute("y2", bd.toSvg(end)[1]);
+    bd.clear();
+    bd.arrow(p, add(p, d), { color: C.red, width: 2.5, dash: "6 4" });
     h.move(p);
-    const snap = Object.entries(P).find(([, q]) => dist(p, q) < 0.18);
-    const endSnap = snap ? Object.entries(P).find(([, q]) => dist(add(snap[1], d), q) < 0.18) : null;
+    const snap = Object.entries(P).find(([, q]) => dist(p, q) < 0.2);
+    const endSnap = snap ? Object.entries(P).find(([, q]) => dist(add(snap[1], d), q) < 0.2) : null;
     if (snap && endSnap) info(ui, `시점 ${snap[0]}에 놓으면 종점은 ${endSnap[0]}이에요. $\\VV{${snap[0]}${endSnap[0]}} = \\VV{BC}$!`);
-    else if (snap) info(ui, `시점 ${snap[0]}에 놓았지만 종점이 꼭짓점이 아니에요.`);
+    else if (snap) info(ui, `시점 ${snap[0]}에 놓으면 종점이 꼭짓점이 아니에요.`);
     else info(ui, "시점(동그라미)을 꼭짓점이나 O에 끌어다 놓아 보세요.");
   };
   bd.drag(h.el, {
-    onMove: (w) => {
-      let snap = w;
-      for (const p of Object.values(P)) if (dist(w, p) < 0.18) { snap = p; break; }
-      cur = snap;
-      update(cur);
-    },
+    onMove: (w) => update(Object.values(P).find((q) => dist(w, q) < 0.2) ?? w),
   });
-  update(cur);
+  update(P.B);
+  const tour = [P.A, P.O, P.F, P.E, P.B];
+  autoplay(ui, (t) => update(tour[t % tour.length]), 1300);
 }
 
+// 2. 정사각형: −[MB]를 B에 이어 붙여 [BM]+[MN]=[BN]
 function squareTool(ui) {
-  const bd = new Board(ui.board, { xmin: -0.5, xmax: 4.5, ymin: -0.5, ymax: 4.5, width: 260 });
-  const A = [0, 4], B = [0, 0], C = [4, 0], D = [4, 4];
-  const M = [0, 2], N = [2, 4];
-  bd.poly([A, B, C, D], { fill: C.roomHex, stroke: C.axis, width: 2 });
-  bd.point(A, { label: "A", dx: -10, dy: 10 });
-  bd.point(B, { label: "B", dx: -10, dy: -10 });
-  bd.point(C, { label: "C", dx: 10, dy: -10 });
-  bd.point(D, { label: "D", dx: 10, dy: 10 });
-  bd.point(M, { label: "M", dx: -12, dy: 0, color: C.a });
-  bd.point(N, { label: "N", dx: 0, dy: 12, color: C.b });
-  bd.arrow(M, N, { color: C.a, width: 3, label: "[MN]" });
-  bd.arrow(M, B, { color: C.b, width: 3, label: "[MB]" });
-
-  let placed = false;
-  const neg = bd.arrow(M, A, { color: C.sum, width: 3, dash: "5 3" });
-  const sum = bd.arrow(B, N, { color: C.ans, width: 3.5 });
-  sum.style.display = "none";
-  const h = bd.handle([0, 1], { color: C.sum, r: 12 });
-  const update = () => {
+  const bd = new Board(ui.board, { xmin: -0.9, xmax: 4.9, ymin: -0.9, ymax: 4.9, width: 300 });
+  const A = [0, 4], B = [0, 0], Cc = [4, 0], D = [4, 4], M = [0, 2], N = [2, 4];
+  const bg = bd.bg;
+  bd.polygon([A, B, Cc, D], { color: C.ink, width: 2, fill: "#fbf6ea", layer: bg });
+  bd.point(A, { label: "A", dx: -14, dy: -12, layer: bg });
+  bd.point(B, { label: "B", dx: -14, dy: 14, layer: bg });
+  bd.point(Cc, { label: "C", dx: 14, dy: 14, layer: bg });
+  bd.point(D, { label: "D", dx: 14, dy: -12, layer: bg });
+  bd.point(M, { label: "M", dx: -16, dy: 0, layer: bg });
+  bd.point(N, { label: "N", dx: 0, dy: -16, layer: bg });
+  bd.arrow(M, N, { color: C.a, width: 3, label: "[MN]", layer: bg });
+  bd.arrow(M, B, { color: C.b, width: 3, label: "[MB]", labelSide: -1, layer: bg });
+  const neg = sub(M, B); // −MB = BM
+  const start0 = [2.6, 0.8];
+  const h = bd.handle(start0, { color: C.b, r: 12 });
+  const update = (p) => {
+    bd.clear();
+    const placed = dist(p, B) < 0.5;
+    const s = placed ? B : p;
+    bd.arrow(s, add(s, neg), { color: C.b, width: 3, dash: "6 4", label: "-[MB]" });
+    h.move(s);
     if (placed) {
-      neg.setAttribute("x1", bd.toSvg(B)[0]); neg.setAttribute("y1", bd.toSvg(B)[1]);
-      neg.setAttribute("x2", bd.toSvg(M)[0]); neg.setAttribute("y2", bd.toSvg(M)[1]);
-      h.move(B);
-      sum.style.display = "";
+      bd.arrow(B, N, { color: C.sum, width: 4, label: "[BN]", labelSide: -1 });
       info(ui, "$-\\VV{MB} = \\VV{BM}$이에요. $\\VV{BM}+\\VV{MN}=\\VV{BN}$으로 이어져요!");
-    } else {
-      neg.setAttribute("x1", bd.toSvg(M)[0]); neg.setAttribute("y1", bd.toSvg(M)[1]);
-      neg.setAttribute("x2", bd.toSvg([0, 4])[0]); neg.setAttribute("y2", bd.toSvg([0, 4])[1]);
-      h.move([0, 3]);
-      sum.style.display = "none";
-      info(ui, "주황 점선($-\\VV{MB}$)을 끌어 B점에 놓아 이어 붙여 보세요.");
-    }
+    } else info(ui, "주황 점선 $-\\VV{MB}$의 시점(동그라미)을 끌어 점 B에 놓아 보세요.");
   };
-  bd.drag(h.el, {
-    onMove: (w) => {
-      placed = dist(w, B) < 1.0;
-      update();
-    },
-  });
-  update();
+  bd.drag(h.el, { onMove: update });
+  update(start0);
+  const path = [[2, 0.6], [1.2, 0.4], [0.5, 0.2], B, B, start0];
+  autoplay(ui, (t) => update(path[t % path.length]), 900);
 }
 
+// 3. 부채꼴: [OC]를 m[a]+n[b]로 나누기
 function sectorTool(ui) {
-  const bd = new Board(ui.board, { xmin: -0.8, xmax: 6.8, ymin: -0.8, ymax: 6.8, width: 260 });
+  const bd = new Board(ui.board, { xmin: -1, xmax: 7, ymin: -1, ymax: 7, width: 300 });
   const O = [0, 0], A = [6, 0], B = [0, 6];
-  bd.seg(O, A, { stroke: C.axis, width: 2 });
-  bd.seg(O, B, { stroke: C.axis, width: 2 });
-  bd.arc(O, 6, 0, Math.PI / 2, { stroke: C.axis, width: 2, fill: C.roomHex });
-  bd.point(O, { label: "O", dx: -10, dy: -10 });
-  bd.point(A, { label: "A", dx: 10, dy: -10 });
-  bd.point(B, { label: "B", dx: -10, dy: 10 });
-  bd.arrow(O, A, { color: C.a, width: 2.5, label: "{a}" });
-  bd.arrow(O, B, { color: C.b, width: 2.5, label: "{b}" });
-
-  const arrowOC = bd.arrow(O, [0, 0], { color: C.ans, width: 3.5, label: "[OC]" });
-  const dropX = bd.seg(O, O, { stroke: C.a, width: 2, dash: "4 3" });
-  const dropY = bd.seg(O, O, { stroke: C.b, width: 2, dash: "4 3" });
-
+  const bg = bd.bg;
+  const arc = [O];
+  for (let k = 0; k <= 30; k++) { const t = (k / 30) * (Math.PI / 2); arc.push([6 * Math.cos(t), 6 * Math.sin(t)]); }
+  bd.polygon(arc, { color: C.ink, width: 2, fill: "#fbf6ea", layer: bg });
+  bd.point(O, { label: "O", dx: -12, dy: 12, layer: bg });
+  bd.point(A, { label: "A", dx: 12, dy: 12, layer: bg });
+  bd.point(B, { label: "B", dx: -12, dy: -12, layer: bg });
+  bd.arrow(O, A, { color: C.a, width: 2.5, label: "{a}", labelSide: -1, layer: bg });
+  bd.arrow(O, B, { color: C.b, width: 2.5, label: "{b}", layer: bg });
+  let sl;
   const setAngle = (deg) => {
     const rad = (deg * Math.PI) / 180;
-    const Cpt = [6 * Math.cos(rad), 6 * Math.sin(rad)];
-    const pX = [Cpt[0], 0], pY = [0, Cpt[1]];
-    arrowOC.setAttribute("x2", bd.toSvg(Cpt)[0]); arrowOC.setAttribute("y2", bd.toSvg(Cpt)[1]);
-    dropX.setAttribute("x1", bd.toSvg(Cpt)[0]); dropX.setAttribute("y1", bd.toSvg(Cpt)[1]);
-    dropX.setAttribute("x2", bd.toSvg(pX)[0]); dropX.setAttribute("y2", bd.toSvg(pX)[1]);
-    dropY.setAttribute("x1", bd.toSvg(Cpt)[0]); dropY.setAttribute("y1", bd.toSvg(Cpt)[1]);
-    dropY.setAttribute("x2", bd.toSvg(pY)[0]); dropY.setAttribute("y2", bd.toSvg(pY)[1]);
-    const m = (Math.cos(rad)).toFixed(2), n = (Math.sin(rad)).toFixed(2);
-    info(ui, `$\\angle\\mathrm{AOC} = ${deg}^\\circ$일 때, $\\VV{OC} \\approx ${m}\\vv{a} + ${n}\\vv{b}$예요.`);
+    const P = [6 * Math.cos(rad), 6 * Math.sin(rad)];
+    bd.clear();
+    bd.line(P, [P[0], 0], { color: C.faint, width: 1.5, dash: "4 3" });
+    bd.line(P, [0, P[1]], { color: C.faint, width: 1.5, dash: "4 3" });
+    bd.arrow(O, [P[0], 0], { color: C.a, width: 4, opacity: 0.55 });
+    bd.arrow(O, [0, P[1]], { color: C.b, width: 4, opacity: 0.55 });
+    bd.arrow(O, P, { color: C.red, width: 3.5, label: "[OC]" });
+    bd.point(P, { label: "C", dx: 12, dy: -12, color: C.red });
+    const m = Math.cos(rad).toFixed(2), n = Math.sin(rad).toFixed(2);
+    info(ui, `$\\angle\\mathrm{AOC} = ${deg}^\\circ$일 때 $\\VV{OC} \\approx ${m}\\vv{a} + ${n}\\vv{b}$예요.`);
   };
-  slider(ui.ctrl, { min: 10, max: 80, step: 5, value: 30, label: "각도" }, setAngle);
+  sl = slider(ui.ctrl, { min: 10, max: 80, step: 5, value: 30, label: "∠AOC" }, setAngle);
   setAngle(30);
+  autoplay(ui, (t) => sl.set(10 + ((t * 5) % 75)), 500);
 }
 
+// 4. 평행 조건: [q]−[r]가 [p]+[q] 방향과 평행해지는 m
 function parallelTool(ui) {
-  const bd = new Board(ui.board, { xmin: -4, xmax: 4, ymin: -4, ymax: 4, width: 260 });
-  bd.arrow([0, 0], [1, -2], { color: C.sum, width: 3, dash: "4 3", label: "{p}+{q}" });
-  bd.arrow([0, 0], [-1, 2], { color: C.sum, width: 1.5, dash: "4 3" });
-  const qr = bd.arrow([0, 0], [0, 0], { color: C.ans, width: 3.5, label: "{q}-{r}" });
-
+  const bd = new Board(ui.board, { xmin: -5, xmax: 5, ymin: -5, ymax: 5, width: 300 });
+  bd.grid(1);
+  const dir = [1, -2]; // p+q = a − 2b (a=(1,0), b=(0,1)로 놓고 그린다)
+  bd.line(mul(-2.4, dir), mul(2.4, dir), { color: C.target, width: 1.5, dash: "5 4", layer: bd.bg });
+  bd.arrow([0, 0], dir, { color: C.target, width: 3, label: "{p}+{q}", layer: bd.bg });
+  let sl;
   const setM = (m) => {
     const v = [-1 - m, 4];
-    qr.setAttribute("x2", bd.toSvg(v)[0]); qr.setAttribute("y2", bd.toSvg(v)[1]);
-    if (m === 1) info(ui, "<b>m = 1</b>일 때 $\\vv{q}-\\vv{r}$가 보라색 점선과 정확히 평행해요!");
+    bd.clear();
+    const par = Math.abs(v[0] * dir[1] - v[1] * dir[0]) < 1e-9;
+    bd.arrow([0, 0], v, { color: par ? C.sum : C.red, width: 3.5, label: "{q}-{r}" });
+    if (par) info(ui, `<b>m = ${m}</b>일 때 $\\vv{q}-\\vv{r}$가 보라색 점선과 평행해요!`);
     else info(ui, `m = ${m}: $\\vv{q}-\\vv{r} = (${-1 - m})\\vv{a} + 4\\vv{b}$`);
   };
-  slider(ui.ctrl, { min: -2, max: 3, step: 0.5, value: 0, label: "m 값" }, setM);
+  sl = slider(ui.ctrl, { min: -2, max: 3, step: 0.5, value: 0, label: "m" }, setM);
   setM(0);
+  const seq = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3];
+  autoplay(ui, (t) => sl.set(seq[t % seq.length]), 700);
 }
 
+// 5. 일직선 조건: 계수의 합이 1이면 C가 직선 AB 위에
 function collinearTool(ui) {
-  const bd = new Board(ui.board, { xmin: -1, xmax: 5, ymin: -1, ymax: 4, width: 260 });
-  const O = [0, 0], A = [1, 2], B = [4, 1];
-  bd.seg([-1, 2.67], [5, 0.67], { stroke: C.axis, width: 1.5, dash: "4 3" });
-  bd.point(O, { label: "O", dx: -10, dy: -10 });
-  bd.point(A, { label: "A", dx: -10, dy: 10, color: C.a });
-  bd.point(B, { label: "B", dx: 10, dy: -10, color: C.b });
-  const ptC = bd.point([0, 0], { label: "C", dx: 10, dy: 10, color: C.ans });
-
+  const bd = new Board(ui.board, { xmin: -7, xmax: 4, ymin: -1, ymax: 8, width: 300 });
+  bd.grid(1);
+  const O = [0, 0], A = [1, 1], B = [2, 0]; // [OA]=a, [OB]=b
+  const bg = bd.bg;
+  bd.line([-6, 8], [3, -1], { color: C.faint, width: 1.5, dash: "5 4", layer: bg });
+  bd.point(O, { label: "O", dx: -12, dy: 12, layer: bg });
+  bd.arrow(O, A, { color: C.a, width: 2.5, label: "{a}", layer: bg });
+  bd.arrow(O, B, { color: C.b, width: 2.5, label: "{b}", labelSide: -1, layer: bg });
+  bd.point(A, { label: "A", dx: 12, dy: -12, layer: bg });
+  bd.point(B, { label: "B", dx: 12, dy: 12, layer: bg });
+  const trail = [];
+  let sl;
   const setM = (m) => {
-    const Cpt = [2 * m * 1 + (m - 5) * 4, 2 * m * 2 + (m - 5) * 1];
-    ptC.move(Cpt);
-    if (m === 2) info(ui, "<b>m = 2</b>일 때 계수의 합 $2m + (m-5) = 1$이 되어 점 C가 직선 AB 위에 와요!");
-    else info(ui, `m = ${m}: 계수의 합은 $3m-5 = ${3 * m - 5}$예요.`);
+    const P = add(mul(2 * m, A), mul(m - 5, B));
+    trail.push(P);
+    bd.clear();
+    for (const q of trail.slice(-20)) bd.point(q, { color: C.faint, r: 2.5 });
+    const on = Math.abs(3 * m - 5 - 1) < 1e-9;
+    bd.arrow(O, P, { color: on ? C.sum : C.red, width: 3, label: "[OC]" });
+    bd.point(P, { label: "C", dx: 12, dy: -12, color: on ? C.sum : C.red });
+    if (on) info(ui, `<b>m = ${m}</b>일 때 계수의 합 $2m + (m-5) = 1$이 되어 점 C가 직선 AB 위에 와요!`);
+    else info(ui, `m = ${m}: 계수의 합 $2m+(m-5) = ${3 * m - 5}$예요. 1이 되면 C가 직선 AB 위에 와요.`);
   };
-  slider(ui.ctrl, { min: 0, max: 4, step: 0.5, value: 1, label: "m 값" }, setM);
+  sl = slider(ui.ctrl, { min: 1, max: 3, step: 0.25, value: 1, label: "m" }, setM);
   setM(1);
+  autoplay(ui, (t) => sl.set(1 + ((t % 9) * 0.25)), 650);
 }
 
+// 6. 직육면체: 네 대각선 벡터를 이어 붙이면 −4[GC]
 function cuboidTool(ui) {
-  const bd = new Board(ui.board, { xmin: -1, xmax: 5, ymin: -1, ymax: 5, width: 260 });
-  info(ui, "직육면체에서 서로 반대 방향인 가로·세로 성분은 합하면 0이 되고, 높이 방향 [GC]만 남아요.");
+  const bd = new Board(ui.board, { xmin: -2.5, xmax: 4.5, ymin: -1.5, ymax: 4, width: 300 });
+  const Q = { A: [0, 0, 2], B: [3, 0, 2], C: [3, 2, 2], D: [0, 2, 2], E: [0, 0, 0], F: [3, 0, 0], G: [3, 2, 0], H: [0, 2, 0] };
+  const v3 = (s) => Q[s[1]].map((x, i) => x - Q[s[0]][i]);
+  const plus3 = (p, v) => p.map((x, i) => x + v[i]);
+  const EDGES = ["AB", "BC", "CD", "DA", "EF", "FG", "GH", "HE", "AE", "BF", "CG", "DH"];
+  const VECS = [["AG", C.a], ["BH", C.b], ["CE", C.sum], ["DF", C.target]];
+  let th = 0.5, chain = 0;
+  const proj = ([x, y, z]) => {
+    const cx = x - 1.5, cy = y - 1;
+    const u = cx * Math.cos(th) - cy * Math.sin(th);
+    const w = cx * Math.sin(th) + cy * Math.cos(th);
+    return [u + 0.8, z + 0.35 * w + 0.2];
+  };
+  const draw = () => {
+    bd.clear();
+    for (const e of EDGES) bd.line(proj(Q[e[0]]), proj(Q[e[1]]), { color: C.faint, width: 1.5 });
+    for (const [k, p] of Object.entries(Q)) bd.point(proj(p), { label: k, dx: 10, dy: -10, r: 3 });
+    if (!chain) for (const [v, col] of VECS) bd.arrow(proj(Q[v[0]]), proj(Q[v[1]]), { color: col, width: 2.5 });
+    else {
+      let p = Q.A;
+      VECS.slice(0, chain).forEach(([v, col]) => { const q = plus3(p, v3(v)); bd.arrow(proj(p), proj(q), { color: col, width: 3 }); p = q; });
+      if (chain === 4) {
+        bd.arrow(proj(Q.A), proj(p), { color: C.red, width: 4, label: "-4[GC]" });
+        info(ui, "네 벡터를 이어 붙이면 가로·세로는 지워지고 높이만 남아요: $\\VV{AG}+\\VV{BH}+\\VV{CE}+\\VV{DF}=-4\\VV{GC}$");
+      } else info(ui, `${chain}개째 이어 붙였어요. 앞 벡터의 화살촉에 다음 벡터의 시점을 붙여요.`);
+    }
+    if (!chain) info(ui, "그림을 좌우로 끌면 돌아가요. '이어 붙이기'를 눌러 보세요.");
+  };
+  let last = null;
+  bd.svg.addEventListener("pointerdown", (e) => { last = e.clientX; bd.svg.setPointerCapture(e.pointerId); });
+  bd.svg.addEventListener("pointermove", (e) => { if (last === null) return; th += (e.clientX - last) * 0.01; last = e.clientX; draw(); });
+  bd.svg.addEventListener("pointerup", () => { last = null; });
+  button(ui.ctrl, "🔗 이어 붙이기", () => { chain = chain >= 4 ? 0 : chain + 1; draw(); });
+  draw();
+  autoplay(ui, (t) => { chain = t % 6 > 4 ? 0 : t % 6; th += 0.15; draw(); }, 1000);
 }
 
+// 7. 원과 단위 벡터: P가 원 위를 돌 때 Q = [OP]/|[OP]|의 자취
 function circleTool(ui) {
-  const bd = new Board(ui.board, { xmin: -1, xmax: 5, ymin: -1, ymax: 5, width: 260 });
-  const O = [0, 0], Cpt = [2, 2];
-  bd.circle(Cpt, 2, { fill: C.roomHex, stroke: C.axis, width: 2 });
-  bd.point(O, { label: "O", dx: -10, dy: -10 });
-  bd.point(Cpt, { label: "C(2,2)", dx: 10, dy: 10 });
-  info(ui, "O에서 원에 그은 두 접선의 접점을 이으면 중심각이 90°(π/2)인 부채꼴 호가 돼요.");
+  const bd = new Board(ui.board, { xmin: -1, xmax: 5, ymin: -1, ymax: 5, width: 300 });
+  bd.grid(1);
+  const O = [0, 0], Ce = [2, 2], R = 2;
+  const bg = bd.bg;
+  bd.circle(Ce, R, { color: C.ink, width: 2, fill: "#fbf6ea", layer: bg });
+  bd.circle(O, 1, { color: C.faint, width: 1.5, dash: "4 3", layer: bg });
+  bd.point(O, { label: "O", dx: -12, dy: 12, layer: bg });
+  bd.point(Ce, { label: "(2, 2)", dx: 0, dy: 16, layer: bg });
+  const trail = [];
+  const h = bd.handle([4, 2], { color: C.a, r: 12 });
+  const setT = (t) => {
+    const P = [Ce[0] + R * Math.cos(t), Ce[1] + R * Math.sin(t)];
+    const len = Math.hypot(P[0], P[1]);
+    const Qp = [P[0] / len, P[1] / len];
+    trail.push(Qp);
+    bd.clear();
+    for (const q of trail.slice(-80)) bd.point(q, { color: C.sum, r: 2 });
+    bd.arrow(O, P, { color: C.a, width: 2, opacity: 0.7, label: "[OP]" });
+    bd.arrow(O, Qp, { color: C.red, width: 3.5 });
+    bd.point(Qp, { label: "Q", dx: -12, dy: -10, color: C.red });
+    h.move(P);
+    const ang = Math.round((Math.atan2(Qp[1], Qp[0]) * 180) / Math.PI);
+    info(ui, `Q는 반지름 1인 원 위에 있어요. 지금 $\\angle$ = ${ang}°. Q가 지나간 자리(초록 점)는 0°~90°의 호예요.`);
+  };
+  bd.drag(h.el, { onMove: (w) => setT(Math.atan2(w[1] - Ce[1], w[0] - Ce[0])) });
+  let tt = 0;
+  button(ui.ctrl, "🔄 한 바퀴 돌리기", () => {
+    let k = 0;
+    const id = setInterval(() => { if (!ui.board.isConnected || k++ > 72) return clearInterval(id); tt += Math.PI / 36; setT(tt); }, 40);
+  });
+  setT(0);
+  autoplay(ui, () => { tt += Math.PI / 12; setT(tt); }, 260);
 }
