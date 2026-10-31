@@ -421,15 +421,15 @@ body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #
   background: #fff; border-radius: 999px; cursor: pointer; }
 .team-opt.on { border-color: var(--teal); background: var(--teal-soft); }
 
-/* 학생 간 실시간 채팅 */
-.chat-toggle { position: absolute; right: 12px; bottom: 12px; z-index: 30; border: 0; cursor: pointer;
-  background: rgba(17, 24, 39, 0.85); color: #fff; font-size: 1.25rem; border-radius: 999px; padding: 8px 12px;
-  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.35), 0 4px 14px rgba(0, 0, 0, 0.35); }
+/* 학생 간 실시간 채팅: 기본 위치 센터 아래쪽(하단 중앙) */
+.chat-toggle { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 30; border: 0; cursor: pointer;
+  background: rgba(17, 24, 39, 0.88); color: #fff; font-size: 1.15rem; border-radius: 999px; padding: 8px 18px;
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.4), 0 4px 14px rgba(0, 0, 0, 0.35); display: flex; align-items: center; gap: 6px; }
 .chat-unread { position: absolute; top: -6px; right: -6px; background: var(--bad); color: #fff; font-size: 0.7rem;
   font-weight: 800; min-width: 18px; height: 18px; border-radius: 999px; display: grid; place-items: center; padding: 0 4px; }
-.chat-panel { position: absolute; right: 12px; bottom: 12px; z-index: 30; width: min(320px, calc(100% - 24px));
-  background: rgba(17, 24, 39, 0.88); border: 1px solid rgba(94, 234, 212, 0.35); border-radius: 14px;
-  color: #fff; display: flex; flex-direction: column; max-height: min(46vh, 320px);
+.chat-panel { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 30; width: min(340px, calc(100% - 24px));
+  background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(94, 234, 212, 0.35); border-radius: 14px;
+  color: #fff; display: flex; flex-direction: column; max-height: min(44vh, 300px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
 .chat-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-size: 0.9rem;
   cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -469,7 +469,7 @@ body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #
 .touch-btn-round:active { background: rgba(94, 234, 212, 0.5); }
 /* 터치 기기에서는 키보드 도움말 대신 패드가 있다 */
 body.touch-device .help { display: none; }
-body.touch-device .chat-toggle { bottom: 230px; right: 14px; }
+body.touch-device .chat-toggle { left: 50%; bottom: 12px; transform: translateX(-50%); right: auto; }
 
 /* 문제 난이도 선택: 상(150점)·중(100점)·하(70점) */
 .diff-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
