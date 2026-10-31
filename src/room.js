@@ -3,7 +3,7 @@
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
 import { gradeLevel, answerText } from "./answers.js";
-import { builtinSet, UNIT_SET, DEFAULT_SET } from "./sets.js";
+import { builtinSet, UNIT_SET, DEFAULT_SET, SET_LIST } from "./sets.js";
 import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, cleanDate, todayKst, parseChannelPasswords } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
 
@@ -375,7 +375,8 @@ export class Room extends DurableObject {
         return ws.close(4003, "forbidden");
       }
       ws.serializeAttachment({ role: "teacher", master });
-      this.send(ws, { type: "joined", role: "teacher", master, answers: this.answerTable(), set: this.teacherSet(), period: master ? null : periodLabel(cfg) });
+      this.data.setId ??= DEFAULT_SET;
+      this.send(ws, { type: "joined", role: "teacher", master, answers: this.answerTable(), set: this.teacherSet(), sets: SET_LIST, period: master ? null : periodLabel(cfg) });
       this.send(ws, this.dashboard());
       this.send(ws, this.classState());
       return;
@@ -442,8 +443,12 @@ export class Room extends DurableObject {
       await this.save();
       this.log({ type: "입장", name });
       // 세트: 연습은 학생이 고른 단원, 수업 채널은 기본 세트 (나중에 교사가 채널별로 고른다)
-      if (!this.data.setId) {
-        this.data.setId = this.practice ? (UNIT_SET[msg.unit] ?? DEFAULT_SET) : DEFAULT_SET;
+      // 연습에서 다른 단원을 고르면 그 단원 세트로 바꾸고, 상자 기록만 새로 시작한다(벡터 점프 기록은 그대로)
+      const wantSet = this.practice ? UNIT_SET[msg.unit] ?? DEFAULT_SET : this.data.setId ?? DEFAULT_SET;
+      if (this.data.setId !== wantSet) {
+        if (this.data.setId && this.practice) Object.assign(st, { probs: {}, concepts: [], escapedAt: undefined });
+        this.data.setId = wantSet;
+        this.data.unlocked = [];
         await this.save();
       }
       this.send(ws, { type: "set", set: this.publicSet() });
@@ -524,9 +529,13 @@ export class Room extends DurableObject {
       this.log({ type: "강퇴", name: st.name });
       this.scheduleBroadcast();
     }
-    if (msg.type === "reset") {
+    if (msg.type === "reset" || (msg.type === "setSet" && SET_LIST.includes(msg.setId))) {
       // 새 수업: 이전 반의 학생과 기록을 지우고, 접속한 학생은 다시 들어오게 한다.
+      // 단원(문항 세트)을 바꿀 때도 기록이 섞이지 않게 새 수업으로 시작한다.
+      const setId = msg.type === "setSet" ? msg.setId : this.data.setId;
       this.data = freshData();
+      this.data.setId = setId ?? DEFAULT_SET;
+      this.coop = null;
       this.pos.clear();
       this.lastPos.clear();
       await this.save();
@@ -534,6 +543,9 @@ export class Room extends DurableObject {
       for (const other of this.ctx.getWebSockets()) {
         if (other.deserializeAttachment()?.role === "student") try { other.close(4006, "new class"); } catch {}
       }
+      // 이 채널의 모든 교사 화면에 새 세트를 보낸다
+      const setMsg = { type: "set", set: this.teacherSet(), answers: this.answerTable() };
+      for (const other of this.ctx.getWebSockets()) if (other.deserializeAttachment()?.role === "teacher") this.send(other, setMsg);
       this.send(ws, this.dashboard());
       this.scheduleBroadcast();
     }

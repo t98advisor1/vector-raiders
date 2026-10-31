@@ -173,7 +173,7 @@ function showWizardStep(step) {
   $("#step-unit").hidden = step !== "unit";
   $("#step-launch").hidden = step !== "launch";
   // 단계 표시: 수업 참가는 채널→팀→유적→이름 4단계, 연습 모드는 유적→이름 2단계
-  const steps = S.pendingMode === "practice" ? ["unit", "launch"] : ["ch", "team", "unit", "launch"];
+  const steps = S.pendingMode === "practice" ? ["unit", "launch"] : ["ch", "team", "launch"]; // 수업 참가는 선생님이 채널 단원을 정한다
   const badge = $(`#step-${step}`)?.querySelector(".step-badge");
   if (badge && steps.includes(step)) badge.textContent = `${steps.indexOf(step) + 1}단계 / ${steps.length}`;
   sound.sfx("open");
@@ -204,10 +204,10 @@ document.querySelectorAll(".mcard[data-mode]").forEach((b) => {
 $("#step-ch-back").onclick = () => showScreen("menu");
 $("#step-ch-next").onclick = () => showWizardStep("team");
 $("#step-team-back").onclick = () => showWizardStep("ch");
-$("#step-team-next").onclick = () => showWizardStep("unit");
+$("#step-team-next").onclick = () => showWizardStep("launch");
 $("#step-unit-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "menu" : "team");
 $("#step-unit-next").onclick = () => showWizardStep("launch");
-$("#step-launch-back").onclick = () => showWizardStep("unit");
+$("#step-launch-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "unit" : "team");
 
 // 1단계 채널 카드 클릭 시 선택 & 2단계(팀 선택)로 자동 진행
 document.querySelectorAll(".ch-card-btn[data-ch]").forEach((b) => {
@@ -233,7 +233,7 @@ document.querySelectorAll(".team-card-btn[data-team]").forEach((b) => {
     if (b.disabled || b.classList.contains("full")) return;
     selectTeam(b.dataset.team);
     sound.sfx("open");
-    setTimeout(() => showWizardStep("unit"), 180);
+    setTimeout(() => showWizardStep("launch"), 180); // 수업 참가: 팀 다음은 바로 이름 (단원은 선생님이 정함)
   };
 });
 selectTeam(S.team);

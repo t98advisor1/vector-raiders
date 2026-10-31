@@ -1162,3 +1162,5 @@ body.touch-device .chat-panel { right: 96px; bottom: calc(14px + env(safe-area-i
   .print-card ul { margin: 0; padding-left: 1.1em; }
   .tp-diagram svg { width: 130px; height: auto; }
 }
+.set-pick { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.set-pick select { font: inherit; padding: 6px 10px; border-radius: 10px; background: #0f1530; color: #e5e9f5; border: 1px solid rgba(129, 140, 248, 0.45); }
