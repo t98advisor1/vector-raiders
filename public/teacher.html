@@ -28,23 +28,17 @@
 
   <section id="setup" class="panel setup">
     <h2>교사 로그인</h2>
-    <p>수업에 참여한 학생들의 기록을 모아 보는 화면이에요. 혼자 연습한 기록은 여기에 나오지 않아요.</p>
+    <p>수업에 참여한 학생들의 기록을 실시간으로 관제하는 교사용 화면입니다. 전달받으신 교사 비밀번호를 입력해 주세요.</p>
     <form id="login" class="row" autocomplete="off">
-      <input id="password" type="password" inputmode="numeric" placeholder="교사 비밀번호" aria-label="교사 비밀번호" required>
+      <input id="password" type="password" placeholder="교사 비밀번호 입력" aria-label="교사 비밀번호" required>
       <button class="btn primary big" type="submit">들어가기</button>
     </form>
-    <div class="admin-guide-card">
-      <div class="admin-guide-title">🔑 중간관리자(동료 교사) 채널별 접속 비밀번호 안내</div>
-      <p>• <b>전체 관리자 채널 비밀번호</b>: <code>119-129</code> (1~7 전 채널 총괄 접속)</p>
-      <p>• <b>개별 채널 비밀번호</b>: ① <code>82821</code> · ② <code>82822</code> · ③ <code>82823</code> · ④ <code>82824</code> · ⑤ <code>82825</code> · ⑥ <code>82826</code> · ⑦ <code>82827</code></p>
-      <small class="muted">※ 1~7채널 독립 수업 관제 가능 · 기본값 <code>1234</code> 및 <code>TEACHER_PASSWORD</code>도 병행 허용됩니다.</small>
-    </div>
     <p id="setup-error" class="error" role="alert"></p>
   </section>
 
   <section id="dash" class="dash" hidden>
     <div class="admin-banner">
-      <span>🔑 <b>중간관리자 안내</b>: 전체 마스터: <code>119-129</code> · 채널별: ① <code>82821</code> ~ ⑦ <code>82827</code> · 7개 채널 독립 운영</span>
+      <span>🧑‍🏫 <b>교사 관제 시스템</b>: 1~7채널 독립 수업 실시간 관제 중</span>
     </div>
     <div id="ch-overview" class="ch-overview" aria-label="채널 통합 현황"></div>
     <div id="kpi-row" class="kpi-row" hidden>

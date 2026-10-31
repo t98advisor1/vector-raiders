@@ -89,44 +89,95 @@
 
     <!-- 수업 참가 / 연습 모드 단계별 팝업 모달 (Step Wizard) -->
     <div id="join-wizard" class="sheet wizard-sheet" hidden>
-      <!-- Step 1: 팀 & 채널 선택 팝업 -->
-      <div id="step-1" class="wizard-step">
+      <!-- Step 1: 수업 채널 선택 팝업 -->
+      <div id="step-ch" class="wizard-step">
         <div class="step-head">
-          <span class="step-badge">1단계 / 3</span>
-          <h2 class="step-title">🚩 팀과 채널을 골라주세요</h2>
-          <p class="muted small">팀당 최대 8명까지 참가할 수 있어요</p>
+          <span class="step-badge">1단계 / 4</span>
+          <h2 class="step-title">🌐 수업 채널을 골라주세요</h2>
+          <p class="muted small">선생님이 안내해 주신 채널 번호를 선택하세요</p>
         </div>
-        <div class="team-pick" id="channel-pick" role="group" aria-label="수업 채널 선택">
-          <span class="team-pick-label">수업 채널</span>
-          <div class="team-pick-row ch-row-7">
-            <button type="button" class="ch-opt on" data-ch="1">① 1채널</button>
-            <button type="button" class="ch-opt" data-ch="2">② 2채널</button>
-            <button type="button" class="ch-opt" data-ch="3">③ 3채널</button>
-            <button type="button" class="ch-opt" data-ch="4">④ 4채널</button>
-            <button type="button" class="ch-opt" data-ch="5">⑤ 5채널</button>
-            <button type="button" class="ch-opt" data-ch="6">⑥ 6채널</button>
-            <button type="button" class="ch-opt" data-ch="7">⑦ 7채널</button>
-          </div>
-        </div>
-        <div class="team-pick" role="group" aria-label="팀 선택">
-          <span class="team-pick-label">내 팀 선택</span>
-          <div class="team-pick-row team-row-grid">
-            <button type="button" class="team-opt on" data-team="A"><span class="team-lbl">🔵 A팀</span> <b class="team-cnt" id="cnt-A">(0/8명)</b></button>
-            <button type="button" class="team-opt" data-team="B"><span class="team-lbl">🟠 B팀</span> <b class="team-cnt" id="cnt-B">(0/8명)</b></button>
-            <button type="button" class="team-opt" data-team="C"><span class="team-lbl">🟢 C팀</span> <b class="team-cnt" id="cnt-C">(0/8명)</b></button>
-            <button type="button" class="team-opt" data-team="D"><span class="team-lbl">🟣 D팀</span> <b class="team-cnt" id="cnt-D">(0/8명)</b></button>
-          </div>
+        <div class="ch-grid-large" role="group" aria-label="수업 채널 선택">
+          <button type="button" class="ch-card-btn on" data-ch="1">
+            <span class="ch-badge">채널 1</span>
+            <b>① 1채널</b>
+            <small>기하 탐험반</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="2">
+            <span class="ch-badge">채널 2</span>
+            <b>② 2채널</b>
+            <small>기하 탐험반</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="3">
+            <span class="ch-badge">채널 3</span>
+            <b>③ 3채널</b>
+            <small>기하 탐험반</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="4">
+            <span class="ch-badge">채널 4</span>
+            <b>④ 4채널</b>
+            <small>기하 탐험반</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="5">
+            <span class="ch-badge">채널 5</span>
+            <b>⑤ 5채널</b>
+            <small>기하 탐험반</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="6">
+            <span class="ch-badge">채널 6</span>
+            <b>⑥ 6채널</b>
+            <small>기하 탐험반</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="7">
+            <span class="ch-badge">채널 7</span>
+            <b>⑦ 7채널</b>
+            <small>기하 탐험반</small>
+          </button>
         </div>
         <div class="sheet-buttons">
-          <button id="step1-back" class="btn" type="button">← 뒤로</button>
-          <button id="step1-next" class="btn primary big" type="button">다음: 단원 선택 ➔</button>
+          <button id="step-ch-back" class="btn" type="button">← 뒤로</button>
+          <button id="step-ch-next" class="btn primary big" type="button">다음: 팀 선택 ➔</button>
         </div>
       </div>
 
-      <!-- Step 2: 2022 개정 기하 3단원 벡터 선택 팝업 -->
-      <div id="step-2" class="wizard-step" hidden>
+      <!-- Step 2: 내 팀 선택 팝업 -->
+      <div id="step-team" class="wizard-step" hidden>
         <div class="step-head">
-          <span class="step-badge">2단계 / 3</span>
+          <span class="step-badge">2단계 / 4</span>
+          <h2 class="step-title">🚩 내 팀을 골라주세요</h2>
+          <p class="muted small">팀당 최대 8명까지 참가할 수 있어요</p>
+        </div>
+        <div class="team-grid-large" role="group" aria-label="팀 선택">
+          <button type="button" class="team-card-btn on" data-team="A">
+            <span class="team-icon">🔵</span>
+            <b>A팀 (여우)</b>
+            <span class="team-cnt" id="cnt-A">(0/8명)</span>
+          </button>
+          <button type="button" class="team-card-btn" data-team="B">
+            <span class="team-icon">🟠</span>
+            <b>B팀 (고양이)</b>
+            <span class="team-cnt" id="cnt-B">(0/8명)</span>
+          </button>
+          <button type="button" class="team-card-btn" data-team="C">
+            <span class="team-icon">🟢</span>
+            <b>C팀 (곰)</b>
+            <span class="team-cnt" id="cnt-C">(0/8명)</span>
+          </button>
+          <button type="button" class="team-card-btn" data-team="D">
+            <span class="team-icon">🟣</span>
+            <b>D팀 (토끼)</b>
+            <span class="team-cnt" id="cnt-D">(0/8명)</span>
+          </button>
+        </div>
+        <div class="sheet-buttons">
+          <button id="step-team-back" class="btn" type="button">← 이전 (채널 변경)</button>
+          <button id="step-team-next" class="btn primary big" type="button">다음: 단원 선택 ➔</button>
+        </div>
+      </div>
+
+      <!-- Step 3: 2022 개정 기하 3단원 벡터 선택 팝업 -->
+      <div id="step-unit" class="wizard-step" hidden>
+        <div class="step-head">
+          <span class="step-badge" id="step-unit-badge">3단계 / 4</span>
           <h2 class="step-title">📜 기하 3단원 벡터 선택</h2>
           <p class="muted small">2022 개정 교육과정 기준 탐험 단원</p>
         </div>
@@ -145,15 +196,15 @@
           </button>
         </div>
         <div class="sheet-buttons">
-          <button id="step2-back" class="btn" type="button">← 이전</button>
-          <button id="step2-next" class="btn primary big" type="button">다음: 난이도 선택 ➔</button>
+          <button id="step-unit-back" class="btn" type="button">← 이전</button>
+          <button id="step-unit-next" class="btn primary big" type="button">다음: 난이도 선택 ➔</button>
         </div>
       </div>
 
-      <!-- Step 3: 난이도 선택 & 이름 입력 후 출발 -->
-      <form id="step-3" class="wizard-step" autocomplete="off" hidden>
+      <!-- Step 4: 난이도 선택 & 이름 입력 후 출발 -->
+      <form id="step-launch" class="wizard-step" autocomplete="off" hidden>
         <div class="step-head">
-          <span class="step-badge">3단계 / 3</span>
+          <span class="step-badge" id="step-launch-badge">4단계 / 4</span>
           <h2 class="step-title">⚔️ 탐험 난이도 & 이름 입력</h2>
           <p class="muted small">이름을 적고 출발 버튼을 눌러주세요</p>
         </div>
@@ -176,7 +227,7 @@
         </div>
         <label class="name-label">내 이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
         <div class="sheet-buttons">
-          <button id="step3-back" class="btn" type="button">← 이전</button>
+          <button id="step-launch-back" class="btn" type="button">← 이전</button>
           <button class="btn primary big launch-btn" type="submit">🚀 탐험 시작!</button>
         </div>
         <button id="start-btn" class="link-btn" type="button" hidden>🔑 선생님: 수업 탐험 시작</button>
@@ -299,7 +350,7 @@
           <span id="hud-keys" title="열쇠 조각 (푼 문제)"></span>
           <span id="hud-jumps" title="벡터 점프 (건넌 장애물)"></span>
           <span id="hud-mile" title="활동 마일리지 (이동·점프·사격·개념 학습)"></span>
-          <button id="map-btn" class="hud-btn" type="button" aria-label="유적 전체 지도 (탭)">🗺️</button>
+          <button id="map-btn" class="hud-btn hud-map-btn" type="button" aria-label="유적 전체 지도보기">🗺️ 지도보기</button>
           <button id="rank-btn" class="hud-btn" type="button" aria-label="팀/개인 랭킹 접기/펼치기 (탭)">🏆</button>
           <button id="sound-btn" class="hud-btn" type="button" aria-label="소리 끄기 (M)">🔊</button>
           <button id="restart-btn" class="hud-btn" type="button" hidden>↺ 처음부터</button>

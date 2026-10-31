@@ -97,16 +97,44 @@ const touch = () => {
 $("#touch").onclick = touch;
 window.addEventListener("keydown", (e) => { if (!$("#join").hidden && (e.key === "Enter" || e.key === " ")) touch(); });
 
-// 캐슬풍 단계별 팝업 모달 제어 (1단계: 팀·채널 ➔ 2단계: 단원 ➔ 3단계: 난이도·이름)
-let currentStep = 1;
+// 텍스트 타이핑 및 다다다닥 타자 소리 모션 그래픽
+function typewriteText(el, text, speed = 25) {
+  if (!el || !text) return;
+  if (el._tInterval) clearInterval(el._tInterval);
+  el.textContent = "";
+  let i = 0;
+  el._tInterval = setInterval(() => {
+    if (i < text.length) {
+      el.textContent += text[i++];
+      if (i % 2 === 0) sound.sfx("key"); // 다다다닥 타자 소리
+    } else {
+      clearInterval(el._tInterval);
+      el._tInterval = null;
+    }
+  }, speed);
+}
+
+// 캐슬풍 4단계 팝업 모달 제어 (1단계: 채널 ➔ 2단계: 팀 ➔ 3단계: 단원 ➔ 4단계: 난이도·이름)
+let currentWizardStep = "ch";
 function showWizardStep(step) {
   if (step === "menu") return showScreen("menu");
-  currentStep = step;
-  $("#step-1").hidden = step !== 1;
-  $("#step-2").hidden = step !== 2;
-  $("#step-3").hidden = step !== 3;
+  currentWizardStep = step;
+  $("#step-ch").hidden = step !== "ch";
+  $("#step-team").hidden = step !== "team";
+  $("#step-unit").hidden = step !== "unit";
+  $("#step-launch").hidden = step !== "launch";
   sound.sfx("open");
-  if (step === 3) $("#join-name").focus();
+  if (step === "launch") $("#join-name").focus();
+
+  // 단계별 제목 타자 효과 모션
+  const stepEl = $(`#step-${step}`);
+  if (stepEl) {
+    const title = stepEl.querySelector(".step-title");
+    if (title) {
+      title._raw ??= title.textContent;
+      typewriteText(title, title._raw, 32);
+    }
+  }
 }
 
 document.querySelectorAll(".mcard[data-mode]").forEach((b) => {
@@ -115,82 +143,44 @@ document.querySelectorAll(".mcard[data-mode]").forEach((b) => {
     $("#start-btn").hidden = S.pendingMode !== "class";
     sound.sfx("open");
     showScreen("name");
-    // 수업 참가: 1단계(팀·채널)부터 / 연습 모드: 2단계(단원)부터 시작
-    showWizardStep(S.pendingMode === "class" ? 1 : 2);
+    // 수업 참가: 1단계(채널 선택)부터 / 연습 모드: 3단계(단원 선택)부터
+    showWizardStep(S.pendingMode === "class" ? "ch" : "unit");
   };
 });
 
-$("#step1-back").onclick = () => showScreen("menu");
-$("#step1-next").onclick = () => showWizardStep(2);
-$("#step2-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "menu" : 1);
-$("#step2-next").onclick = () => showWizardStep(3);
-$("#step3-back").onclick = () => showWizardStep(2);
+$("#step-ch-back").onclick = () => showScreen("menu");
+$("#step-ch-next").onclick = () => showWizardStep("team");
+$("#step-team-back").onclick = () => showWizardStep("ch");
+$("#step-team-next").onclick = () => showWizardStep("unit");
+$("#step-unit-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "menu" : "team");
+$("#step-unit-next").onclick = () => showWizardStep("launch");
+$("#step-launch-back").onclick = () => showWizardStep("unit");
 
-// 단원 카드 클릭 시 선택 & 3단계로 자동 진행
-document.querySelectorAll(".wizard-item[data-unit]").forEach((b) => {
+// 1단계 채널 카드 클릭 시 선택 & 2단계(팀 선택)로 자동 진행
+document.querySelectorAll(".ch-card-btn[data-ch]").forEach((b) => {
+  b.classList.toggle("on", b.dataset.ch === S.ch);
   b.onclick = () => {
-    selectUnit(b.dataset.unit);
-    document.querySelectorAll(".wizard-item[data-unit]").forEach((o) => o.classList.toggle("on", o === b));
+    S.ch = b.dataset.ch;
+    store("vr-ch", S.ch);
+    document.querySelectorAll(".ch-card-btn[data-ch]").forEach((o) => o.classList.toggle("on", o === b));
     sound.sfx("open");
-    setTimeout(() => showWizardStep(3), 160);
+    setTimeout(() => showWizardStep("team"), 180);
   };
 });
 
-// 난이도 버튼 클릭
-document.querySelectorAll(".diff-btn[data-diff]").forEach((b) => {
-  b.onclick = () => {
-    S.diff = b.dataset.diff;
-    store("vr-diff", S.diff);
-    document.querySelectorAll(".diff-btn[data-diff]").forEach((o) => o.classList.toggle("on", o === b));
-    sound.sfx("open");
-  };
-});
-
-// 설정 창 탭 (📖 설명서 vs ⚙️ 옵션)
-document.querySelectorAll(".s-tab[data-stab]").forEach((b) => {
-  b.onclick = () => {
-    const tab = b.dataset.stab;
-    document.querySelectorAll(".s-tab[data-stab]").forEach((o) => o.classList.toggle("on", o === b));
-    $("#tab-manual").hidden = tab !== "manual";
-    $("#tab-options").hidden = tab !== "options";
-    sound.sfx("open");
-  };
-});
-
-// 게임 설명서 캐러셀 슬라이더
-let curSlide = 1;
-const TOTAL_SLIDES = 4;
-function showSlide(idx) {
-  curSlide = Math.max(1, Math.min(TOTAL_SLIDES, idx));
-  document.querySelectorAll(".carousel-slide").forEach((s) => {
-    s.classList.toggle("on", Number(s.dataset.slide) === curSlide);
-  });
-  document.querySelectorAll(".car-dots .dot").forEach((d) => {
-    d.classList.toggle("on", Number(d.dataset.idx) === curSlide);
-  });
-  sound.sfx("key");
-}
-$("#car-prev").onclick = () => showSlide(curSlide - 1);
-$("#car-next").onclick = () => showSlide(curSlide + 1);
-document.querySelectorAll(".car-dots .dot").forEach((d) => {
-  d.onclick = () => showSlide(Number(d.dataset.idx));
-});
-
-$("#open-settings").onclick = () => { sound.sfx("open"); showScreen("settings"); };
-$("#settings-close").onclick = () => showScreen("menu");
-
-// 팀 선택: 자동 배정은 제외, A·B·C·D 중 선택(팀당 최대 8명)
+// 2단계 팀 카드 클릭 시 선택 & 3단계(단원 선택)로 자동 진행
 S.team = load("vr-team") || "A";
 function selectTeam(team) {
   S.team = team;
   store("vr-team", team);
-  document.querySelectorAll(".team-opt[data-team]").forEach((o) => o.classList.toggle("on", o.dataset.team === team));
+  document.querySelectorAll(".team-card-btn[data-team]").forEach((o) => o.classList.toggle("on", o.dataset.team === team));
 }
-document.querySelectorAll(".team-opt[data-team]").forEach((b) => {
+document.querySelectorAll(".team-card-btn[data-team]").forEach((b) => {
   b.onclick = () => {
-    if (b.disabled) return;
+    if (b.disabled || b.classList.contains("full")) return;
     selectTeam(b.dataset.team);
     sound.sfx("open");
+    setTimeout(() => showWizardStep("unit"), 180);
   };
 });
 selectTeam(S.team);
@@ -201,7 +191,7 @@ function updateTeamCounts(counts) {
   for (const team of ["A", "B", "C", "D"]) {
     const cnt = counts[team] ?? 0;
     const el = $(`#cnt-${team}`);
-    const btn = document.querySelector(`.team-opt[data-team="${team}"]`);
+    const btn = document.querySelector(`.team-card-btn[data-team="${team}"]`);
     if (el) el.textContent = `(${cnt}/${max}명${cnt >= max ? " · 마감" : ""})`;
     if (btn) {
       const full = cnt >= max;
@@ -215,43 +205,92 @@ function updateTeamCounts(counts) {
   }
 }
 
-// 수업 채널 선택(1~7): URL의 ?ch=가 있으면 그 채널로 정해지고 선택기는 감춘다.
-document.querySelectorAll(".ch-opt[data-ch]").forEach((b) => {
-  b.classList.toggle("on", b.dataset.ch === S.ch);
-  b.onclick = () => {
-    S.ch = b.dataset.ch;
-    store("vr-ch", S.ch);
-    document.querySelectorAll(".ch-opt[data-ch]").forEach((o) => o.classList.toggle("on", o === b));
-    sound.sfx("open");
-  };
-});
-if (CH) $("#channel-pick").hidden = true;
-
-// 2022 개정 기하 3단원 벡터(3-1, 3-2, 3-3) 선택 동기화
+// 3단계 단원 카드 클릭 시 선택 & 4단계(난이도·이름)로 자동 진행
 S.unit = load("vr-unit") || "3-1";
 function selectUnit(u) {
   S.unit = u;
   store("vr-unit", u);
-  document.querySelectorAll(".unit-opt[data-unit], .unit-btn[data-unit]").forEach((b) => {
+  document.querySelectorAll(".wizard-item[data-unit], .unit-btn[data-unit]").forEach((b) => {
     b.classList.toggle("on", b.dataset.unit === u);
   });
 }
-document.querySelectorAll(".unit-opt[data-unit], .unit-btn[data-unit]").forEach((b) => {
-  b.onclick = () => { selectUnit(b.dataset.unit); sound.sfx("open"); };
+document.querySelectorAll(".wizard-item[data-unit], .unit-btn[data-unit]").forEach((b) => {
+  b.onclick = () => {
+    selectUnit(b.dataset.unit);
+    sound.sfx("open");
+    setTimeout(() => showWizardStep("launch"), 180);
+  };
 });
 selectUnit(S.unit);
 
-// 탐험 난이도 선택(low: 초심자용, mid: 기본형, high: 심화 수능형)
+// 4단계 난이도 버튼 클릭
 S.diff = load("vr-diff") || "mid";
-document.querySelectorAll(".diff-opt[data-diff]").forEach((b) => {
+document.querySelectorAll(".diff-btn[data-diff]").forEach((b) => {
   b.classList.toggle("on", b.dataset.diff === S.diff);
   b.onclick = () => {
     S.diff = b.dataset.diff;
     store("vr-diff", S.diff);
-    document.querySelectorAll(".diff-opt[data-diff]").forEach((o) => o.classList.toggle("on", o === b));
+    document.querySelectorAll(".diff-btn[data-diff]").forEach((o) => o.classList.toggle("on", o === b));
     sound.sfx("open");
   };
 });
+
+// 4단계 폼 제출
+const session = store("vr-session");
+$("#join-name").value = session?.name ?? "";
+$("#step-launch").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = $("#join-name").value.trim();
+  if (!name) return showJoinError("이름을 입력해 주세요.");
+  sound.start();
+  join(name, S.pendingMode === "practice" ? "practice" : "class");
+});
+
+// 설정 창 탭 (📖 설명서 vs ⚙️ 옵션)
+document.querySelectorAll(".s-tab[data-stab]").forEach((b) => {
+  b.onclick = () => {
+    const tab = b.dataset.stab;
+    document.querySelectorAll(".s-tab[data-stab]").forEach((o) => o.classList.toggle("on", o === b));
+    $("#tab-manual").hidden = tab !== "manual";
+    $("#tab-options").hidden = tab !== "options";
+    sound.sfx("open");
+    if (tab === "manual") showSlide(curSlide);
+  };
+});
+
+// 게임 설명서 캐러셀 슬라이더: 다다다닥 타자 소리 & 타이핑 모션
+let curSlide = 1;
+const TOTAL_SLIDES = 4;
+function showSlide(idx) {
+  curSlide = Math.max(1, Math.min(TOTAL_SLIDES, idx));
+  document.querySelectorAll(".carousel-slide").forEach((s) => {
+    const isCur = Number(s.dataset.slide) === curSlide;
+    s.classList.toggle("on", isCur);
+    if (isCur) {
+      const title = s.querySelector(".slide-title");
+      const desc = s.querySelector(".slide-desc");
+      if (title) {
+        title._raw ??= title.textContent;
+        typewriteText(title, title._raw, 32);
+      }
+      if (desc) {
+        desc._raw ??= desc.textContent;
+        setTimeout(() => typewriteText(desc, desc._raw, 20), 160);
+      }
+    }
+  });
+  document.querySelectorAll(".car-dots .dot").forEach((d) => {
+    d.classList.toggle("on", Number(d.dataset.idx) === curSlide);
+  });
+}
+$("#car-prev").onclick = () => showSlide(curSlide - 1);
+$("#car-next").onclick = () => showSlide(curSlide + 1);
+document.querySelectorAll(".car-dots .dot").forEach((d) => {
+  d.onclick = () => showSlide(Number(d.dataset.idx));
+});
+
+$("#open-settings").onclick = () => { sound.sfx("open"); showScreen("settings"); showSlide(1); };
+$("#settings-close").onclick = () => showScreen("menu");
 
 function renderVisitorStats(data) {
   if (!data) return;
@@ -292,15 +331,6 @@ onSettings(() => {
   });
 });
 
-const session = store("vr-session");
-$("#join-name").value = session?.name ?? "";
-$("#step-3").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const name = $("#join-name").value.trim();
-  if (!name) return showJoinError("이름을 입력해 주세요.");
-  sound.start();
-  join(name, S.pendingMode === "practice" ? "practice" : "class");
-});
 // 새로고침 뒤 자동으로 다시 들어온 경우처럼 버튼을 누르지 않았을 때는 첫 조작에서 소리를 켠다.
 for (const ev of ["pointerdown", "keydown"]) window.addEventListener(ev, () => sound.start(), { once: true });
 

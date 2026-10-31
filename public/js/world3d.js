@@ -401,7 +401,7 @@ export class World3D {
     this.scene.add(group);
     loadCharacter(n).then((gltf) => {
       if (this.avatars.get(key) !== av) return; // 그새 나갔으면 버린다
-      const { model, mixer, action } = makeCharacter(gltf, { outline: this.quality !== "low" });
+      const { model, mixer, action } = makeCharacter(gltf, { outline: this.quality !== "low", n });
       model.scale.setScalar(1.45);
       group.add(model);
       Object.assign(av, { model, mixer, actions: { idle: action("idle"), walk: action("walk"), yes: action("emote-yes"), jump: action("jump") } });

@@ -25,8 +25,6 @@ watchMath();
 const remember = (pw) => {
   try {
     pw === null ? sessionStorage.removeItem("vr-teacher") : sessionStorage.setItem("vr-teacher", pw);
-    const apw = $("#admin-pw-display");
-    if (apw) apw.textContent = pw || "1234";
   } catch {}
 };
 const remembered = (() => { try { return sessionStorage.getItem("vr-teacher"); } catch { return null; } })();
