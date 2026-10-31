@@ -227,6 +227,7 @@ function onChannelMessage(ch, msg) {
       isMaster = true;
       $("#admin-panel").hidden = false;
       conns[ch]?.send({ type: "adminGet" });
+      conns[ch]?.send({ type: "setListGet" });
     }
     if (!msg.master && msg.period) $(".admin-banner").dataset.period = `📅 ${ch}채널 사용 기간: ${msg.period}`;
     // 채널마다 단원(문항 세트)이 다를 수 있어서 채널별로 기억해 두고, 보고 있는 채널의 세트를 쓴다
@@ -259,6 +260,10 @@ function onChannelMessage(ch, msg) {
       buildAnswerSheet();
       fillSetSelect(null, msg.set.id);
     }
+  } else if (msg.type === "uploadResult") {
+    onUploadResult(msg);
+  } else if (msg.type === "setExample") {
+    download("문항세트_형식예시_geo-3-1.md", msg.md, "text/markdown");
   } else if (msg.type === "admin") {
     renderAdmin(msg);
   } else if (msg.type === "adminResult") {
@@ -646,17 +651,19 @@ function renderAdmin(msg) {
 }
 
 // ---------- 이 채널의 단원(문항 세트) ----------
-const SET_NAME = { "geo-3-1": "3-1 벡터의 연산", "geo-3-2": "3-2 벡터의 성분과 내적", "geo-3-3": "3-3 도형의 방정식" };
+// 목록은 서버가 보내 준다: 기본 세트 + 전체 관리자가 올린 세트 [{ id, title, uploaded }]
 let setList = [];
+const setTitle = (id) => setList.find((x) => x.id === id)?.title ?? id;
 function fillSetSelect(list, current) {
   if (list) setList = list;
   const sel = $("#set-select");
   if (!sel) return;
-  sel.replaceChildren(...setList.map((id) => {
+  current ??= sel.dataset.current;
+  sel.replaceChildren(...setList.map((x) => {
     const o = document.createElement("option");
-    o.value = id;
-    o.textContent = SET_NAME[id] ?? id;
-    o.selected = id === current;
+    o.value = x.id;
+    o.textContent = `${x.uploaded ? "📤 " : ""}${x.title}`;
+    o.selected = x.id === current;
     return o;
   }));
   sel.dataset.current = current ?? sel.dataset.current ?? "";
@@ -665,9 +672,58 @@ $("#set-select")?.addEventListener("change", (e) => {
   const id = e.target.value, cur = e.target.dataset.current;
   if (id === cur) return;
   const n = last?.students?.length ?? 0;
-  if (!confirm(`${activeCh}채널의 단원을 '${SET_NAME[id] ?? id}'(으)로 바꿀까요?\n학생 ${n}명의 기록이 지워지고 새 수업으로 시작해요. 먼저 CSV를 내려받아 두세요.`)) {
+  if (!confirm(`${activeCh}채널의 단원을 '${setTitle(id)}'(으)로 바꿀까요?\n학생 ${n}명의 기록이 지워지고 새 수업으로 시작해요. 먼저 CSV를 내려받아 두세요.`)) {
     e.target.value = cur;
     return;
   }
   net?.send({ type: "setSet", setId: id });
 });
+
+// ---------- 전체 관리자: 문항 세트(md) 올리기 ----------
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function sendSetFile(check) {
+  const f = $("#set-file").files?.[0];
+  const box = $("#upload-result");
+  if (!f) { box.className = "upload-result bad"; box.textContent = "먼저 md 파일을 골라 주세요."; return; }
+  if (f.size > 200_000) { box.className = "upload-result bad"; box.textContent = "파일이 너무 커요 (200KB 이하)."; return; }
+  box.className = "upload-result"; box.textContent = "검사하는 중…";
+  net?.send({ type: "uploadSet", md: await f.text(), check });
+}
+$("#set-check").onclick = () => sendSetFile(true);
+$("#set-upload").onclick = () => sendSetFile(false);
+$("#set-example").onclick = () => net?.send({ type: "setExample" });
+
+function onUploadResult(msg) {
+  const box = $("#upload-result");
+  const sum = msg.summary ? `「${msg.summary.title}」 상자 ${msg.summary.boxes}개 · 문항 ${msg.summary.items}개 · 핵심 카드 ${msg.summary.cards}장 · 협업 상자 ${msg.summary.coop}개` : "";
+  if (!msg.ok) {
+    box.className = "upload-result bad";
+    box.innerHTML = `<b>⚠️ 고칠 곳이 있어요.</b>${sum ? `<br>${sum}` : ""}<ul>${msg.errors.map((e) => `<li>${e.replace(/[<>&]/g, "")}</li>`).join("")}</ul>`;
+  } else if (msg.checked) {
+    box.className = "upload-result ok"; box.textContent = `✅ 형식과 정답이 모두 괜찮아요. ${sum} — '검사 후 저장'을 누르면 저장돼요.`;
+  } else if (msg.saved) {
+    box.className = "upload-result ok"; box.textContent = `✅ 저장했어요 (세트 이름: ${msg.id}). ${sum} — 채널마다 "이 채널 단원"에서 고르세요.`;
+  } else if (msg.deleted) {
+    box.className = "upload-result ok"; box.textContent = `🗑️ '${msg.deleted}' 세트를 지웠어요.`;
+  }
+  if (msg.sets) {
+    fillSetSelect(msg.sets);
+    const ul = $("#uploaded-sets");
+    ul.replaceChildren(...msg.sets.filter((x) => x.uploaded).map((x) => {
+      const li = document.createElement("li");
+      li.textContent = `📤 ${x.title} (${x.id}) · ${x.at ? new Date(x.at).toLocaleString("ko-KR") : ""} `;
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "btn danger"; del.textContent = "지우기";
+      del.onclick = () => { if (confirm(`'${x.title}' 세트를 지울까요? 이 세트를 쓰는 채널은 '새 수업 시작' 때 기본 세트로 돌아가요.`)) net?.send({ type: "deleteSet", id: x.id }); };
+      li.appendChild(del);
+      return li;
+    }));
+    if (!ul.children.length) ul.innerHTML = "<li class='muted'>아직 올린 세트가 없어요.</li>";
+  }
+}

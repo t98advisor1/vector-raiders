@@ -11,6 +11,8 @@ export const UNIT_SET = { "3-1": "geo-3-1", "3-2": "geo-3-2", "3-3": "geo-3-3" }
 export const SET_LIST = Object.keys(RAW);
 export const DEFAULT_SET = "geo-3-1";
 
+export const builtinRaw = (id) => RAW[id] ?? null; // 업로드 형식 예시로 내려 줄 원본 md
+
 export function builtinSet(id) {
   if (!RAW[id]) return null;
   if (!cache.has(id)) cache.set(id, { id, ...parseSet(RAW[id]) });
