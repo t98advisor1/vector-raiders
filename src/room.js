@@ -3,7 +3,8 @@
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
 import { gradeLevel, answerText } from "./answers.js";
-import { builtinSet, UNIT_SET, DEFAULT_SET, SET_LIST } from "./sets.js";
+import { builtinSet, builtinRaw, UNIT_SET, DEFAULT_SET, SET_LIST } from "./sets.js";
+import { parseSet, validateSet } from "./setfile.js";
 import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, cleanDate, todayKst, parseChannelPasswords } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
 
@@ -42,6 +43,7 @@ const problemName = (pid) => `상자 ${pid.slice(1)}`;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // 마지막 활동 뒤 24시간이 지나면 수업 기록을 지운다
 const TTL_REFRESH_MS = 60 * 60 * 1000; // 삭제 예약은 한 시간에 한 번만 뒤로 미룬다
 const MAX_MESSAGE = 2048;
+const MAX_UPLOAD_MESSAGE = 220_000; // 전체 관리자가 md 세트를 올릴 때만 (세트 파일은 200KB 이하)
 const ADMIN_ROOM = "admin:global"; // 전체 관리자가 바꾼 중간관리자(채널) 설정을 보관하는 Durable Object
 const CHANNEL_IDS = ["1", "2", "3", "4", "5", "6", "7"];
 const PERIOD_TEXT = { notyet: "아직 사용 기간이 시작되지 않았어요", expired: "사용 기간이 끝났어요" };
@@ -123,6 +125,24 @@ export class Room extends DurableObject {
     const url = new URL(request.url);
     // 중간관리자 설정 보관함(admin:global) 전용. worker.js는 /ws와 /api/stats만 넘기므로 밖에서는 부를 수 없다.
     if (url.pathname === "/admin/get") return Response.json((await this.ctx.storage.get("channels")) ?? {});
+    // 올린 문항 세트: 목록(setIndex)과 세트마다 원본 md(set:아이디)
+    if (url.pathname === "/admin/sets") return Response.json((await this.ctx.storage.get("setIndex")) ?? []);
+    if (url.pathname === "/admin/setmd") return Response.json({ md: (await this.ctx.storage.get(`set:${url.searchParams.get("id")}`)) ?? null });
+    if (url.pathname === "/admin/setput" && request.method === "POST") {
+      const { id, md, info } = await request.json();
+      const index = ((await this.ctx.storage.get("setIndex")) ?? []).filter((x) => x.id !== id);
+      index.push({ id, ...info });
+      await this.ctx.storage.put(`set:${id}`, md);
+      await this.ctx.storage.put("setIndex", index);
+      return Response.json(index);
+    }
+    if (url.pathname === "/admin/setdel" && request.method === "POST") {
+      const { id } = await request.json();
+      const index = ((await this.ctx.storage.get("setIndex")) ?? []).filter((x) => x.id !== id);
+      await this.ctx.storage.delete(`set:${id}`);
+      await this.ctx.storage.put("setIndex", index);
+      return Response.json(index);
+    }
     if (url.pathname === "/admin/set" && request.method === "POST") {
       const { ch, cfg } = await request.json();
       const all = (await this.ctx.storage.get("channels")) ?? {};
@@ -150,7 +170,29 @@ export class Room extends DurableObject {
 
   // ---------- 문항 세트 ----------
   // 이 유적이 쓰는 세트. 수업 채널은 기본 세트, 연습은 학생이 고른 단원의 세트.
-  set() { return builtinSet(this.data?.setId) ?? builtinSet(DEFAULT_SET); }
+  set() {
+    const id = this.data?.setId;
+    if (this.uploaded?.id === id) return this.uploaded;
+    return builtinSet(id) ?? builtinSet(DEFAULT_SET);
+  }
+
+  // 올린 세트를 쓰는 유적이면 처음 한 번 보관함에서 md를 받아 읽어 둔다
+  async ensureSet() {
+    const id = this.data?.setId;
+    if (!id || builtinSet(id) || this.uploaded?.id === id) return;
+    try {
+      const { md } = await (await this.adminStub().fetch(`https://admin/admin/setmd?id=${encodeURIComponent(id)}`)).json();
+      if (md) this.uploaded = { id, ...validateSet(md, gradeLevel).set };
+    } catch {}
+  }
+
+  // 고를 수 있는 세트 목록: 기본 세트 + 올린 세트 [{ id, title, uploaded }]
+  async setList() {
+    const base = SET_LIST.map((id) => ({ id, title: builtinSet(id)?.meta?.제목 ?? id, uploaded: false }));
+    let up = [];
+    try { up = await (await this.adminStub().fetch("https://admin/admin/sets")).json(); } catch {}
+    return [...base, ...up.map((x) => ({ id: x.id, title: x.title, uploaded: true, at: x.at }))];
+  }
   level(pid, diff) { return this.set().boxes[Number(pid.slice(1)) - 1]?.levels[diff] ?? null; }
 
   // 학생에게 보내는 세트: 정답을 빼고, 협업 문항의 조건 ㉠·㉡도 뺀다(짝이 되면 따로 보낸다).
@@ -269,7 +311,10 @@ export class Room extends DurableObject {
 
   async webSocketMessage(ws, raw) {
     this.data ??= freshData(this.mode); // 기록이 지워진 뒤 처음 들어오면 새 유적을 연다
-    if (typeof raw !== "string" || raw.length > MAX_MESSAGE) return;
+    if (typeof raw !== "string") return;
+    const isTeacher = ws.deserializeAttachment()?.role === "teacher";
+    if (raw.length > (isTeacher ? MAX_UPLOAD_MESSAGE : MAX_MESSAGE)) return;
+    await this.ensureSet();
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     const who = ws.deserializeAttachment() ?? { role: null };
@@ -376,7 +421,7 @@ export class Room extends DurableObject {
       }
       ws.serializeAttachment({ role: "teacher", master });
       this.data.setId ??= DEFAULT_SET;
-      this.send(ws, { type: "joined", role: "teacher", master, answers: this.answerTable(), set: this.teacherSet(), sets: SET_LIST, period: master ? null : periodLabel(cfg) });
+      this.send(ws, { type: "joined", role: "teacher", master, answers: this.answerTable(), set: this.teacherSet(), sets: await this.setList(), period: master ? null : periodLabel(cfg) });
       this.send(ws, this.dashboard());
       this.send(ws, this.classState());
       return;
@@ -464,6 +509,22 @@ export class Room extends DurableObject {
   // 전체 관리자 전용: 중간관리자(채널) 비밀번호·사용 기간 보기와 바꾸기
   async onAdmin(ws, msg) {
     if (!ws.deserializeAttachment()?.master) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
+    // ---------- 문항 세트 올리기·지우기·예시 ----------
+    if (msg.type === "setExample") return this.send(ws, { type: "setExample", md: builtinRaw(DEFAULT_SET) });
+    if (msg.type === "uploadSet") {
+      const r = validateSet(msg.md, gradeLevel);
+      if (r.ok && SET_LIST.includes(r.id)) r.errors.push(`'${r.id}'은(는) 기본 세트 이름이에요. 다른 이름을 써 주세요.`);
+      if (!r.ok || r.errors.length) return this.send(ws, { type: "uploadResult", ok: false, errors: r.errors, summary: r.summary ?? null });
+      if (msg.check) return this.send(ws, { type: "uploadResult", ok: true, checked: true, summary: r.summary, id: r.id });
+      await this.adminStub().fetch("https://admin/admin/setput", { method: "POST", body: JSON.stringify({ id: r.id, md: msg.md, info: { title: r.summary.title, at: Date.now() } }) });
+      this.log({ type: "관리자", name: "전체 관리자", detail: `문항 세트 올림: ${r.id}` });
+      return this.send(ws, { type: "uploadResult", ok: true, saved: true, summary: r.summary, id: r.id, sets: await this.setList() });
+    }
+    if (msg.type === "deleteSet" && typeof msg.id === "string" && !SET_LIST.includes(msg.id)) {
+      await this.adminStub().fetch("https://admin/admin/setdel", { method: "POST", body: JSON.stringify({ id: msg.id }) });
+      return this.send(ws, { type: "uploadResult", ok: true, deleted: msg.id, sets: await this.setList() });
+    }
+    if (msg.type === "setListGet") return this.send(ws, { type: "uploadResult", ok: true, sets: await this.setList() });
     if (msg.type === "adminSet") {
       const ch = String(msg.ch);
       if (!CHANNEL_IDS.includes(ch)) return;
@@ -503,7 +564,7 @@ export class Room extends DurableObject {
   }
 
   async onTeacher(ws, msg) {
-    if (msg.type === "adminGet" || msg.type === "adminSet") return this.onAdmin(ws, msg);
+    if (["adminGet", "adminSet", "uploadSet", "deleteSet", "setExample", "setListGet"].includes(msg.type)) return this.onAdmin(ws, msg);
     if (msg.type === "stage" && STAGES.includes(msg.stage)) {
       this.data.stage = msg.stage;
       await this.save();
@@ -529,13 +590,15 @@ export class Room extends DurableObject {
       this.log({ type: "강퇴", name: st.name });
       this.scheduleBroadcast();
     }
-    if (msg.type === "reset" || (msg.type === "setSet" && SET_LIST.includes(msg.setId))) {
+    if (msg.type === "setSet" && !(await this.setList()).some((x) => x.id === msg.setId)) return this.send(ws, { type: "error", message: "그런 문항 세트가 없어요." });
+    if (msg.type === "reset" || msg.type === "setSet") {
       // 새 수업: 이전 반의 학생과 기록을 지우고, 접속한 학생은 다시 들어오게 한다.
       // 단원(문항 세트)을 바꿀 때도 기록이 섞이지 않게 새 수업으로 시작한다.
       const setId = msg.type === "setSet" ? msg.setId : this.data.setId;
       this.data = freshData();
       this.data.setId = setId ?? DEFAULT_SET;
       this.coop = null;
+      await this.ensureSet();
       this.pos.clear();
       this.lastPos.clear();
       await this.save();

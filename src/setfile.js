@@ -91,3 +91,39 @@ export function parseVecExpr(src) {
   }
   return out;
 }
+
+// ---------- 올린 세트 검사 (전체 관리자 업로드용) ----------
+// 형식 오류에 더해, 정답을 그 정답 그대로 채점했을 때 맞게 나오는지까지 확인한다.
+// grade는 answers.js의 gradeLevel (순환 import를 피하려고 인자로 받는다).
+export const SET_ID_RE = /^[a-z0-9][a-z0-9-]{2,29}$/;
+const strip = (s) => String(s ?? "").replace(/[<>"'`]/g, "").trim();
+
+export function validateSet(md, grade) {
+  if (typeof md !== "string" || !md.trim()) return { ok: false, errors: ["파일이 비어 있어요."] };
+  if (md.length > 200_000) return { ok: false, errors: ["파일이 너무 커요 (200KB 이하)."] };
+  const set = parseSet(md);
+  const errors = [...set.errors];
+  const id = String(set.meta.세트 ?? "").trim().toLowerCase();
+  if (!SET_ID_RE.test(id)) errors.push("맨 위 '세트:' 이름은 영어 소문자·숫자·하이픈 3~30자로 써 주세요. 예: 세트: phys-1-2");
+  if (!set.meta.제목) errors.push("맨 위에 '제목:'을 적어 주세요.");
+  if (set.boxes.length !== 9) errors.push(`상자는 9개여야 해요 (지금 ${set.boxes.length}개).`);
+  for (const b of set.boxes) {
+    if (!b.room || b.room < 1 || b.room > 4) errors.push(`상자 ${b.no}: 방은 1~4로 적어 주세요.`);
+    for (const [k, lv] of Object.entries(b.levels)) {
+      const name = { low: "하", mid: "중", high: "상" }[k];
+      if (!lv.kind || !lv.answer) continue; // 위에서 이미 알렸다
+      const input = lv.kind === "set" ? lv.answer.split(",").map((x) => x.trim()) : lv.kind === "choice" ? (lv.answer.match(/\d/)?.[0] ?? lv.answer) : lv.answer;
+      if (grade && grade(lv, input)?.ok !== true) errors.push(`상자 ${b.no} ${name}: 정답 '${lv.answer}'을(를) 채점기가 읽지 못해요. 숫자는 2√5, 1/2, π/2처럼, 벡터식은 -a+2b처럼 써 주세요.`);
+      if (lv.kind === "choice" && lv.options.length !== 5) errors.push(`상자 ${b.no} ${name}: 오지선다는 보기가 5개여야 해요.`);
+    }
+  }
+  if (!set.cards.length) errors.push("핵심 카드가 하나도 없어요. '# 핵심 카드 · 제목'으로 적어 주세요.");
+  // 제목·개념·그림 칸은 화면에 그대로 들어가므로 HTML 글자를 지운다 (본문·풀이는 화면에서 따로 막는다)
+  for (const b of set.boxes) { b.title = strip(b.title); b.concept = strip(b.concept); b.tool = strip(b.tool); }
+  for (const c of set.cards) c.title = strip(c.title);
+  for (const k of Object.keys(set.meta)) set.meta[k] = strip(set.meta[k]);
+  return {
+    ok: errors.length === 0, errors: errors.slice(0, 30), id, set,
+    summary: { title: set.meta.제목 ?? "", boxes: set.boxes.length, items: set.boxes.length * 3, cards: set.cards.length, coop: set.boxes.filter((b) => b.coop).length },
+  };
+}
