@@ -450,7 +450,7 @@ export class Room extends DurableObject {
       if (p.tries >= MAX_TRIES) return this.send(ws, { type: "error", message: "도전 횟수를 다 썼어요. 선생님께 도움을 요청하세요." });
       // 상자를 열 때 고른 난이도(상 150 / 중 100 / 하 70). 고르지 않으면 기본 100점.
       if (DIFF_POINTS[msg.diff]) p.diff = msg.diff;
-      const result = checkAnswer(msg.pid, msg.answer);
+      const result = checkAnswer(msg.pid, msg.answer, p.diff ?? msg.diff ?? "mid");
       if (!result) return this.send(ws, { type: "result", pid: msg.pid, invalid: true, tries: p.tries });
       p.tries += 1;
       if (result.ok) {
@@ -458,6 +458,28 @@ export class Room extends DurableObject {
         p.firstTry = p.tries === 1 && !p.hinted;
         p.solvedAt = st.lastAt = Date.now();
         if (Object.values(st.probs).filter((x) => x.solved).length === PROBLEM_IDS.length) st.escapedAt = p.solvedAt;
+
+        // 2인 협동 레이드: 근처에 함께 있던 같은 팀원에게도 동시 해결 인정
+        if (p.diff === "high" && (msg.pid === "p2" || msg.pid === "p4")) {
+          const myPos = this.pos.get(cid);
+          if (myPos && st.team) {
+            for (const [otherCid, otherSt] of Object.entries(this.data.students)) {
+              if (otherCid === cid || otherSt.team !== st.team) continue;
+              const oPos = this.pos.get(otherCid);
+              if (oPos && Math.hypot(oPos.x - myPos.x, oPos.y - myPos.y) < 4.0) {
+                const op = (otherSt.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
+                if (!op.solved) {
+                  op.solved = true;
+                  op.diff = "high";
+                  op.firstTry = true;
+                  op.solvedAt = otherSt.lastAt = Date.now();
+                  this.log({ type: "2인 협동 정답", name: `${st.name} & ${otherSt.name}`, problem: problemName(msg.pid), detail: "팀 협동 완수" });
+                }
+              }
+            }
+          }
+        }
+
         this.updateUnlocks();
       } else if (p.wrongs.length < 10) {
         p.wrongs.push(result.display);

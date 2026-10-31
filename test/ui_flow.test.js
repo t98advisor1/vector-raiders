@@ -36,9 +36,10 @@ test("채널 선택 및 팀 선택 분리 버튼 7개 및 4개 팀 구성 검증
     assert.equal(html.includes(`data-unit="${unit}"`), true, `${unit} 단원 버튼 존재`);
   }
 
-  // 3개 난이도
+  // 문제 창 3개 난이도 토글 버튼 (입장 단계 대신 문제 모달에서 직접 선택)
+  const studentJs = fs.readFileSync("public/js/student.js", "utf8");
   for (const diff of ["low", "mid", "high"]) {
-    assert.equal(html.includes(`data-diff="${diff}"`), true, `${diff} 난이도 버튼 존재`);
+    assert.equal(studentJs.includes(`data-pdiff="${diff}"`), true, `${diff} 난이도 문제 선택 버튼 존재`);
   }
 
   // 캐러셀 설명서 슬라이드 4개

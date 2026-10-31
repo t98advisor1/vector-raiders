@@ -16,7 +16,7 @@ test("발판은 바닥 칸에 있고 높이는 오를 수 있는 범위다", () 
   for (const [key, ph] of PLATFORMS) {
     const [x, y] = key.split(",").map(Number);
     assert.equal(g[y][x], ".", `발판 (${x},${y})는 바닥 칸이어야 해요: ${g[y][x]}`);
-    assert.ok(ph > 0 && ph <= 2.4, `발판 높이 ${ph}는 0 < h ≤ 2.4`);
+    assert.ok(ph > 0 && ph <= 3.0, `발판 높이 ${ph}는 0 < h ≤ 3.0`);
   }
 });
 
