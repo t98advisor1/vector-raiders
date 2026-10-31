@@ -143,6 +143,10 @@ function showWizardStep(step) {
   $("#step-team").hidden = step !== "team";
   $("#step-unit").hidden = step !== "unit";
   $("#step-launch").hidden = step !== "launch";
+  // 단계 표시: 수업 참가는 채널→팀→유적→이름 4단계, 연습 모드는 유적→이름 2단계
+  const steps = S.pendingMode === "practice" ? ["unit", "launch"] : ["ch", "team", "unit", "launch"];
+  const badge = $(`#step-${step}`)?.querySelector(".step-badge");
+  if (badge && steps.includes(step)) badge.textContent = `${steps.indexOf(step) + 1}단계 / ${steps.length}`;
   sound.sfx("open");
   if (step === "launch") $("#join-name").focus();
 
@@ -225,23 +229,15 @@ function updateTeamCounts(counts) {
   }
 }
 
-// 3단계 단원 선택: 시작 화면 상단 버튼은 단원만 변경하고, 팝업 안의 카드는 다음 단계로 자동 진행
+// 단원(스테이지) 선택: 연습 모드·수업 참가에 들어간 뒤 카드로 고르고, 고르면 다음 단계로 자동 진행
 S.unit = store("vr-unit") || "3-1";
 function selectUnit(u) {
   S.unit = u;
   store("vr-unit", u);
-  document.querySelectorAll(".wizard-item[data-unit], .unit-btn[data-unit]").forEach((b) => {
+  document.querySelectorAll(".wizard-item[data-unit]").forEach((b) => {
     b.classList.toggle("on", b.dataset.unit === u);
   });
 }
-
-document.querySelectorAll(".unit-btn[data-unit]").forEach((b) => {
-  b.onclick = (e) => {
-    e.stopPropagation();
-    selectUnit(b.dataset.unit);
-    sound.sfx("open");
-  };
-});
 
 document.querySelectorAll(".wizard-item[data-unit]").forEach((b) => {
   b.onclick = () => {

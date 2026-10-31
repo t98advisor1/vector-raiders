@@ -438,14 +438,6 @@ body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #
   background: #fff; border-radius: 999px; cursor: pointer; transition: all 0.15s ease; }
 .team-opt.on, .unit-opt.on, .diff-opt.on { border-color: var(--teal); background: var(--teal-soft); color: #0f766e; }
 
-/* 2022 개정 기하 3단원 상단 선택 바 */
-.unit-bar-top { margin-bottom: 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.unit-tag { font-size: 0.82rem; font-weight: 800; color: #5eead4; text-shadow: 0 0 8px rgba(94, 234, 212, 0.6); }
-.unit-buttons { display: flex; gap: 6px; background: rgba(17, 24, 39, 0.85); padding: 4px 6px; border-radius: 999px;
-  border: 1px solid rgba(94, 234, 212, 0.35); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); flex-wrap: wrap; justify-content: center; }
-.unit-btn { font: inherit; font-size: 0.88rem; font-weight: 700; padding: 6px 14px; border: 0; background: transparent; color: #94a3b8; border-radius: 999px; cursor: pointer; transition: all 0.2s ease; }
-.unit-btn.on { background: var(--teal); color: #fff; box-shadow: 0 0 12px rgba(45, 212, 191, 0.5); }
-
 /* 수업 참가 모드 강조 및 타이핑 모션 */
 .class-hero { border: 2px solid #5eead4 !important; box-shadow: 0 0 20px rgba(94, 234, 212, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4) !important; transform: scale(1.02); }
 .class-hero-title { font-size: 1.4rem !important; color: #5eead4 !important; display: block; text-shadow: 0 0 10px rgba(94, 234, 212, 0.5); margin-bottom: 3px; }
@@ -912,3 +904,47 @@ body.touch-device .chat-toggle { left: 50%; bottom: 12px; transform: translateX(
 .game .touch-btn-round, .game .dpad-btn { background: radial-gradient(circle at 50% 35%, rgba(60, 50, 90, 0.9), rgba(14, 10, 26, 0.92)) !important;
   border: 2px solid rgba(255, 201, 77, 0.55) !important; color: #fff !important; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important; }
 .game .touch-btn-round:active, .game .dpad-btn:active { transform: scale(0.92); border-color: var(--cyan) !important; }
+
+/* ===================== 첫 화면: 게임 타이틀 ===================== */
+.splash .title-tag { background: linear-gradient(180deg, #ff6b6b, #e11d48); color: #fff; box-shadow: 0 4px 0 #881337, 0 0 18px rgba(244, 63, 94, 0.55);
+  letter-spacing: 0.02em; }
+.tagline { margin: 14px 0 0; font-family: "BMJUA", "Black Han Sans", sans-serif; font-size: clamp(17px, 2.3vw, 26px); color: #fff;
+  text-shadow: 0 2px 0 #1e1b4b, 0 0 14px rgba(0, 0, 0, 0.8); }
+.tagline b { color: #ffd166; font-weight: 400; }
+.feature-chips { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.feature-chips li { background: rgba(10, 8, 20, 0.72); border: 1px solid rgba(255, 201, 77, 0.45); color: #ffe7a3; border-radius: 4px 12px 4px 12px;
+  padding: 4px 12px; font-size: clamp(13px, 1.5vw, 16px); font-weight: 700; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: chipIn 0.5s backwards; }
+.feature-chips li:nth-child(2) { animation-delay: 0.08s; }
+.feature-chips li:nth-child(3) { animation-delay: 0.16s; }
+.feature-chips li:nth-child(4) { animation-delay: 0.24s; }
+@keyframes chipIn { from { opacity: 0; transform: translateY(10px); } }
+.credit { background: rgba(10, 8, 20, 0.6); }
+
+/* ===================== 유적(단원) 선택: 스테이지 카드 ===================== */
+.stage-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stage-card { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 0 10px; text-align: center; overflow: hidden;
+  border: 3px solid #2d2a40; border-radius: 18px; background: #fff; font: inherit; box-shadow: 0 6px 0 #2d2a40;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
+.stage-card:hover, .stage-card:focus-visible { transform: translateY(-4px); background: #fff; }
+.stage-card.on { border-color: #f59e0b; background: #fff8e6; box-shadow: 0 6px 0 #b45309, 0 0 20px rgba(245, 158, 11, 0.55); transform: translateY(-4px); }
+.stage-art { position: relative; width: 100%; aspect-ratio: 4 / 3; display: grid; place-items: center; margin-bottom: 4px;
+  clip-path: polygon(0 0, 100% 0, 100% 86%, 0 100%); }
+.stage-card.s1 .stage-art { background: linear-gradient(160deg, #0ea5e9, #14b8a6); }
+.stage-card.s2 .stage-art { background: linear-gradient(160deg, #7c3aed, #2563eb); }
+.stage-card.s3 .stage-art { background: linear-gradient(160deg, #f97316, #b91c1c); }
+.stage-icon { font-size: clamp(34px, 7vw, 48px); filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.25)); transition: transform 0.2s; }
+.stage-card:hover .stage-icon, .stage-card.on .stage-icon { transform: scale(1.15) rotate(-6deg); }
+.stage-no { position: absolute; top: 6px; left: 6px; background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 0.66rem; font-weight: 800;
+  letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px; }
+.stage-card .item-title { font-family: "BMJUA", "Black Han Sans", sans-serif; font-weight: 400; font-size: 1.12rem; margin: 0; color: #1e1b4b; }
+.stage-card.on .item-title { color: #b45309; }
+.stage-card .item-desc { font-size: 0.72rem; }
+.stage-card .stars { color: #f59e0b; font-size: 0.95rem; letter-spacing: 1px; }
+.stage-card .stars i { color: #d6d3e0; font-style: normal; }
+@media (max-width: 420px) {
+  .stage-list { grid-template-columns: 1fr; }
+  .stage-card { display: grid; grid-template-columns: 84px 1fr; align-items: center; justify-items: start; column-gap: 12px; row-gap: 0; padding: 0; text-align: left; }
+  .stage-art { grid-row: 1 / span 3; width: 84px; height: 100%; min-height: 76px; aspect-ratio: auto; margin: 0; clip-path: none; }
+  .stage-no { font-size: 0.55rem; padding: 0 5px; }
+}
