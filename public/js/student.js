@@ -1,4 +1,5 @@
 import { connect, store } from "./net.js";
+const load = store;
 import { fmt, watchMath } from "./mathtext.js";
 import { LAB_LEVELS } from "./lab.js";
 import { PROBLEMS, DIFFICULTY } from "./problems.js";
@@ -169,7 +170,7 @@ document.querySelectorAll(".ch-card-btn[data-ch]").forEach((b) => {
 });
 
 // 2단계 팀 카드 클릭 시 선택 & 3단계(단원 선택)로 자동 진행
-S.team = load("vr-team") || "A";
+S.team = store("vr-team") || "A";
 function selectTeam(team) {
   S.team = team;
   store("vr-team", team);
@@ -205,8 +206,8 @@ function updateTeamCounts(counts) {
   }
 }
 
-// 3단계 단원 카드 클릭 시 선택 & 4단계(난이도·이름)로 자동 진행
-S.unit = load("vr-unit") || "3-1";
+// 3단계 단원 선택: 시작 화면 상단 버튼은 단원만 변경하고, 팝업 안의 카드는 다음 단계로 자동 진행
+S.unit = store("vr-unit") || "3-1";
 function selectUnit(u) {
   S.unit = u;
   store("vr-unit", u);
@@ -214,7 +215,16 @@ function selectUnit(u) {
     b.classList.toggle("on", b.dataset.unit === u);
   });
 }
-document.querySelectorAll(".wizard-item[data-unit], .unit-btn[data-unit]").forEach((b) => {
+
+document.querySelectorAll(".unit-btn[data-unit]").forEach((b) => {
+  b.onclick = (e) => {
+    e.stopPropagation();
+    selectUnit(b.dataset.unit);
+    sound.sfx("open");
+  };
+});
+
+document.querySelectorAll(".wizard-item[data-unit]").forEach((b) => {
   b.onclick = () => {
     selectUnit(b.dataset.unit);
     sound.sfx("open");
@@ -224,7 +234,7 @@ document.querySelectorAll(".wizard-item[data-unit], .unit-btn[data-unit]").forEa
 selectUnit(S.unit);
 
 // 4단계 난이도 버튼 클릭
-S.diff = load("vr-diff") || "mid";
+S.diff = store("vr-diff") || "mid";
 document.querySelectorAll(".diff-btn[data-diff]").forEach((b) => {
   b.classList.toggle("on", b.dataset.diff === S.diff);
   b.onclick = () => {
@@ -243,7 +253,8 @@ $("#step-launch").addEventListener("submit", (e) => {
   const name = $("#join-name").value.trim();
   if (!name) return showJoinError("이름을 입력해 주세요.");
   sound.start();
-  join(name, S.pendingMode === "practice" ? "practice" : "class");
+  const mode = S.pendingMode === "practice" ? "practice" : "class";
+  join(name, mode);
 });
 
 // 설정 창 탭 (📖 설명서 vs ⚙️ 옵션)
