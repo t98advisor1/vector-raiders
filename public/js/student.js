@@ -20,6 +20,7 @@ const CLOSE_REASON = {
   4002: "유적 인원이 가득 찼어요. 선생님께 알려 주세요.",
   4005: "다른 창에서 같은 이름으로 들어와서 이 창의 연결을 끊었어요.",
   4006: "선생님이 새 수업을 시작했어요. 이름을 확인하고 다시 들어와 주세요.",
+  4007: "선생님이 수업에서 내보냈어요. 선생님께 문의해 주세요.",
 };
 
 let cid = store("vr-cid");
@@ -28,7 +29,7 @@ if (typeof cid !== "string" || !/^[a-z0-9]{8,32}$/.test(cid)) {
   store("vr-cid", cid);
 }
 
-const S = { net: null, name: null, me: null, cls: null, game: null, world: null, modal: null, waiting: false };
+const S = { net: null, name: null, me: null, cls: null, game: null, world: null, modal: null, waiting: false, team: "" };
 if (["127.0.0.1", "localhost"].includes(location.hostname)) window.__vr = S; // 이 컴퓨터에서 개발할 때만 점검용으로 연다
 
 const solved = (pid) => !!S.me?.probs[pid]?.solved;
@@ -90,6 +91,15 @@ $("#sheet-back").onclick = () => showScreen("menu");
 $("#open-settings").onclick = () => { sound.sfx("open"); showScreen("settings"); };
 $("#settings-close").onclick = () => showScreen("menu");
 
+// 팀 선택: 기본은 자동 배정(""). 고르면 입장할 때 서버에 함께 보낸다.
+document.querySelectorAll(".team-opt[data-team]").forEach((b) => {
+  b.onclick = () => {
+    S.team = b.dataset.team;
+    document.querySelectorAll(".team-opt[data-team]").forEach((o) => o.classList.toggle("on", o === b));
+    sound.sfx("open");
+  };
+});
+
 const SETTING_TEXT = { music: ["켜짐", "꺼짐"], sfx: ["켜짐", "꺼짐"], quality: ["높음", "낮음"] };
 document.querySelectorAll(".toggle[data-key]").forEach((b) => {
   b.onclick = () => {
@@ -128,7 +138,7 @@ function join(name, mode) {
   S.mode = mode;
   showJoinError("");
   const query = mode === "practice" ? `?mode=practice&cid=${cid}` : "";
-  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name }), onMessage, onStatus, query);
+  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, team: S.team || undefined }), onMessage, onStatus, query);
 }
 
 // 연습 모드 '처음부터 다시' 뒤에는 새로고침하고 자동으로 다시 들어온다.
@@ -192,6 +202,10 @@ function onMessage(msg) {
     updateHud();
   } else if (msg.type === "pos") {
     S.game?.setOthers(msg.list);
+  } else if (msg.type === "chat") {
+    addChat(msg);
+  } else if (msg.type === "kicked") {
+    alert(msg.reason ?? "선생님에 의해 퇴장되었어요.");
   } else if (msg.type === "result") {
     onResult(msg);
   } else if (msg.type === "started") {
@@ -245,6 +259,88 @@ function toast(text, kind = "") {
   setTimeout(() => t.classList.add("out"), 2600);
   setTimeout(() => t.remove(), 3200);
 }
+
+// ---------- 학생 간 실시간 채팅 ----------
+const chatLog = () => $("#chat-log");
+let chatUnread = 0;
+
+function addChat(msg) {
+  const log = chatLog();
+  const row = document.createElement("div");
+  row.className = "chat-row";
+  const team = TEAMS[msg.team];
+  if (team) {
+    const badge = document.createElement("span");
+    badge.className = "chat-team";
+    badge.style.background = team.color;
+    badge.textContent = team.name.replace("팀", "");
+    row.appendChild(badge);
+  }
+  const name = document.createElement("span");
+  name.className = "chat-name";
+  name.textContent = msg.name ?? "";
+  const text = document.createElement("span");
+  text.className = "chat-text";
+  text.textContent = msg.text ?? ""; // 채팅 본문은 HTML로 조판하지 않고 그대로 보여 준다
+  row.append(name, text);
+  log.appendChild(row);
+  while (log.childElementCount > 60) log.firstChild.remove(); // 오래된 말은 지운다
+  log.scrollTop = log.scrollHeight;
+  if ($("#chat-panel").hidden) {
+    chatUnread++;
+    const b = $("#chat-unread");
+    b.hidden = false;
+    b.textContent = chatUnread > 9 ? "9+" : String(chatUnread);
+  }
+}
+
+function openChat(open) {
+  $("#chat-panel").hidden = !open;
+  $("#chat-toggle").hidden = open;
+  if (open) {
+    chatUnread = 0;
+    $("#chat-unread").hidden = true;
+    $("#chat-input").focus();
+  }
+}
+$("#chat-toggle").onclick = () => { openChat(true); $("#world")?.focus(); $("#chat-input").focus(); };
+$("#chat-close").onclick = () => { openChat(false); $("#world")?.focus(); };
+$("#chat-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = $("#chat-input");
+  const text = input.value.trim().slice(0, 100);
+  if (!text) return;
+  S.net?.send({ type: "chat", text });
+  input.value = "";
+  input.focus();
+});
+
+// ---------- 터치 기기용 가상 조작판 ----------
+function setupTouchControls() {
+  if (!("ontouchstart" in window) && navigator.maxTouchPoints === 0) return;
+  document.body.classList.add("touch-device");
+  $("#touch-dpad").hidden = false;
+  $("#touch-actions").hidden = false;
+
+  const DIRS = {
+    "dpad-up": [0, -1], "dpad-down": [0, 1], "dpad-left": [-1, 0], "dpad-right": [1, 0],
+  };
+  const held = new Map();
+  const apply = () => {
+    let x = 0, y = 0;
+    for (const [dx, dy] of held.values()) { x += dx; y += dy; }
+    S.game?.setTouch(Math.sign(x), Math.sign(y));
+  };
+  for (const [id, dir] of Object.entries(DIRS)) {
+    const btn = document.getElementById(id);
+    btn.addEventListener("touchstart", (e) => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); held.set(id, dir); apply(); }, { passive: false });
+    for (const ev of ["touchend", "touchcancel"])
+      btn.addEventListener(ev, (e) => { e.preventDefault(); held.delete(id); apply(); }, { passive: false });
+  }
+  $("#touch-jump").addEventListener("touchstart", (e) => { e.preventDefault(); S.game?.jump(); }, { passive: false });
+  $("#touch-act").addEventListener("touchstart", (e) => { e.preventDefault(); S.game?.touchInteract(); }, { passive: false });
+}
+setupTouchControls();
 
 function updateHud() {
   if (!S.game) return;

@@ -312,7 +312,7 @@ export class World3D {
       const { model, mixer, action } = makeCharacter(gltf, { outline: this.quality !== "low" });
       model.scale.setScalar(1.45);
       group.add(model);
-      Object.assign(av, { model, mixer, actions: { idle: action("idle"), walk: action("walk"), yes: action("emote-yes") } });
+      Object.assign(av, { model, mixer, actions: { idle: action("idle"), walk: action("walk"), yes: action("emote-yes"), jump: action("jump") } });
       av.actions.idle.play();
       av.current = "idle";
     });
@@ -326,15 +326,19 @@ export class World3D {
     av.current = name;
   }
 
-  placeAvatar(av, x, y, dir, moving, name, isMe) {
-    av.group.position.set(x, 0, y);
+  placeAvatar(av, x, y, dir, moving, name, isMe, jumpY = 0) {
+    av.group.position.set(x, jumpY, y);
     if (moving) {
-      const target = Math.atan2(-dir[0], -dir[1]); // 모델 정면이 -z
+      // 모델은 기본 회전(0°)에서 전면(+Z, 카메라 쪽)을 향한다.
+      // 진행 방향(dir)으로 부드럽게 돌아 걷는다: W(전진, -Z)면 등을 보고 전방으로, S(후진, +Z)면 정면을 보고 걷는다.
+      const target = Math.atan2(-dir[0], dir[1]);
       let d = target - av.group.rotation.y;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       av.group.rotation.y += d * 0.3;
     }
-    if (av.current !== "yes") this.setAnim(av, moving ? "walk" : "idle");
+    // 공중에 떠 있으면 점프 애니메이션, 아니면 걷기·대기 (인사 중일 때는 건드리지 않는다)
+    if (jumpY > 0.02) this.setAnim(av, "jump");
+    else if (av.current !== "yes") this.setAnim(av, moving ? "walk" : "idle");
     if (av.labelText !== name) {
       if (av.label) { av.group.remove(av.label); disposeLabel(av.label); }
       av.label = makeLabel(name, { bg: isMe ? "rgba(15,118,110,0.92)" : "rgba(17,24,39,0.7)" });
@@ -361,7 +365,7 @@ export class World3D {
     // 나와 친구들
     if (g.me.n !== null) {
       const me = this.avatar("me", g.me.n);
-      this.placeAvatar(me, g.me.x, g.me.y, g.me.dir, g.me.moving, g.me.name, true);
+      this.placeAvatar(me, g.me.x, g.me.y, g.me.dir, g.me.moving, g.me.name, true, g.me.jumpY ?? 0);
       me.mixer?.update(dt);
     }
     for (const [n, o] of g.others) {

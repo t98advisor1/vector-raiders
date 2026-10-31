@@ -42,11 +42,13 @@ export const SPAWN = [2.5, 6.5];
 const SPEED = 4.2; // 초당 칸
 const RADIUS = 0.3;
 const REACH = 1.7;
+const JUMP_VY = 4.8; // 점프 순간의 수직 속도
+const GRAVITY = 16.0; // 초당 낙하 가속
 const MOVE_KEYS = {
   KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1],
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
 };
-const ACT_KEYS = new Set(["KeyE", "Space", "Enter"]);
+const ACT_KEYS = new Set(["KeyE", "Enter"]);
 
 // 지도 글자: # 벽, . 바닥, ~ 물, ^ 절벽, ! 용암, 1~3 문, a~e 다리 자리, o 상자류, @ 제단
 export function buildGrid() {
@@ -74,7 +76,8 @@ export class Game {
   constructor(hooks) {
     this.h = hooks;
     this.grid = buildGrid();
-    this.me = { x: SPAWN[0], y: SPAWN[1], dir: [0, 1], n: null, name: "", moving: false };
+    this.me = { x: SPAWN[0], y: SPAWN[1], dir: [0, 1], n: null, name: "", moving: false, jumpY: 0, jumpVy: 0, jumping: false };
+    this.touch = [0, 0]; // 가상 패드(터치) 방향: 키보드와 합쳐서 움직인다
     this.others = new Map(); // n → { x, y, tx, ty, moving, dir }
     this.names = new Map();
     this.keys = new Set();
@@ -107,11 +110,23 @@ export class Game {
     const tag = e.target?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || this.h.paused()) return;
     if (MOVE_KEYS[e.code]) { this.keys.add(e.code); this.taps.add(e.code); e.preventDefault(); }
+    else if (e.code === "Space" && !e.repeat) { e.preventDefault(); this.jump(); }
     else if (ACT_KEYS.has(e.code) && !e.repeat) {
       e.preventDefault();
       if (this.focus) this.h.onInteract(this.focus);
     }
   }
+
+  // 스페이스바·점프 버튼: 바닥에 닿아 있을 때만 뛴다
+  jump() {
+    if (this.h.paused() || this.me.jumping) return;
+    this.me.jumping = true;
+    this.me.jumpVy = JUMP_VY;
+  }
+
+  // 모바일 가상 패드: 눌린 방향 버튼들의 합을 정규화 없이 그대로 둔다(대각선도 2방향 합으로)
+  setTouch(x, y) { this.touch = [x, y]; }
+  touchInteract() { if (!this.h.paused() && this.focus) this.h.onInteract(this.focus); }
 
   blocked(tx, ty) {
     const ch = this.grid[ty]?.[tx];
@@ -169,7 +184,10 @@ export class Game {
 
   update(dt, now) {
     let vx = 0, vy = 0;
-    if (!this.h.paused()) for (const k of new Set([...this.keys, ...this.taps])) { const d = MOVE_KEYS[k]; vx += d[0]; vy += d[1]; }
+    if (!this.h.paused()) {
+      for (const k of new Set([...this.keys, ...this.taps])) { const d = MOVE_KEYS[k]; vx += d[0]; vy += d[1]; }
+      vx += this.touch[0]; vy += this.touch[1];
+    }
     // 키를 누르고 있지 않은데 톡 누른 키만 있으면, 눈에 보이도록 조금 더 움직인다.
     const step = this.keys.size === 0 && this.taps.size > 0 ? Math.max(dt, 1 / 15) : dt;
     this.taps.clear();
@@ -185,6 +203,13 @@ export class Game {
       else if (vx === 0) moved = this.slide("x", vy, SPEED * step) || moved;
     }
     this.me.moving = moved;
+
+    // 점프: 위로 뛰고 중력에 끌려 떨어져 바닥에 착지한다
+    if (this.me.jumping) {
+      this.me.jumpY += this.me.jumpVy * dt;
+      this.me.jumpVy -= GRAVITY * dt;
+      if (this.me.jumpY <= 0) { this.me.jumpY = 0; this.me.jumpVy = 0; this.me.jumping = false; }
+    }
     if ((moved || this.needSend) && now - this.lastSend > 120) {
       if (this.h.onMove(this.me.x, this.me.y, roomAt(this.me.x))) this.needSend = false;
       this.lastSend = now;

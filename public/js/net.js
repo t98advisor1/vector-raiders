@@ -1,5 +1,5 @@
 // 유적 WebSocket 연결. 끊기면 자동으로 다시 연결하고, 다시 연결될 때마다 hello를 보낸다.
-const FINAL_CODES = new Set([4000, 4001, 4002, 4003, 4005, 4006]);
+const FINAL_CODES = new Set([4000, 4001, 4002, 4003, 4005, 4006, 4007]);
 
 // query: 연습 유적이면 "?mode=practice&cid=..."
 export function connect(hello, onMessage, onStatus = () => {}, query = "") {
