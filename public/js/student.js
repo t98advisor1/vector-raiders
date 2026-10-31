@@ -117,6 +117,52 @@ document.querySelectorAll(".ch-opt[data-ch]").forEach((b) => {
 });
 if (CH) $("#channel-pick").hidden = true;
 
+// 기하 단원 선택(1: 이차곡선, 2: 평면벡터, 3: 공간도형·공간좌표)
+S.unit = load("vr-unit") || "2";
+document.querySelectorAll(".unit-opt[data-unit]").forEach((b) => {
+  b.classList.toggle("on", b.dataset.unit === S.unit);
+  b.onclick = () => {
+    S.unit = b.dataset.unit;
+    store("vr-unit", S.unit);
+    document.querySelectorAll(".unit-opt[data-unit]").forEach((o) => o.classList.toggle("on", o === b));
+    sound.sfx("open");
+  };
+});
+
+// 탐험 난이도 선택(low: 초심자용, mid: 기본형, high: 심화 수능형)
+S.diff = load("vr-diff") || "mid";
+document.querySelectorAll(".diff-opt[data-diff]").forEach((b) => {
+  b.classList.toggle("on", b.dataset.diff === S.diff);
+  b.onclick = () => {
+    S.diff = b.dataset.diff;
+    store("vr-diff", S.diff);
+    document.querySelectorAll(".diff-opt[data-diff]").forEach((o) => o.classList.toggle("on", o === b));
+    sound.sfx("open");
+  };
+});
+
+function renderVisitorStats(data) {
+  if (!data) return;
+  const chip = $("#visitor-chip");
+  if (!chip) return;
+  const liveEl = chip.querySelector(".v-live b");
+  const todayEl = chip.querySelector(".v-today b");
+  const totalEl = chip.querySelector(".v-total b");
+  if (liveEl) liveEl.textContent = data.active ?? 0;
+  if (todayEl) todayEl.textContent = data.today ?? 0;
+  if (totalEl) totalEl.textContent = data.total ?? 0;
+}
+
+async function loadVisitorStats() {
+  try {
+    const res = await fetch("/api/stats");
+    if (!res.ok) return;
+    const data = await res.json();
+    renderVisitorStats(data);
+  } catch {}
+}
+loadVisitorStats();
+
 const SETTING_TEXT = { music: ["켜짐", "꺼짐"], sfx: ["켜짐", "꺼짐"], quality: ["높음", "낮음"] };
 document.querySelectorAll(".toggle[data-key]").forEach((b) => {
   b.onclick = () => {
@@ -155,7 +201,7 @@ function join(name, mode) {
   S.mode = mode;
   showJoinError("");
   const query = mode === "practice" ? `?mode=practice&cid=${cid}` : `?ch=${S.ch}`;
-  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, team: S.team || undefined }), onMessage, onStatus, query);
+  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, team: S.team || undefined, unit: S.unit, diff: S.diff }), onMessage, onStatus, query);
 }
 
 // 연습 모드 '처음부터 다시' 뒤에는 새로고침하고 자동으로 다시 들어온다.
@@ -214,6 +260,7 @@ function onMessage(msg) {
   } else if (msg.type === "class") {
     const before = S.cls;
     S.cls = msg;
+    if (msg.visitors) renderVisitorStats(msg.visitors);
     S.game?.setRoster(msg.players ?? []);
     announceRelics(before, msg);
     if (!before || before.stage !== msg.stage) onStage(msg.stage);

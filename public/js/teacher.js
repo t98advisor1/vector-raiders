@@ -22,7 +22,13 @@ const STAGE_NAME = { lobby: "⏸ 대기 중", play: "▶ 탐험 중", done: "■
 watchMath();
 
 // 비밀번호는 이 탭을 닫으면 잊는다.
-const remember = (pw) => { try { pw === null ? sessionStorage.removeItem("vr-teacher") : sessionStorage.setItem("vr-teacher", pw); } catch {} };
+const remember = (pw) => {
+  try {
+    pw === null ? sessionStorage.removeItem("vr-teacher") : sessionStorage.setItem("vr-teacher", pw);
+    const apw = $("#admin-pw-display");
+    if (apw) apw.textContent = pw || "1234";
+  } catch {}
+};
 const remembered = (() => { try { return sessionStorage.getItem("vr-teacher"); } catch { return null; } })();
 if (remembered) start(remembered);
 
@@ -227,6 +233,9 @@ function renderKpis(d) {
   for (const p of PROBLEMS) { tried += d.stats[p.id]?.tried ?? 0; solved += d.stats[p.id]?.solved ?? 0; }
   const acc = tried ? Math.round((solved / tried) * 100) : null;
   $("#kpi-people").innerHTML = `<span class="kpi-icon">👥</span><b>${online}<small>/${total}</small></b><small>접속 중 / 총 학생</small>`;
+  const v = d.visitors ?? { today: Math.max(total, 1), total: Math.max(total, 1), active: online };
+  const kv = $("#kpi-visitors");
+  if (kv) kv.innerHTML = `<span class="kpi-icon">👁️</span><b>${v.today}<small>명</small></b><small>오늘 방문 (누적 ${v.total}명 · 접속 ${v.active}명)</small>`;
   $("#kpi-avg").innerHTML = `<span class="kpi-icon">📊</span><b>${avg}<small>점</small></b><small>평균 점수 · 정답률 ${acc === null ? "–" : `${acc}%`}</small>`;
   $("#kpi-stage").innerHTML = `<span class="kpi-icon">🧭</span><b>${STAGE_TEXT[d.stage] ?? "–"}</b><small>${activeCh}채널 탐험 상태</small>`;
   const teams = d.teams ?? [];
