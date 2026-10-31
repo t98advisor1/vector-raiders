@@ -195,3 +195,13 @@ mjx-container {
 
 /* 문제 글씨는 명조체로, 줄바꿈을 살린다 */
 .pr-text, .tp-text, .fa-q, .bogi-line { font-family: "함초롬바탕", "HCR Batang", "한컴바탕", "Nanum Myeongjo", "AppleMyungjo", "Batang", "바탕", serif; }
+
+/* 형성평가 2단 편집: 문항마다 글 → 그림 → 답 칸, 문항은 단 사이에서 쪼개지지 않는다 */
+.fa-cols { column-count: 2; column-gap: 8mm; column-rule: 1px solid #cbd5e1; }
+.fa-cols .fa-item { break-inside: avoid; page-break-inside: avoid; }
+.fa-cols .fa-body { display: block; }
+.fa-cols .fa-fig { text-align: center; margin: 6px 0 2px; }
+.fa-cols .fa-fig svg, .fa-cols .fa-fig img { width: 46mm; max-width: 100%; height: auto; }
+.fa-cols .fa-blank span { width: 70%; }
+.fa-cols .fa-item h3 { font-size: 10.5pt; }
+.fa-cols .pr-text, .fa-cols .bogi-line { font-size: 10pt; }

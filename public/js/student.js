@@ -1635,10 +1635,10 @@ function printAssessment(kind) {
     <header class="pr-head fa-head">
       <h1>벡터 유적 탈출 · 형성평가 ${isAnswer ? "<span class=\"fa-tag ans\">답지</span>" : "<span class=\"fa-tag\">문제지</span>"}</h1>
       <p>${unit ? `기하 ${unit.name} · ` : ""}${new Date().toLocaleDateString("ko-KR")} · ${S.ch}채널</p>
-      <p class="fa-name">이름: <b>${esc(S.name ?? "")}</b> &emsp; ${isAnswer ? "" : "점수: ________ / 7"}</p>
+      <p class="fa-name">이름: <b>${esc(S.name ?? "")}</b> &emsp; ${isAnswer ? "" : `점수: ________ / ${PROBLEMS.length}`}</p>
     </header>
     ${isAnswer ? "" : `<p class="fa-guide">탐험에서 만난 문제를 다시 풀어 보세요. 풀이 과정을 적고 '답' 칸에 답을 쓰세요.</p>`}
-    ${items}`);
+    <div class="fa-cols">${items}</div>`);
 }
 
 function printReview(all = false) {

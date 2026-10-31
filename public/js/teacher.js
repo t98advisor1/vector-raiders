@@ -134,7 +134,7 @@ function printAssessmentTeacher(kind, level) {
       <h1>${fmt(SET?.meta?.제목 ?? "벡터 유적 탈출")} · 형성평가 ${isAnswer ? '<span class="fa-tag ans">답지</span>' : '<span class="fa-tag">문제지</span>'} <small>${level === "all" ? "하·중·상 전체" : `${LV[level]} 난이도`}</small></h1>
       <p>${new Date().toLocaleDateString("ko-KR")} · ${activeCh}채널</p>
       ${isAnswer ? "" : '<p class="fa-name">이름: ____________ &emsp; 점수: ________</p>'}
-    </header>${items}`, docTitle);
+    </header><div class="fa-cols">${items}</div>`, docTitle);
 }
 
 // 핵심 카드 모음: 수업 전에 나눠 주거나 칠판에 붙일 수 있게
