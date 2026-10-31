@@ -152,6 +152,7 @@ export class World3D {
     this.buildAltar(models);
     this.buildPlatforms();
     this.buildTargets();
+    this.buildVectorHolograms();
     // 사격 탄환용 공용 지오메트리·재료 (네온 벡터 탄)
     this.boltGeo = new THREE.SphereGeometry(0.16, 10, 10);
     this.boltMat = new THREE.MeshBasicMaterial({ color: 0x7dfcff });
@@ -340,6 +341,43 @@ export class World3D {
       this.scene.add(label);
       this.targets.set(t.zone, { t, crystal, ring, label, labelCount: 0, hits: 0, done: false, flash: 0 });
     }
+  }
+
+  // ---------- 기하 벡터 3D 좌표계 및 네온 벡터 홀로그램 ----------
+  buildVectorHolograms() {
+    this.vectorHolograms = [];
+    const points = [
+      { x: 10, y: 1.4, z: 7 },
+      { x: 26, y: 1.4, z: 7 },
+      { x: 42, y: 1.4, z: 7 },
+      { x: 60, y: 1.4, z: 7 },
+      { x: ALTAR.x + 0.5, y: 2.3, z: ALTAR.y + 0.5 },
+    ];
+    for (const p of points) {
+      const g = new THREE.Group();
+      g.position.set(p.x, p.y, p.z);
+      // X, Y, Z 3차원 직교 좌표축 화살표
+      const ax = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1.2, 0xef4444, 0.35, 0.2);
+      const ay = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1.2, 0x22c55e, 0.35, 0.2);
+      const az = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), 1.2, 0x3b82f6, 0.35, 0.2);
+      // 벡터 합 마법진 화살표: a + b = sum
+      const a = new THREE.ArrowHelper(new THREE.Vector3(0.8, 0, 0.6).normalize(), new THREE.Vector3(0, 0, 0), 1.1, 0x5eead4, 0.3, 0.18);
+      const sum = new THREE.ArrowHelper(new THREE.Vector3(0.8, 0.7, 0.6).normalize(), new THREE.Vector3(0, 0, 0), 1.6, 0xfde68a, 0.4, 0.22);
+      g.add(ax, ay, az, a, sum);
+      this.scene.add(g);
+      this.vectorHolograms.push(g);
+    }
+
+    // 플레이어 발밑 방향 벡터 화살표 (진행 방향 및 크기 실시간 표시)
+    this.playerVectorArrow = new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(0, 0.08, 0),
+      1.0,
+      0x5eead4,
+      0.32,
+      0.2
+    );
+    this.scene.add(this.playerVectorArrow);
   }
 
   // 사격: 전방(me.dir)으로 네온 벡터 탄환을 하나 쏜다. 명중·소멸은 sync에서 처리한다.
@@ -563,6 +601,22 @@ export class World3D {
       this.promptText = text;
     }
     if (this.prompt) this.prompt.position.set(g.focus.x, 2.05 + Math.sin(t * 3) * 0.05, g.focus.y);
+
+    // 기하 벡터 홀로그램 회전 및 플레이어 발밑 방향 벡터 업데이트
+    if (this.vectorHolograms) {
+      for (const h of this.vectorHolograms) h.rotation.y = t * 0.8;
+    }
+    if (this.playerVectorArrow) {
+      const dir = g.me.dir;
+      const len = Math.hypot(dir[0], dir[1]);
+      this.playerVectorArrow.position.set(g.me.x, 0.08, g.me.y);
+      if (len > 0.01) {
+        this.playerVectorArrow.setDirection(new THREE.Vector3(dir[0] / len, 0, dir[1] / len));
+        this.playerVectorArrow.visible = true;
+      } else {
+        this.playerVectorArrow.visible = false;
+      }
+    }
 
     // 카메라: 쿼터뷰(하이앵글)로 위에서 내려다본다 — 입체 고저차와 발판이 잘 보이게
     // 지도 밖 빈 공간을 비추지 않게: 화면 절반 폭(바닥 기준)만큼 안쪽에서 멈춘다. 좁은 화면일수록 덜 멈춘다.
