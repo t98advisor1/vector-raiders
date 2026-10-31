@@ -21,7 +21,7 @@
   <meta name="twitter:description" content="상자를 열고 벡터 문제를 풀어 잊힌 유적을 탈출하세요!">
   <meta name="twitter:image" content="https://go.geomath.workers.dev/og-image.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&display=swap">
   <link rel="stylesheet" href="/css/style.css">
   <script>
     // 수식은 MathJax로 조판한다. \vv{a}: 벡터 a, \VV{AB}: 벡터 AB
@@ -57,19 +57,22 @@
 
     <!-- 메뉴: 카드 세 장 -->
     <div id="menu" class="menu" hidden>
-      <h1 class="menu-title">벡터 유적 탈출</h1>
+      <div class="menu-head">
+        <p class="menu-kicker">SELECT MODE</p>
+        <h1 class="menu-title fx-letters">벡터 유적 탈출</h1>
+      </div>
       <div class="cards">
         <button class="mcard practice" type="button" data-mode="practice">
-          <span class="art"><img id="art-practice" alt=""></span>
-          <span class="label"><b>연습 모드</b><small>혼자 언제든 · 기록은 나만 봐요</small></span>
+          <span class="art"><span class="tag">SOLO</span><img id="art-practice" alt=""></span>
+          <span class="label"><b class="fx-letters">연습 모드</b><small>혼자 언제든 · 기록은 나만 봐요</small></span>
         </button>
         <button class="mcard class class-hero" type="button" data-mode="class">
-          <span class="art"><img id="art-class" alt=""></span>
-          <span class="label"><b class="class-hero-title">수업 참가하기</b><small class="class-hero-lead typing-lead">선생님이 연 탐험에 반 친구들과 함께!</small></span>
+          <span class="art"><span class="tag live">LIVE</span><img id="art-class" alt=""></span>
+          <span class="label"><b class="class-hero-title fx-letters">수업 참가하기</b><small class="class-hero-lead typing-lead">선생님이 연 탐험에 반 친구들과 함께!</small></span>
         </button>
         <button class="mcard settings" type="button" id="open-settings">
-          <span class="art gear" aria-hidden="true">⚙</span>
-          <span class="label"><b>설정</b><small>그래픽 · 배경음</small></span>
+          <span class="art gear" aria-hidden="true"><span class="tag">OPTION</span><span class="gear-icon">⚙</span></span>
+          <span class="label"><b class="fx-letters">설정</b><small>그래픽 · 배경음 · 설명서</small></span>
         </button>
       </div>
       <div id="visitor-chip" class="visitor-chip" aria-label="실시간 방문자 집계">
@@ -335,10 +338,10 @@
           <span id="hud-keys" title="열쇠 조각 (푼 문제)"></span>
           <span id="hud-jumps" title="벡터 점프 (건넌 장애물)"></span>
           <span id="hud-mile" title="활동 마일리지 (이동·점프·사격·개념 학습)"></span>
-          <button id="map-btn" class="hud-btn hud-map-btn" type="button" aria-label="유적 전체 지도보기">🗺️ 지도보기</button>
+          <button id="map-btn" class="hud-btn hud-map-btn" type="button" aria-label="유적 전체 지도보기">🗺️<span class="lbl"> 지도보기</span></button>
           <button id="rank-btn" class="hud-btn" type="button" aria-label="팀/개인 랭킹 접기/펼치기 (탭)">🏆</button>
           <button id="sound-btn" class="hud-btn" type="button" aria-label="소리 끄기 (M)">🔊</button>
-          <button id="restart-btn" class="hud-btn" type="button" hidden>↺ 처음부터</button>
+          <button id="restart-btn" class="hud-btn" type="button" aria-label="처음부터" hidden>↺<span class="lbl"> 처음부터</span></button>
         </div>
         <div class="hud-right">
           <ol id="hud-teams" class="hud-card hud-teams" aria-label="팀 랭킹" hidden></ol>
