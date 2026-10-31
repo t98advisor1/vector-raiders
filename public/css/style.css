@@ -413,13 +413,31 @@ body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #
   100% { filter: drop-shadow(0 0 8px rgba(94, 234, 212, 0.6)); }
 }
 
-/* 입장 폼: 팀 선택 */
+/* 입장 폼: 팀·단원·난이도 선택 */
 .team-pick { margin: 4px 0 14px; }
 .team-pick-label { display: block; font-weight: 600; margin-bottom: 6px; }
 .team-pick-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.team-opt { font: inherit; font-weight: 700; font-size: 0.95rem; padding: 7px 10px; border: 2px solid var(--line);
-  background: #fff; border-radius: 999px; cursor: pointer; }
-.team-opt.on { border-color: var(--teal); background: var(--teal-soft); }
+.team-opt, .unit-opt, .diff-opt { font: inherit; font-weight: 700; font-size: 0.92rem; padding: 7px 12px; border: 2px solid var(--line);
+  background: #fff; border-radius: 999px; cursor: pointer; transition: all 0.15s ease; }
+.team-opt.on, .unit-opt.on, .diff-opt.on { border-color: var(--teal); background: var(--teal-soft); color: #0f766e; }
+
+/* 방문자 집계 칩 */
+.visitor-chip { margin-top: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
+  background: rgba(17, 24, 39, 0.75); border: 1px solid rgba(94, 234, 212, 0.35); border-radius: 999px;
+  color: #e5e7eb; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); backdrop-filter: blur(6px); }
+.visitor-chip b { color: #5eead4; font-weight: 800; }
+.visitor-chip .v-divider { opacity: 0.4; }
+.visitor-chip .v-dot { font-size: 0.75rem; animation: pulseDot 1.5s infinite; }
+@keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+
+/* 교사용 화면: 중간관리자 안내 박스 및 배너 */
+.admin-guide-card { margin-top: 16px; padding: 12px 16px; background: rgba(254, 243, 199, 0.75); border: 1.5px solid #f59e0b;
+  border-radius: 12px; font-size: 0.88rem; color: #92400e; text-align: left; }
+.admin-guide-title { font-weight: 800; margin-bottom: 4px; color: #78350f; font-size: 0.95rem; }
+.admin-guide-card code { background: #fff; padding: 2px 6px; border-radius: 6px; border: 1px solid #fcd34d; font-weight: 800; }
+.admin-banner { margin-bottom: 12px; padding: 10px 16px; background: rgba(17, 24, 39, 0.88); border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 12px; color: #fde68a; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; }
+.admin-banner code { background: rgba(0, 0, 0, 0.5); padding: 2px 8px; border-radius: 6px; color: #5eead4; border: 1px solid rgba(94, 234, 212, 0.4); font-weight: 800; }
 
 /* 학생 간 실시간 채팅: 기본 위치 센터 아래쪽(하단 중앙) */
 .chat-toggle { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 30; border: 0; cursor: pointer;

@@ -6,11 +6,18 @@
 import { Board, C, el, add, sub, mul, dist } from "./svg.js";
 import { fmt } from "./mathtext.js";
 
-// 난이도 선택: 상자를 열 때 학생이 고른다. 배점은 서버(src/room.js의 DIFF_POINTS)와 짝을 이룬다.
+// 기하 3대 대단원 체계
+export const UNITS = [
+  { id: "1", name: "Ⅰ. 이차곡선", desc: "포물선·타원·쌍곡선의 정의와 방정식", short: "이차곡선" },
+  { id: "2", name: "Ⅱ. 평면벡터", desc: "벡터의 연산·성분과 내적·도형의 방정식", short: "평면벡터", default: true },
+  { id: "3", name: "Ⅲ. 공간도형과 공간좌표", desc: "위치 관계·삼수선의 정리·정사영·공간좌표", short: "공간도형" },
+];
+
+// 난이도 3가지: 초심자용(하) · 기본형(중) · 심화형(상, 수능형)
 export const DIFFICULTY = [
-  { key: "high", name: "상", points: 150, desc: "도전! 스스로 풀이를 찾아요" },
-  { key: "mid", name: "중", points: 100, desc: "기본! 보통 수업 문제예요" },
-  { key: "low", name: "하", points: 70, desc: "차근차근 풀어요" },
+  { key: "high", name: "심화형 (수능형)", points: 150, desc: "수능/평가원 기출 4점 및 3인 협동 레이드" },
+  { key: "mid", name: "기본형", points: 100, desc: "교과서 중단원 표준 및 교과서 예제" },
+  { key: "low", name: "초심자용", points: 70, desc: "교과서 기초 개념 탐색" },
 ];
 
 export const PROBLEMS = [

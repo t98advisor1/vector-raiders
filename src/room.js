@@ -75,12 +75,56 @@ export class Room extends DurableObject {
     });
   }
 
+  async ensureStats() {
+    this.statsData ??= (await this.ctx.storage.get("stats")) ?? {
+      todayDate: new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }),
+      today: 1,
+      total: 1,
+    };
+    const nowKst = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+    if (this.statsData.todayDate !== nowKst) {
+      this.statsData.todayDate = nowKst;
+      this.statsData.today = 0;
+    }
+  }
+
+  async recordVisit() {
+    try {
+      await this.ensureStats();
+      this.statsData.today++;
+      this.statsData.total++;
+      await this.ctx.storage.put("stats", this.statsData);
+    } catch {}
+  }
+
+  async getStats() {
+    await this.ensureStats();
+    let live = 0;
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws.readyState === 1) live++;
+    }
+    return {
+      today: this.statsData.today,
+      total: this.statsData.total,
+      active: Math.max(live, this.onlineCids ? this.onlineCids().size : 0),
+    };
+  }
+
   async fetch(request) {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/stats") {
+      const stats = await this.getStats();
+      return new Response(JSON.stringify(stats), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
     // 연습 유적인지는 진입점(worker.js)이 알려 준다. 처음 열릴 때만 정해진다.
     this.mode ??= request.headers.get("X-Room-Mode") === "practice" ? "practice" : "class";
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].serializeAttachment({ role: null });
+    await this.recordVisit();
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
@@ -532,6 +576,7 @@ export class Room extends DurableObject {
       players: students.map((st) => [st.n, st.name, st.team ?? null]),
       ranking: this.ranking().map(({ n, name, score, solved, escapedAt, cid, mileage, concepts }) => ({ n, name, score, solved, escaped: !!escapedAt, mileage, concepts, team: this.data.students[cid].team ?? null })),
       teams: this.teamScores(),
+      visitors: { today: this.statsData?.today ?? Math.max(1, total), total: this.statsData?.total ?? Math.max(1, total), active: this.onlineCids().size },
     };
   }
 
@@ -560,7 +605,15 @@ export class Room extends DurableObject {
       const topWrong = Object.entries(wrongCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
       stats[pid] = { tried, solved, first, topWrong };
     }
-    return { type: "dashboard", stage: this.data.stage, labLevels: LAB_LEVELS.length, students, stats, teams: this.teamScores() };
+    return {
+      type: "dashboard",
+      stage: this.data.stage,
+      labLevels: LAB_LEVELS.length,
+      students,
+      stats,
+      teams: this.teamScores(),
+      visitors: { today: this.statsData?.today ?? Math.max(1, students.length), total: this.statsData?.total ?? Math.max(1, students.length), active: online.size },
+    };
   }
 
   // 여러 학생이 동시에 제출해도 0.2초에 한 번만 모두에게 보낸다.

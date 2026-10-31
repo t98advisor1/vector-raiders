@@ -48,7 +48,7 @@
         <h1 class="game-title"><span class="t1">벡터</span><span class="t2">유적 탈출</span></h1>
       </div>
       <button id="touch" class="touch-btn" type="button">TOUCH TO START</button>
-      <p class="credit">기하 Ⅲ-1 · 벡터의 연산 · <a class="teacher-link" href="/teacher.html" target="_blank" rel="noopener">🧑‍🏫 교사 관리 화면</a></p>
+      <p class="credit">기하 3개 단원(이차곡선·벡터·공간도형) · 난이도 3단계 · <a class="teacher-link" href="/teacher.html" target="_blank" rel="noopener">🧑‍🏫 교사 관리 화면</a></p>
     </div>
 
     <!-- 메뉴: 카드 세 장 -->
@@ -67,6 +67,14 @@
           <span class="art gear" aria-hidden="true">⚙</span>
           <span class="label"><b>설정</b><small>그래픽 · 배경음</small></span>
         </button>
+      </div>
+      <div id="visitor-chip" class="visitor-chip" aria-label="실시간 방문자 집계">
+        <span class="v-dot">🟢</span>
+        <span class="v-live">탐험 중 <b>0</b>명</span>
+        <span class="v-divider">·</span>
+        <span class="v-today">오늘 <b>0</b>명</span>
+        <span class="v-divider">·</span>
+        <span class="v-total">누적 <b>0</b>명</span>
       </div>
       <p id="join-error" class="error menu-error" role="alert"></p>
     </div>
@@ -90,10 +98,26 @@
         <span class="team-pick-label">내 팀 고르기</span>
         <div class="team-pick-row">
           <button type="button" class="team-opt on" data-team="">🎲 자동 배정</button>
-          <button type="button" class="team-opt" data-team="A">🔵 A팀</button>
-          <button type="button" class="team-opt" data-team="B">🟠 B팀</button>
-          <button type="button" class="team-opt" data-team="C">🟢 C팀</button>
-          <button type="button" class="team-opt" data-team="D">🟣 D팀</button>
+          <button type="button" class="team-opt" data-team="A">🔵 A팀 (여우)</button>
+          <button type="button" class="team-opt" data-team="B">🟠 B팀 (고양이)</button>
+          <button type="button" class="team-opt" data-team="C">🟢 C팀 (곰)</button>
+          <button type="button" class="team-opt" data-team="D">🟣 D팀 (토끼)</button>
+        </div>
+      </div>
+      <div class="team-pick" id="unit-pick" role="group" aria-label="기하 단원 선택">
+        <span class="team-pick-label">기하 단원 선택</span>
+        <div class="team-pick-row">
+          <button type="button" class="unit-opt" data-unit="1">Ⅰ. 이차곡선</button>
+          <button type="button" class="unit-opt on" data-unit="2">Ⅱ. 평면벡터</button>
+          <button type="button" class="unit-opt" data-unit="3">Ⅲ. 공간도형·좌표</button>
+        </div>
+      </div>
+      <div class="team-pick" id="diff-pick" role="group" aria-label="탐험 난이도 선택">
+        <span class="team-pick-label">탐험 난이도 선택</span>
+        <div class="team-pick-row">
+          <button type="button" class="diff-opt" data-diff="low">🟢 초심자용</button>
+          <button type="button" class="diff-opt on" data-diff="mid">🟡 기본형</button>
+          <button type="button" class="diff-opt" data-diff="high">🔴 심화 수능형</button>
         </div>
       </div>
       <div class="sheet-buttons">

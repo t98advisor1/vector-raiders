@@ -10,6 +10,12 @@ const CH_RE = /^[1-5]$/;
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // 실시간 방문자 집계 API (오늘/누적/현재 접속자)
+    if (url.pathname === "/api/stats") {
+      return env.ROOM.get(env.ROOM.idFromName("stats:global")).fetch(request);
+    }
+
     if (url.pathname !== "/ws") return new Response("not found", { status: 404 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
 

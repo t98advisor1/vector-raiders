@@ -33,13 +33,22 @@
       <input id="password" type="password" inputmode="numeric" placeholder="교사 비밀번호" aria-label="교사 비밀번호" required>
       <button class="btn primary big" type="submit">들어가기</button>
     </form>
+    <div class="admin-guide-card">
+      <div class="admin-guide-title">🔑 중간관리자(동료 교사) 접속 안내</div>
+      <p>동료 선생님께 공유할 교사 관리 비밀번호: <code>1234</code> (기본값 / <code>TEACHER_PASSWORD</code>)</p>
+      <small class="muted">※ 1~5채널 모두 동일한 중간관리자 비밀번호로 접속하여 각 반별 수업을 독립 관제할 수 있습니다.</small>
+    </div>
     <p id="setup-error" class="error" role="alert"></p>
   </section>
 
   <section id="dash" class="dash" hidden>
+    <div class="admin-banner">
+      <span>🔑 <b>중간관리자 안내</b>: 동료 교사 공유 비밀번호: <code id="admin-pw-display">1234</code> · 5개 채널 독립 운영 가능 · 탐험 시작코드: <code>START_CODES</code></span>
+    </div>
     <div id="ch-overview" class="ch-overview" aria-label="채널 통합 현황"></div>
     <div id="kpi-row" class="kpi-row" hidden>
       <div id="kpi-people" class="kpi-card"></div>
+      <div id="kpi-visitors" class="kpi-card"></div>
       <div id="kpi-teams" class="kpi-card"></div>
       <div id="kpi-avg" class="kpi-card"></div>
       <div id="kpi-stage" class="kpi-card"></div>
