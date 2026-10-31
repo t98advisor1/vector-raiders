@@ -1176,3 +1176,28 @@ body.touch-device .chat-panel { right: 96px; bottom: calc(14px + env(safe-area-i
 .upload-result ul { margin: 6px 0 0; padding-left: 1.2em; font-weight: 500; }
 .uploaded-sets { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
 .uploaded-sets .btn { padding: 2px 10px; font-size: 0.8rem; margin-left: 6px; }
+
+/* 합답형 [보기] 상자: ㄱ, ㄴ, ㄷ을 한 줄씩 */
+.bogi-box { position: relative; margin: 14px 0 8px; padding: 16px 16px 10px; border: 2px solid #94a3b8; border-radius: 10px; background: #fff;
+  animation: fadeUp 0.5s 0.6s backwards; }
+.bogi-title { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 12px; font-weight: 800; color: #334155;
+  border: 2px solid #94a3b8; border-radius: 999px; font-size: 0.9rem; }
+.bogi-line { padding: 4px 0; font-size: 1.08rem; line-height: 1.7; }
+.bogi-line + .bogi-line { border-top: 1px dashed #e2e8f0; }
+/* 그림의 '보기' 값 읽기 */
+.fig-row { padding: 2px 0; font-size: 1.02rem; }
+.fig-row b { color: #0f766e; }
+.fig-row .fig-val { color: #b45309; font-size: 1.08rem; }
+@media print {
+  .bogi-box { border: 1.5px solid #111; padding: 10px 12px 6px; margin: 10px 0 6px; animation: none; }
+  .bogi-title { border: 1.5px solid #111; font-size: 9.5pt; }
+  .bogi-line { font-size: 10.5pt; padding: 2px 0; }
+}
+
+/* 문제 글씨: 명조체(한컴 바탕·나눔명조)로, 조금 크게. 문항 파일의 줄바꿈(\n)은 그대로 줄을 바꾼다. */
+:root { --q-font: "함초롬바탕", "HCR Batang", "한컴바탕", "Nanum Myeongjo", "AppleMyungjo", "Batang", "바탕", serif; }
+.p-text, .bogi-line, .coop-conds, .pr-text, .tp-text, .fa-q { font-family: var(--q-font); }
+.p-text { font-size: 1.55rem; line-height: 1.85; white-space: pre-line; font-weight: 700; color: #1e1b2e; }
+.bogi-line { font-size: 1.3rem; font-weight: 700; }
+.coop-conds { font-size: 1.2rem; }
+@media (max-width: 600px) { .p-text { font-size: 1.32rem; } .bogi-line { font-size: 1.15rem; } }

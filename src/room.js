@@ -201,10 +201,10 @@ export class Room extends DurableObject {
     return {
       id: s.id, meta: s.meta, cards: s.cards,
       boxes: s.boxes.map((b) => ({
-        no: b.no, title: b.title, room: b.room, coop: b.coop, tool: b.tool, concept: b.concept,
+        no: b.no, title: b.title, room: b.room, coop: b.coop, tool: b.tool, concept: b.concept, howto: b.howto,
         levels: Object.fromEntries(LEVELS.map((k) => {
           const lv = b.levels[k];
-          return [k, { points: lv.points, text: lv.text, kind: lv.kind, options: lv.options, hint: lv.hint, coop: b.coop && k === "high", conditionLabels: lv.conditions.map((c) => c.label) }];
+          return [k, { points: lv.points, text: lv.text, kind: lv.kind, options: lv.options, hint: lv.hint, figure: lv.figure, howto: lv.howto, coop: b.coop && k === "high", conditionLabels: lv.conditions.map((c) => c.label) }];
         })),
       })),
     };
@@ -659,10 +659,24 @@ export class Room extends DurableObject {
     if (msg.type === "review") {
       // 수업 탐험이 끝난 뒤 오답 정리·형성평가 답지용으로 정답표를 내려 준다.
       // 수업 중에는 정답이 학생에게 가지 않고, 연습 모드에서는 출력(PDF)을 하지 않으므로 보내지 않는다.
-      if (this.practice || this.data.stage !== "done") return;
+      // 모든 방을 탈출한 학생은 탐험이 끝나기 전에도 받을 수 있다. 이때는 자기가 푼 난이도의 정답만 보낸다
+      // (다른 난이도 정답이 아직 풀고 있는 친구에게 새지 않도록).
+      if (this.practice) return;
+      const done = this.data.stage === "done";
+      if (!done && !st.escapedAt) return;
       const table = this.answerTable();
-      const conditions = Object.fromEntries(this.set().boxes.map((b) => [`p${b.no}`, Object.fromEntries(LEVELS.map((k) => [k, b.levels[k].conditions]))]));
-      return this.send(ws, { type: "review", answers: Object.fromEntries(Object.entries(table).map(([k, v]) => [k, v.mid])), byDiff: table, conditions });
+      let conditions = Object.fromEntries(this.set().boxes.map((b) => [`p${b.no}`, Object.fromEntries(LEVELS.map((k) => [k, b.levels[k].conditions]))]));
+      let byDiff = table;
+      if (!done) {
+        const mineOnly = (src) => Object.fromEntries(Object.entries(src).map(([pid, v]) => {
+          const d = st.probs[pid]?.diff;
+          return [pid, d && st.probs[pid]?.solved ? { [d]: v[d] } : {}];
+        }));
+        byDiff = mineOnly(table);
+        conditions = mineOnly(conditions);
+      }
+      const answers = Object.fromEntries(Object.entries(byDiff).map(([k, v]) => [k, done ? v.mid : Object.values(v)[0]]));
+      return this.send(ws, { type: "review", answers, byDiff, conditions, early: !done });
     }
 
     if (msg.type === "chat") {

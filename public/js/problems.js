@@ -4,6 +4,7 @@
 // 그림은 저절로 움직이는 모션으로 시작하고(ui.autoplay), 학생이 만지면 멈춘다.
 import { Board, C, el, add, sub, mul, dist } from "./svg.js";
 import { fmt } from "./mathtext.js";
+import { figureTool } from "./figure.js";
 
 // 2022 개정 교육과정 기하 3단원 벡터 (단원마다 content/sets/의 문항 세트를 쓴다)
 export const UNITS = [
@@ -25,7 +26,7 @@ const LEVEL_NAME = { low: "하 · 기본", mid: "중 · 표준", high: "상 · �
 
 // 내장 확인 도구: 문항 파일의 '그림:' 이름 → 도구 함수와 안내
 export const TOOLS = {
-  hex: { fn: (ui) => hexTool(ui), help: "빨간 점선 벡터의 시점(동그라미)을 끌어 꼭짓점이나 O에 놓아 보세요. 평행이동한 벡터예요." },
+  hex: { fn: (ui, arg) => hexTool(ui, arg), help: "빨간 점선 벡터의 시점(동그라미)을 끌어 꼭짓점이나 O에 놓아 보세요. 평행이동한 벡터예요." },
   square: { fn: (ui) => squareTool(ui), help: "주황 점선 벡터 $-\\VV{MB}$의 시점을 끌어 꼭짓점 B에 놓아 보세요." },
   sector: { fn: (ui) => sectorTool(ui), help: "조절기로 점 C를 움직이면 $\\VV{OC}$가 $m\\vv{a}$와 $n\\vv{b}$로 나뉘는 모습이 보여요." },
   parallel: { fn: (ui) => parallelTool(ui), help: "조절기로 m을 바꾸며 두 벡터가 평행해지는 순간을 찾아보세요." },
@@ -46,7 +47,9 @@ export function loadSet(set) {
     const diffs = {};
     for (const k of ["low", "mid", "high"]) {
       const lv = b.levels[k];
+      const fig = resolveFigure(lv.figure || b.tool);
       diffs[k] = {
+        fig, howto: lv.howto || b.howto || fig.help,
         level: LEVEL_NAME[k] + (lv.coop ? " · 🤝 협업" : ""), points: lv.points, source: set.meta?.제목 ?? "",
         text: lv.text, hint: lv.hint, coop: !!lv.coop, conditions: lv.conditions ?? null, conditionLabels: lv.conditionLabels ?? [],
         answer: { kind: KIND[lv.kind] ?? "expr", vec: lv.kind === "vec", options: lv.options, label: lv.kind === "vec" ? "벡터식 =" : "정답 =" },
@@ -61,12 +64,24 @@ export function loadSet(set) {
   }
 }
 
-// 조작 그림을 인쇄용 SVG 글자로 (자동 재생 없이 한 장면)
-export function figureHtml(p) {
-  if (!p.hasTool) return p.image ? `<img src="${p.image}" alt="" style="max-width:160px">` : "";
+// 그림 이름(내장 도구) 또는 그림 줄(평면/공간 …) 또는 이미지 주소 → { has, fn, help, image }
+export function resolveFigure(spec) {
+  spec = String(spec ?? "").trim();
+  const [name, arg] = spec.split(/\s+/);
+  if (TOOLS[name]) return { has: true, fn: (ui) => TOOLS[name].fn(ui, arg), help: TOOLS[name].help };
+  const fn = /^(평면|공간)\s/.test(spec) ? figureTool(spec) : null;
+  if (fn) return { has: true, fn, help: spec.startsWith("공간") ? "그림을 끌어서 돌려 보며 확인해 보세요." : "점이나 화살표 끝(동그라미)을 끌거나 조절기를 움직이며 값이 어떻게 바뀌는지 보세요." };
+  if (/^https?:\/\//.test(spec)) return { has: false, image: spec, help: "" };
+  return { has: false, help: "" };
+}
+
+// 조작 그림을 인쇄용 SVG 글자로 (자동 재생 없이 한 장면). d를 주면 그 난이도의 그림
+export function figureHtml(p, d = "mid") {
+  const fig = p.diffs?.[d]?.fig ?? { has: p.hasTool, fn: p.tool, image: p.image };
+  if (!fig.has) return fig.image ? `<img src="${fig.image}" alt="" style="max-width:160px">` : "";
   const box = document.createElement("div");
   const dummy = document.createElement("div");
-  try { p.tool({ board: box, info: dummy, ctrl: dummy, autoplay: false }); } catch { return ""; }
+  try { fig.fn({ board: box, info: dummy, ctrl: dummy, autoplay: false }); } catch { return ""; }
   return box.innerHTML;
 }
 
@@ -119,8 +134,8 @@ function autoplay(ui, stepFn, ms = 900) {
   }
 }
 
-// 1. 정육각형: [BC]를 평행이동해 같은 벡터 찾기
-function hexTool(ui) {
+// 1. 정육각형: 벡터(기본 [BC])를 평행이동해 같은 벡터 찾기. "hex AB"처럼 옮길 벡터를 고른다
+function hexTool(ui, vecName = "BC") {
   const r3 = Math.sqrt(3) / 2;
   const P = { O: [0, 0], A: [-0.5, r3], B: [-1, 0], C: [-0.5, -r3], D: [0.5, -r3], E: [1, 0], F: [0.5, r3] };
   const bd = new Board(ui.board, { xmin: -1.6, xmax: 1.6, ymin: -1.3, ymax: 1.3, width: 300 });
@@ -132,24 +147,25 @@ function hexTool(ui) {
     const dy = p[1] === 0 ? -12 : p[1] < 0 ? 14 : -14;
     bd.point(p, { label: k, dx, dy, layer: bg });
   }
-  bd.arrow(P.B, P.C, { color: C.red, width: 3.5, label: "[BC]", labelSide: -1, layer: bg });
-  const d = sub(P.C, P.B);
-  const h = bd.handle(P.B, { color: C.red, r: 12 });
+  const S0 = P[vecName[0]] ?? P.B, E0 = P[vecName[1]] ?? P.C;
+  bd.arrow(S0, E0, { color: C.red, width: 3.5, label: `[${vecName}]`, labelSide: -1, layer: bg });
+  const d = sub(E0, S0);
+  const h = bd.handle(S0, { color: C.red, r: 12 });
   const update = (p) => {
     bd.clear();
     bd.arrow(p, add(p, d), { color: C.red, width: 2.5, dash: "6 4" });
     h.move(p);
     const snap = Object.entries(P).find(([, q]) => dist(p, q) < 0.2);
     const endSnap = snap ? Object.entries(P).find(([, q]) => dist(add(snap[1], d), q) < 0.2) : null;
-    if (snap && endSnap) info(ui, `시점 ${snap[0]}에 놓으면 종점은 ${endSnap[0]}이에요. $\\VV{${snap[0]}${endSnap[0]}} = \\VV{BC}$!`);
+    if (snap && endSnap) info(ui, `시점 ${snap[0]}에 놓으면 종점은 ${endSnap[0]}이에요. $\\VV{${snap[0]}${endSnap[0]}} = \\VV{${vecName}}$!`);
     else if (snap) info(ui, `시점 ${snap[0]}에 놓으면 종점이 꼭짓점이 아니에요.`);
     else info(ui, "시점(동그라미)을 꼭짓점이나 O에 끌어다 놓아 보세요.");
   };
   bd.drag(h.el, {
     onMove: (w) => update(Object.values(P).find((q) => dist(w, q) < 0.2) ?? w),
   });
-  update(P.B);
-  const tour = [P.A, P.O, P.F, P.E, P.B];
+  update(S0);
+  const tour = [...Object.values(P).filter((q) => q !== S0), S0];
   autoplay(ui, (t) => update(tour[t % tour.length]), 1300);
 }
 
@@ -232,7 +248,7 @@ function parallelTool(ui) {
     bd.clear();
     const par = Math.abs(v[0] * dir[1] - v[1] * dir[0]) < 1e-9;
     bd.arrow([0, 0], v, { color: par ? C.sum : C.red, width: 3.5, label: "{q}-{r}" });
-    if (par) info(ui, `<b>m = ${m}</b>일 때 $\\vv{q}-\\vv{r}$가 보라색 점선과 평행해요!`);
+    if (par) info(ui, `$m = ${m}$일 때 $\\vv{q}-\\vv{r}$가 보라색 점선과 평행해요!`);
     else info(ui, `m = ${m}: $\\vv{q}-\\vv{r} = (${-1 - m})\\vv{a} + 4\\vv{b}$`);
   };
   sl = slider(ui.ctrl, { min: -2, max: 3, step: 0.5, value: 0, label: "m" }, setM);
@@ -263,7 +279,7 @@ function collinearTool(ui) {
     const on = Math.abs(3 * m - 5 - 1) < 1e-9;
     bd.arrow(O, P, { color: on ? C.sum : C.red, width: 3, label: "[OC]" });
     bd.point(P, { label: "C", dx: 12, dy: -12, color: on ? C.sum : C.red });
-    if (on) info(ui, `<b>m = ${m}</b>일 때 계수의 합 $2m + (m-5) = 1$이 되어 점 C가 직선 AB 위에 와요!`);
+    if (on) info(ui, `$m = ${m}$일 때 계수의 합 $2m + (m-5) = 1$이 되어 점 C가 직선 AB 위에 와요!`);
     else info(ui, `m = ${m}: 계수의 합 $2m+(m-5) = ${3 * m - 5}$예요. 1이 되면 C가 직선 AB 위에 와요.`);
   };
   sl = slider(ui.ctrl, { min: 1, max: 3, step: 0.25, value: 1, label: "m" }, setM);

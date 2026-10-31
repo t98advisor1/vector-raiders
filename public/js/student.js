@@ -1,6 +1,7 @@
 import { connect, store } from "./net.js";
 const load = store;
-import { fmt, watchMath } from "./mathtext.js";
+import { fmt, watchMath, splitBogi, bogiHtml, boxedText } from "./mathtext.js";
+import { openPrintDoc } from "./printdoc.js";
 import { LAB_LEVELS } from "./lab.js";
 import { PROBLEMS, DIFFICULTY, UNITS, loadSet, figureHtml, SET } from "./problems.js";
 import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
@@ -509,10 +510,17 @@ const hooks = {
   onInteract,
   onShoot: () => { S.world?.shoot(); sound.sfx("shoot"); },
   // 표적 10발 완성: 그 구역의 핵심 개념 카드가 자동으로 열리고, 이어 기하 수학자 카드가 해금된다!
-  onTargetHit: (t) => {
+  // 처음 깬 방의 수정은 개념 카드 → 수학자 카드, 그다음부터(벽·문 옆 수정, 다시 생긴 수정)는 다음 수학자 카드
+  onTargetHit: (t, { first = true } = {}) => {
     sound.sfx("target");
-    toast(`🎯 표적 10발 완성! '${CONCEPTS[t.concept]?.title ?? ""}' 개념 카드가 해금되었어요.`, "ok");
-    showConcept(t.concept, () => triggerMathematicianEvent(closeModal), "problem");
+    if (S.modal) return toast("🎯 수정을 깼어요! 창을 닫고 다시 깨면 수학자 카드를 볼 수 있어요.", "ok");
+    if (first) {
+      toast(`🎯 표적 10발 완성! '${CONCEPTS[t.concept]?.title ?? ""}' 개념 카드가 해금되었어요.`, "ok");
+      showConcept(t.concept, () => triggerMathematicianEvent(closeModal), "problem");
+    } else {
+      toast("🎯 수정을 깼어요! 새로운 수학자 카드가 나타나요. (깨진 수정은 40초 뒤 벽·문 옆에 다시 생겨요)", "ok");
+      triggerMathematicianEvent(closeModal);
+    }
   },
 };
 
@@ -889,8 +897,16 @@ function onStage(stage) {
   if (stage === "done") { banner.textContent = "탐험이 끝났어요. 수고했어요!"; showSummary(); }
 }
 
+// 수업에서 내가 모든 방(상자 전부)을 탈출했는가
+const iEscaped = () => !!S.me && PROBLEMS.length > 0 && PROBLEMS.every((p) => S.me.probs[p.id]?.solved);
+
 function announceProgress(before, now) {
   if (!before) return;
+  const wasDone = PROBLEMS.every((p) => before.probs[p.id]?.solved);
+  if (S.mode === "class" && S.cls?.stage !== "done" && !wasDone && iEscaped()) {
+    toast("🏁 모든 방을 탈출했어요! 내가 푼 문제를 PDF로 출력할 수 있어요.", "ok");
+    setTimeout(() => { closeModal(); showSummary(); }, 1800);
+  }
   for (const id of Object.keys(DOORS)) {
     const wasOpen = DOORS[id].every((p) => before.probs[p]?.solved);
     if (!wasOpen && doorOpen(id)) {
@@ -955,8 +971,13 @@ $("#modal").addEventListener("pointerdown", (e) => { if (e.target.id === "modal"
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && S.modal) closeModal();
   const tag = e.target?.tagName;
-  if (e.code === "KeyM" && tag !== "INPUT" && tag !== "TEXTAREA") sound.toggle();
-  if (e.code === "KeyN" && tag !== "INPUT" && tag !== "TEXTAREA" && !$("#game").hidden) setMap($("#minimap").hidden, true);
+  const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  if (e.code === "KeyK" && !typing) sound.toggle();
+  // 지도 켜기·끄기: 많은 게임처럼 M, 방향키로 움직이는 사람은 왼손의 Tab (예전 N도 그대로)
+  if (["KeyM", "Tab", "KeyN"].includes(e.code) && !typing && !$("#game").hidden && !S.modal) {
+    e.preventDefault(); // Tab이 버튼 사이로 초점을 옮기지 않게
+    setMap($("#minimap").hidden, true);
+  }
 });
 $("#sound-btn").onclick = () => sound.toggle();
 $("#restart-btn").onclick = () => {
@@ -1278,9 +1299,10 @@ function openProblemBody(pid) {
       </div>
       ${coopWarning}
       <p class="p-text"></p>
+      ${bogiHtml(splitBogi(diffSpec.text).lines)}
       <div class="coop-conds" hidden></div>
-      <div class="tool" ${p.hasTool ? "" : "hidden"}>
-        <div class="tool-help">🔍 ${fmt(p.toolHelp)}</div>
+      <div class="tool" ${diffSpec.fig?.has ? "" : "hidden"}>
+        <div class="tool-help">🔍 ${fmt(diffSpec.howto ?? p.toolHelp)}</div>
         <div class="board-wrap"></div>
         <div class="tool-info"></div>
         <div class="tool-ctrl"></div>
@@ -1289,8 +1311,8 @@ function openProblemBody(pid) {
       <div class="feedback" role="status"></div>
       <div class="hint" hidden></div>`;
 
-    if (p.hasTool) p.tool({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: true });
-    typeText($(".p-text", body), diffSpec.text);
+    if (diffSpec.fig?.has) diffSpec.fig.fn({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: true });
+    typeText($(".p-text", body), splitBogi(diffSpec.text).stem);
     S.net?.send({ type: "open", pid, diff: curDiff }); // 풀이 시간 기록 시작 (처음 연 때만 서버가 적는다)
     const mine = S.me?.probs[pid];
     if (diffSpec.coop && !mine?.solved) {
@@ -1511,16 +1533,18 @@ function showAltar() {
 
 function showSummary() {
   const body = openModal(false);
+  const early = S.cls?.stage !== "done"; // 모든 방을 탈출했지만 탐험은 아직 진행 중
   const mine = PROBLEMS.filter((p) => solved(p.id)).length;
   const unlocked = PROBLEMS.filter((p) => S.cls?.relics[p.id]?.unlocked).length;
   // 오답 정리·형성평가 답지용 정답표: 수업 탐험이 끝나면 서버가 내려 준다(reviewAnswers에 저장).
   // 연습 모드에서는 PDF 출력을 하지 않는다.
-  const canPrint = S.mode === "class";
+  const canPrint = S.mode === "class" && (S.cls?.stage === "done" || iEscaped());
   if (canPrint) S.net?.send({ type: "review" });
   const wait = reviewAnswers ? "" : "disabled";
   body.innerHTML = `
     <div class="done">
-      <h2>탐험 끝!</h2>
+      <h2>${early ? "🏁 모든 방 탈출 성공!" : "탐험 끝!"}</h2>
+      ${early ? `<p class="muted">팀 친구들이 아직 풀고 있어도, 내가 푼 문제는 지금 바로 PDF로 출력할 수 있어요.</p>` : ""}
       <p class="big-num">우리 반이 깨운 유물 <b>${unlocked}</b> / ${PROBLEMS.length}</p>
       <p>내가 연 상자 <b>${mine}</b> / ${PROBLEMS.length} · 벡터 점프 ${S.me?.lab.length ?? 0} / ${LAB_LEVELS.length}</p>
       ${canPrint ? `<div class="print-box">
@@ -1529,6 +1553,7 @@ function showSummary() {
         <div class="summary-actions">
           <button id="fa-sheet-btn" class="btn primary" type="button">📝 형성평가 문제지</button>
           <button id="fa-answer-btn" class="btn needs-answers" type="button" ${wait}>✅ 형성평가 답지</button>
+          <button id="mine-btn" class="btn primary needs-answers" type="button" ${wait}>🗂️ 나의 풀이 기록</button>
           <button id="print-btn" class="btn needs-answers" type="button" ${wait}>📄 나의 오답 정리</button>
         </div>
       </div>` : ""}
@@ -1543,7 +1568,8 @@ function showSummary() {
   }
   $(".done", body).appendChild(ul);
   if (canPrint) {
-    $("#print-btn", body).onclick = printReview;
+    $("#print-btn", body).onclick = () => printReview(false);
+    $("#mine-btn", body).onclick = () => printReview(true);
     $("#fa-sheet-btn", body).onclick = () => printAssessment("sheet");
     $("#fa-answer-btn", body).onclick = () => printAssessment("answer");
   }
@@ -1557,14 +1583,13 @@ let reviewConds = null; // 협업 문제의 조건 ㉠·㉡ (탐험이 끝난 �
 const durText = (ms) => { if (!ms) return ""; const s = Math.round(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`; };
 
 // 인쇄 영역을 채운 뒤 수식(MathJax) 조판이 끝나면 인쇄 창을 연다
-function openPrint(html) {
+function openPrint(html, title = "벡터 유적 탈출 출력") {
+  if (openPrintDoc(title, html)) return; // 새 창 미리보기 (팝업이 막혔을 때만 아래 예전 방식)
   const area = $("#print-area");
   area.innerHTML = html;
   area.hidden = false;
-  setTimeout(() => {
-    window.print();
-    setTimeout(() => { area.hidden = true; }, 300);
-  }, 700);
+  window.addEventListener("afterprint", () => { area.hidden = true; }, { once: true });
+  window.print();
 }
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -1592,8 +1617,8 @@ function printAssessment(kind) {
       return `<section class="fa-item">
         ${head}
         <div class="fa-body">
-          <div class="fa-q"><p class="pr-text">${fmt(text)}</p>${(reviewConds?.[p.id]?.[d] ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("")}${optHtml}</div>
-          ${(() => { const f = figureHtml(p); return f ? `<div class="fa-fig">${f}</div>` : ""; })()}
+          <div class="fa-q"><div class="pr-text">${boxedText(text)}</div>${(reviewConds?.[p.id]?.[d] ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("")}${optHtml}</div>
+          ${(() => { const f = figureHtml(p, d); return f ? `<div class="fa-fig">${f}</div>` : ""; })()}
         </div>
         <p class="fa-blank"><b>답</b> <span></span></p>
       </section>`;
@@ -1616,36 +1641,30 @@ function printAssessment(kind) {
     ${items}`);
 }
 
-function printReview() {
+function printReview(all = false) {
   if (S.mode !== "class") return;
-  const area = $("#print-area");
+  if (!reviewByDiff && !reviewAnswers) return toast("정답표를 받는 중이에요. 잠시 후 다시 눌러 주세요.");
   const rows = PROBLEMS.map((p, i) => {
     const m = S.me?.probs[p.id];
     const wrongs = m?.wrongs?.length ? m.wrongs.join(", ") : m?.tries ? "형식 오류 없이 오답" : null;
     const status = m?.solved ? (m.firstTry ? "★ 한 번에 정답" : `✓ 정답 (${m.tries}번 시도)`) : m?.tries ? `✗ ${m.tries}번 시도, 미해결` : "미응시";
-    const need = !m?.solved || !m.firstTry; // 틀리거나 여러 번 시도한 문제만 자세히
+    const need = all ? m?.tries || m?.solved : !m?.solved || !m.firstTry; // 오답 정리: 틀리거나 여러 번 시도한 문제만 / 풀이 기록: 내가 푼 문제 전부
     if (!need) return "";
     const d = m?.diff ?? S.diff ?? "mid";
     const v = p.diffs?.[d] ?? p;
     return `
       <section class="pr-item">
-        <h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.level} · ${p.source}</small> <span class="pr-status">${status}</span></h3>
-        <p class="pr-text">${fmt(v.text ?? p.text)}</p>
+        <h3>${i + 1}. ${p.icon} ${p.relic} <small>${DIFF_NAME[d] ?? ""} · ${p.level}</small> <span class="pr-status">${status}${m?.timeMs ? ` · ⏱ ${durText(m.timeMs)}` : ""}</span></h3>
+        <div class="pr-text">${boxedText(v.text ?? p.text)}</div>
         ${wrongs ? `<p class="pr-wrongs"><b>내가 낸 답:</b> ${wrongs}</p>` : ""}
         <p class="pr-answer"><b>정답:</b> ${fmt(reviewByDiff?.[p.id]?.[d] ?? reviewAnswers?.[p.id] ?? "탐험이 끝나면 공개돼요")}</p>
         <p class="pr-hint"><b>풀이</b>: ${fmt(v.hint ?? p.hint)}</p>
       </section>`;
   }).join("");
-  area.innerHTML = `
+  openPrint(`
     <header class="pr-head">
-      <h1>벡터 유적 탈출 · 나의 오답 정리</h1>
+      <h1>벡터 유적 탈출 · ${all ? "나의 풀이 기록" : "나의 오답 정리"}</h1>
       <p>${S.name ?? ""} · ${new Date().toLocaleDateString("ko-KR")} · 맞힌 문제 ${PROBLEMS.filter((p) => solved(p.id)).length}/${PROBLEMS.length}</p>
     </header>
-    ${rows || "<p>틀린 문제가 없어요! 모든 문제를 한 번에 맞혔어요. 🎉</p>"}`;
-  area.hidden = false;
-  // 수식(MathJax) 조판이 끈 뒤 인쇄 창을 연다
-  setTimeout(() => {
-    window.print();
-    setTimeout(() => { area.hidden = true; }, 300);
-  }, 600);
+    ${rows || (all ? "<p>아직 푼 문제가 없어요.</p>" : "<p>틀린 문제가 없어요! 모든 문제를 한 번에 맞혔어요. 🎉</p>")}`, all ? "나의 풀이 기록" : "나의 오답 정리");
 }
