@@ -2,7 +2,8 @@
 // 모델: Kenney Mini Dungeon / Mini Characters (CC0). 지도 한 칸 = 3D 공간 1, 지도 (x, y) → (x, 0, y).
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { loadCharacter, makeCharacter } from "./characters.js";
+import { loadCharacter, makeCharacter, teamColor } from "./characters.js";
+import { Particles, glowSprite, brickTexture, slabTexture, lavaTexture, waterTexture, aimTexture } from "./fx.js";
 import { settings } from "./settings.js";
 import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR, PLATFORMS, TARGETS, TABLETS } from "./game.js";
 
@@ -55,7 +56,7 @@ function tileMatrix(x, z, { y = 0, rot = 0, sx = 1, sy = 1, sz = 1 } = {}) {
 }
 
 // 글자 표지판 (이름표, 안내 말풍선)
-function makeLabel(text, { bg = "rgba(17,24,39,0.8)", fg = "#fff", size = 30, height = 0.32 } = {}) {
+function makeLabel(text, { bg = "rgba(12,10,22,0.82)", fg = "#fff", size = 30, height = 0.32, border = "rgba(255,255,255,0.18)" } = {}) {
   const c = document.createElement("canvas");
   const ctx = c.getContext("2d");
   const font = `bold ${size}px Pretendard, "Malgun Gothic", "Noto Sans KR", sans-serif`;
@@ -66,9 +67,14 @@ function makeLabel(text, { bg = "rgba(17,24,39,0.8)", fg = "#fff", size = 30, he
   ctx.font = font;
   ctx.fillStyle = bg;
   ctx.beginPath();
-  ctx.roundRect(0, 0, c.width, c.height, c.height / 2);
+  ctx.roundRect(2, 2, c.width - 4, c.height - 4, (c.height - 4) / 2);
   ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = border;
+  ctx.stroke();
   ctx.fillStyle = fg;
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 4;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, c.width / 2, c.height / 2 + 1);
@@ -76,6 +82,30 @@ function makeLabel(text, { bg = "rgba(17,24,39,0.8)", fg = "#fff", size = 30, he
   tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
   sprite.scale.set((height * c.width) / c.height, height, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
+// 표적 위의 체력 바: 맞힐수록 줄어든다
+function makeBar(hits, total = 10) {
+  const c = document.createElement("canvas");
+  c.width = 220; c.height = 44;
+  const ctx = c.getContext("2d");
+  const left = Math.max(0, total - hits) / total;
+  ctx.fillStyle = "rgba(10,6,20,0.85)";
+  ctx.beginPath(); ctx.roundRect(2, 8, 216, 30, 8); ctx.fill();
+  ctx.strokeStyle = "rgba(255,138,216,0.7)"; ctx.lineWidth = 2; ctx.stroke();
+  const g = ctx.createLinearGradient(0, 0, 220, 0);
+  g.addColorStop(0, "#ff2fb3"); g.addColorStop(1, "#ffb3ec");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.roundRect(7, 13, 206 * left, 20, 5); ctx.fill();
+  ctx.font = "bold 18px Pretendard, sans-serif";
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(`${total - hits} / ${total}`, 110, 24);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.scale.set(1.3, 0.26, 1);
   sprite.renderOrder = 10;
   return sprite;
 }
@@ -98,24 +128,50 @@ export class World3D {
     this.renderer.setPixelRatio(low ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.shadowMap.enabled = !low;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // 영화처럼 밝은 곳은 부드럽게, 어두운 곳은 깊게 (횃불·용암 빛이 살아난다)
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1c1828);
-    this.scene.fog = new THREE.Fog(0x1c1828, 16, 32);
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-    this.scene.add(new THREE.HemisphereLight(0xfff4dc, 0x40355a, 1.7));
-    this.sun = new THREE.DirectionalLight(0xffffff, 2.4);
+    this.scene.background = new THREE.Color(0x0c0a14);
+    this.scene.fog = new THREE.Fog(0x0c0a14, 15, 30);
+    this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+    this.scene.add(new THREE.HemisphereLight(0xb7c2ff, 0x1c1428, 0.85));
+    this.sun = new THREE.DirectionalLight(0xffe6c8, 1.55);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
     Object.assign(this.sun.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: 1, far: 40 });
     this.sun.shadow.bias = -0.0008;
     this.scene.add(this.sun, this.sun.target);
     // 뒤쪽에서 비추는 차가운 빛: 캐릭터와 물체 가장자리가 반짝여 입체감이 산다
-    this.rim = new THREE.DirectionalLight(0xa8d8ff, 1.3);
+    this.rim = new THREE.DirectionalLight(0x8fc8ff, 1.4);
     this.scene.add(this.rim, this.rim.target);
     // 정면 보조광(필 라이트): 캐릭터 얼굴이 어둡게 묻히지 않게 카메라 쪽에서 밝혀 준다
-    this.fill = new THREE.DirectionalLight(0xfff2dd, 1.25);
+    this.fill = new THREE.DirectionalLight(0xfff2dd, 0.7);
     this.scene.add(this.fill, this.fill.target);
+
+    // 횃불 빛: 몇 개의 점광원을 플레이어 가까운 횃불로 옮겨 가며 쓴다 (크롬북에서도 가볍게)
+    this.torches = [];
+    this.torchLights = Array.from({ length: low ? 2 : 5 }, () => {
+      const l = new THREE.PointLight(0xff9a3c, 0, 7, 1.4);
+      this.scene.add(l);
+      return l;
+    });
+    // 사격 섬광: 쏠 때와 맞힐 때 잠깐 번쩍이는 빛
+    this.flashLight = new THREE.PointLight(0x7dfcff, 0, 6, 1.5);
+    this.scene.add(this.flashLight);
+
+    // 파티클: 빛나는 불꽃·스파크(더하기 합성)와 흙먼지(보통 합성)
+    this.sparks = new Particles(this.scene, { max: low ? 300 : 700, additive: true, soft: 0.0 });
+    this.dust = new Particles(this.scene, { max: low ? 120 : 260, additive: false, soft: 0.2 });
+    this.motes = []; // 공중을 떠다니는 먼지 티끌
+    this.shake = 0; // 화면 흔들림 세기 (0~1)
+    this.kick = new THREE.Vector3(); // 사격 반동
+    this.lead = new THREE.Vector3(); // 진행 방향으로 살짝 앞을 보여 주는 카메라
+    this.camLook = new THREE.Vector3();
+    this.stepT = 0;
+    this.wasAir = false;
+    this.popTexts = [];
 
     this.mixers = [];
     this.avatars = new Map(); // n(나는 "me") → 캐릭터
@@ -140,6 +196,9 @@ export class World3D {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    const px = h * this.renderer.getPixelRatio();
+    this.sparks?.setViewport(px, this.camera.fov);
+    this.dust?.setViewport(px, this.camera.fov);
   }
 
   async init() {
@@ -154,9 +213,12 @@ export class World3D {
     this.buildPlatforms();
     this.buildTargets();
     this.buildVectorHolograms();
-    // 사격 탄환용 공용 지오메트리·재료 (네온 벡터 탄)
-    this.boltGeo = new THREE.SphereGeometry(0.16, 10, 10);
-    this.boltMat = new THREE.MeshBasicMaterial({ color: 0x7dfcff });
+    this.buildTorches();
+    // 사격 탄환용 공용 지오메트리·재료 (네온 벡터 탄: 길쭉한 빛줄기)
+    this.boltGeo = new THREE.CapsuleGeometry(0.07, 0.36, 4, 8);
+    this.boltGeo.rotateX(Math.PI / 2);
+    this.boltMat = new THREE.MeshBasicMaterial({ color: 0xd9feff });
+    this.resize();
   }
 
   start() {
@@ -174,7 +236,8 @@ export class World3D {
   buildStatic(m) {
     const grid = this.game.grid;
     const floors = [], floorColors = [], details = [], detailColors = [], walls = [], banners = [];
-    const tint = ROOMS.map((r) => new THREE.Color(r.tint));
+    // 방 색은 살리되 돌바닥처럼 차분하게
+    const tint = ROOMS.map((r) => new THREE.Color(r.tint).lerp(new THREE.Color(0x6e6680), 0.5));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const ch = grid[y][x];
       if (ch === "#") {
@@ -197,20 +260,33 @@ export class World3D {
     // 물·절벽·용암: 다리마다 세로로 긴 띠
     for (const br of Object.values(BRIDGES)) {
       const hz = HAZARD[br.hazard];
+      let map = null;
+      if (br.hazard === "!") { map = lavaTexture(); map.repeat.set(1, (H - 2) / 2); }
+      if (br.hazard === "~") { map = waterTexture(); map.repeat.set(1, (H - 2) / 2); }
       const mat = new THREE.MeshStandardMaterial({
-        color: hz.color, emissive: hz.emissive, emissiveIntensity: br.hazard === "!" ? 1.2 : 0.4,
-        roughness: br.hazard === "~" ? 0.15 : 0.9, transparent: hz.opacity < 1, opacity: hz.opacity,
+        color: map ? 0xffffff : hz.color, map, emissive: br.hazard === "!" ? 0xffffff : hz.emissive,
+        emissiveMap: br.hazard === "!" ? map : null, emissiveIntensity: br.hazard === "!" ? 1.1 : 0.35,
+        roughness: br.hazard === "~" ? 0.12 : 0.9, metalness: br.hazard === "~" ? 0.2 : 0,
+        transparent: hz.opacity < 1, opacity: hz.opacity,
       });
       const plane = new THREE.Mesh(new THREE.PlaneGeometry(2, H - 2), mat);
       plane.rotation.x = -Math.PI / 2;
       plane.position.set(br.cx, hz.y, H / 2);
       plane.receiveShadow = true;
       this.scene.add(plane);
-      this.hazards.push({ kind: br.hazard, mat, base: mat.emissiveIntensity });
+      this.hazards.push({ kind: br.hazard, mat, map, base: mat.emissiveIntensity, cx: br.cx });
+      if (br.hazard === "!") {
+        // 용암 빛: 주변 벽과 바닥을 붉게 물들인다
+        for (const z of [3.5, 7.5, 11.5]) {
+          const l = new THREE.PointLight(0xff5a1f, 5, 6, 1.3);
+          l.position.set(br.cx, 0.8, z);
+          this.scene.add(l);
+        }
+      }
       if (br.hazard === "^") {
         // 절벽 양쪽 벽면
         for (const side of [-1, 1]) {
-          const cliff = new THREE.Mesh(new THREE.PlaneGeometry(H - 2, 0.9), new THREE.MeshStandardMaterial({ color: 0x3a2f45 }));
+          const cliff = new THREE.Mesh(new THREE.PlaneGeometry(H - 2, 0.9), new THREE.MeshStandardMaterial({ color: 0x2a2233, roughness: 1 }));
           cliff.rotation.y = side * Math.PI / 2;
           cliff.position.set(br.cx - side, -0.45, H / 2);
           this.scene.add(cliff);
@@ -339,11 +415,23 @@ export class World3D {
 
   // 로블록스풍 수직 발판: 점프로 딛고 올라가는 계단·부유 디딤돌·기둥 블록
   buildPlatforms() {
-    const sideMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.85 });
-    const topMat = new THREE.MeshStandardMaterial({ color: 0xb0906a, roughness: 0.65 });
+    // 고대 돌 블록: 옆면은 벽돌, 윗면은 금빛 테두리 판석. 높이별로 벽돌 무늬 반복을 맞춘다.
+    const brick = brickTexture();
+    const topMat = new THREE.MeshStandardMaterial({ map: slabTexture(), roughness: 0.7 });
+    const sideMats = new Map();
+    const sideMat = (ph) => {
+      if (!sideMats.has(ph)) {
+        const map = brick.clone();
+        map.needsUpdate = true;
+        map.repeat.set(1, ph);
+        sideMats.set(ph, new THREE.MeshStandardMaterial({ map, roughness: 0.9 }));
+      }
+      return sideMats.get(ph);
+    };
     for (const [key, ph] of PLATFORMS) {
       const [x, y] = key.split(",").map(Number);
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.96, ph, 0.96), [sideMat, sideMat, topMat, sideMat, sideMat, sideMat]);
+      const sm = sideMat(ph);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.96, ph, 0.96), [sm, sm, topMat, sm, sm, sm]);
       box.position.set(x + 0.5, ph / 2, y + 0.5);
       box.castShadow = box.receiveShadow = true;
       this.scene.add(box);
@@ -362,23 +450,21 @@ export class World3D {
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(t.x, 0.03, t.y);
       this.scene.add(crystal, ring);
-      const label = makeLabel("🎯 0 / 10", { bg: "rgba(87,16,64,0.9)", fg: "#ffd6f5", size: 26, height: 0.3 });
-      label.position.set(t.x, 1.9, t.y);
+      const label = makeBar(0);
+      label.position.set(t.x, 1.75, t.y);
+      const halo = glowSprite(0xff4fc8, 1.6, 0.55);
+      halo.position.set(t.x, 1.05, t.y);
+      this.scene.add(halo);
       this.scene.add(label);
-      this.targets.set(t.zone, { t, crystal, ring, label, labelCount: 0, hits: 0, done: false, flash: 0 });
+      this.targets.set(t.zone, { t, crystal, ring, label, halo, labelCount: 0, hits: 0, done: false, flash: 0 });
     }
   }
 
   // ---------- 기하 벡터 3D 좌표계 및 네온 벡터 홀로그램 ----------
   buildVectorHolograms() {
     this.vectorHolograms = [];
-    const points = [
-      { x: 10, y: 1.4, z: 7 },
-      { x: 26, y: 1.4, z: 7 },
-      { x: 42, y: 1.4, z: 7 },
-      { x: 60, y: 1.4, z: 7 },
-      { x: ALTAR.x + 0.5, y: 2.3, z: ALTAR.y + 0.5 },
-    ];
+    // 방마다 떠 있던 좌표축은 화면을 어지럽혀서 제단 위에만 남긴다
+    const points = [{ x: ALTAR.x + 0.5, y: 2.3, z: ALTAR.y + 0.5 }];
     for (const p of points) {
       const g = new THREE.Group();
       g.position.set(p.x, p.y, p.z);
@@ -394,26 +480,84 @@ export class World3D {
       this.vectorHolograms.push(g);
     }
 
-    // 플레이어 발밑 방향 벡터 화살표 (진행 방향 및 크기 실시간 표시)
-    this.playerVectorArrow = new THREE.ArrowHelper(
-      new THREE.Vector3(1, 0, 0),
-      new THREE.Vector3(0, 0.08, 0),
-      1.0,
-      0x5eead4,
-      0.32,
-      0.2
+    // 플레이어 앞 바닥의 조준 화살표(진행 방향 벡터): 사격이 나가는 방향을 보여 준다
+    const aim = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.5, 1.0),
+      new THREE.MeshBasicMaterial({ map: aimTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
     );
-    this.scene.add(this.playerVectorArrow);
+    aim.rotation.x = -Math.PI / 2;
+    aim.position.set(0, 0, -1.05);
+    this.aim = new THREE.Group();
+    this.aim.add(aim);
+    this.aim.renderOrder = 4;
+    this.scene.add(this.aim);
+  }
+
+  // 벽에 건 횃불: 불꽃 스프라이트는 모두 그리고, 실제 빛은 가까운 몇 개만 켠다
+  buildTorches() {
+    const grid = this.game.grid;
+    const spots = [];
+    for (let x = 2; x < W - 2; x++) {
+      if (x % 4 === 0 && grid[1][x] !== "#" && !"~^!".includes(grid[1][x])) spots.push([x + 0.5, 0.92, 0]); // 뒷벽
+    }
+    for (const col of Object.values(DOOR_COLS)) {
+      for (const r of [DOOR_ROWS[0] - 1.5, DOOR_ROWS[DOOR_ROWS.length - 1] + 2.5]) {
+        spots.push([col - 0.08, r, -1], [col + 1.08, r, 1]); // 문 양옆 기둥
+      }
+    }
+    const holderGeo = new THREE.CylinderGeometry(0.05, 0.035, 0.32, 6);
+    const cupGeo = new THREE.CylinderGeometry(0.11, 0.06, 0.12, 8);
+    const metal = new THREE.MeshStandardMaterial({ color: 0x3a3030, roughness: 0.6, metalness: 0.5 });
+    for (const [x, z, side] of spots) {
+      const g = new THREE.Group();
+      g.position.set(x, 1.45, z + (side === 0 ? 0.12 : 0));
+      const holder = new THREE.Mesh(holderGeo, metal);
+      holder.rotation.x = side === 0 ? 0.5 : 0;
+      holder.rotation.z = side === 0 ? 0 : -side * 0.5;
+      const cup = new THREE.Mesh(cupGeo, metal);
+      cup.position.set(side * 0.07, 0.17, side === 0 ? 0.08 : 0);
+      const flame = glowSprite(0xff9a30, 0.9, 1);
+      flame.position.set(side * 0.07, 0.33, side === 0 ? 0.08 : 0);
+      const core = glowSprite(0xfff1b0, 0.35, 1);
+      core.position.copy(flame.position);
+      g.add(holder, cup, flame, core);
+      this.scene.add(g);
+      this.torches.push({ g, flame, core, seed: Math.random() * 10, pos: new THREE.Vector3(x + side * 0.07, 1.85, z + (side === 0 ? 0.35 : 0)) });
+    }
   }
 
   // 사격: 전방(me.dir)으로 네온 벡터 탄환을 하나 쏜다. 명중·소멸은 sync에서 처리한다.
   shoot() {
     const g = this.game;
     const dir = g.me.dir, len = Math.hypot(dir[0], dir[1]) || 1;
+    const dx = dir[0] / len, dz = dir[1] / len;
+    const y = 0.7 + (g.me.jumpY ?? 0);
+    const sx = g.me.x + dx * 0.45, sz = g.me.y + dz * 0.45;
     const mesh = new THREE.Mesh(this.boltGeo, this.boltMat.clone());
-    mesh.position.set(g.me.x, 0.9, g.me.y);
+    mesh.position.set(sx, y, sz);
+    mesh.rotation.y = Math.atan2(dx, dz);
+    const glow = glowSprite(0x5ff6ff, 0.6, 0.8);
+    mesh.add(glow);
     this.scene.add(mesh);
-    this.bolts.push({ mesh, vx: (dir[0] / len) * BOLT_SPEED, vz: (dir[1] / len) * BOLT_SPEED, ttl: 1.5 });
+    this.bolts.push({ mesh, glow, vx: dx * BOLT_SPEED, vz: dz * BOLT_SPEED, ttl: BOLT_TTL });
+    // 총구 섬광, 반동, 살짝 흔들림
+    this.sparks.burst(sx, y, sz, { count: 8, speed: 2.2, up: 0.6, life: 0.16, size: 0.12, color: 0x9ffcff, gravity: 0 });
+    this.sparks.emit({ x: sx, y, z: sz, life: 0.07, size: 0.45, color: 0xc8ffff });
+    this.flashLight.position.set(sx, y + 0.2, sz);
+    this.flashLight.color.set(0x7dfcff);
+    this.flashLight.intensity = 9;
+    this.kick.set(-dx * 0.12, 0, -dz * 0.12);
+    this.shake = Math.min(1, this.shake + 0.12);
+    const me = this.avatars.get("me");
+    if (me?.model) me.recoil = 1;
+  }
+
+  // 공중에 떠오르며 사라지는 글자 (+1, HIT!, CLEAR!)
+  popText(text, x, y, z, color = "#ffe066", size = 0.36) {
+    const label = makeLabel(text, { bg: "rgba(0,0,0,0)", fg: color, size: 40, height: size, border: "rgba(0,0,0,0)" });
+    label.position.set(x + (Math.random() - 0.5) * 0.3, y, z);
+    this.scene.add(label);
+    this.popTexts.push({ label, life: 0.8, max: 0.8, vy: 1.6 });
   }
 
   // ---------- 캐릭터 ----------
@@ -422,14 +566,25 @@ export class World3D {
     if (av) return av;
     const group = new THREE.Group();
     group.rotation.y = Math.PI; // 모델은 -z를 보고 있으므로 처음에는 카메라 쪽(+z)을 보게 돌린다
-    av = { group, n, team, label: null, labelText: "", model: null, mixer: null, actions: null, current: null };
+    av = { group, n, team, key, label: null, labelText: "", model: null, mixer: null, actions: null, current: null };
     this.avatars.set(key, av);
     this.scene.add(group);
     loadCharacter(n).then((gltf) => {
       if (this.avatars.get(key) !== av) return; // 그새 나갔으면 버린다
-      const { model, mixer, action } = makeCharacter(gltf, { outline: this.quality !== "low", n, team });
-      model.scale.setScalar(1.45);
+      const { model, mixer, action, muzzle } = makeCharacter(gltf, { outline: this.quality !== "low", n, team });
+      model.scale.setScalar(1.7);
       group.add(model);
+      // 발밑: 둥근 그림자 + 팀 색 링 (내 캐릭터는 더 밝게 빛난다)
+      const col = teamColor(team, n);
+      const isMe = key === "me";
+      const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.36, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = 0.015;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, isMe ? 0.5 : 0.46, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: isMe ? 0.9 : 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.02;
+      group.add(shadow, ring);
+      Object.assign(av, { ring, shadow, muzzle, recoil: 0 });
       Object.assign(av, { model, mixer, actions: { idle: action("idle"), walk: action("walk"), yes: action("emote-yes"), jump: action("jump") } });
       av.actions.idle.play();
       av.current = "idle";
@@ -459,8 +614,9 @@ export class World3D {
     else if (av.current !== "yes") this.setAnim(av, moving ? "walk" : "idle");
     if (av.labelText !== name) {
       if (av.label) { av.group.remove(av.label); disposeLabel(av.label); }
-      av.label = makeLabel(name, { bg: isMe ? "rgba(15,118,110,0.92)" : "rgba(17,24,39,0.7)" });
-      av.label.position.y = 1.55;
+      const col = "#" + new THREE.Color(teamColor(av.team, av.n)).getHexString();
+      av.label = makeLabel(isMe ? `▼ ${name}` : name, { bg: isMe ? "rgba(10,40,44,0.92)" : "rgba(12,10,22,0.78)", fg: isMe ? "#7dfcff" : "#fff", border: col, size: 28, height: 0.28 });
+      av.label.position.y = 1.6;
       av.group.add(av.label);
       av.labelText = name;
     }
@@ -527,7 +683,15 @@ export class World3D {
           a.reset().play();
           if (!this.ready) ob.mixer.update(ob.clip.duration);
         }
-        if (this.ready) this.cheer();
+        if (this.ready) {
+          this.cheer();
+          // 보물 획득: 금빛 폭죽
+          const p = ob.root.position;
+          this.sparks.burst(p.x, 0.9, p.z, { count: 50, speed: 3.5, up: 5, life: 1.1, size: 0.16, color: 0xffd34d });
+          this.sparks.burst(p.x, 0.9, p.z, { count: 20, speed: 2, up: 4, life: 1.3, size: 0.1, color: 0xffffff });
+          this.popText("🗝️ +1", p.x, 1.8, p.z, "#ffe066", 0.5);
+          this.shake = Math.min(1, this.shake + 0.4);
+        }
       }
       ob.solved = solved;
       ob.key.visible = !solved;
@@ -559,21 +723,46 @@ export class World3D {
     }
 
     // 물결·용암 반짝임
-    for (const hz of this.hazards) if (hz.kind !== "^") hz.mat.emissiveIntensity = hz.base * (0.8 + 0.25 * Math.sin(t * (hz.kind === "!" ? 3 : 1.5)));
+    for (const hz of this.hazards) {
+      if (hz.kind === "^") continue;
+      hz.mat.emissiveIntensity = hz.base * (0.8 + 0.25 * Math.sin(t * (hz.kind === "!" ? 3 : 1.5)));
+      if (hz.map) {
+        hz.map.offset.y = t * (hz.kind === "!" ? 0.05 : 0.18);
+        hz.map.offset.x = Math.sin(t * 0.6) * 0.04;
+      }
+      // 플레이어 근처 용암에서 불티가 솟는다
+      if (hz.kind === "!" && Math.abs(hz.cx - g.me.x) < 14 && Math.random() < dt * 14) {
+        this.sparks.emit({
+          x: hz.cx - 1 + Math.random() * 2, y: 0, z: 1 + Math.random() * (H - 2),
+          vx: (Math.random() - 0.5) * 0.3, vy: 0.8 + Math.random() * 1.2, vz: (Math.random() - 0.5) * 0.3,
+          life: 1.2 + Math.random(), size: 0.08 + Math.random() * 0.08, color: Math.random() < 0.5 ? 0xffb347 : 0xff5a1f,
+        });
+      }
+    }
 
     // 사격 탄환: 앞으로 나아가고, 벽에 닿거나 시간이 다 되면 사라진다. 표적에 닿으면 명중!
     for (const b of this.bolts) {
-      b.mesh.position.x += b.vx * dt;
-      b.mesh.position.z += b.vz * dt;
-      b.mesh.rotation.y += dt * 8;
+      const P = b.mesh.position;
+      P.x += b.vx * dt;
+      P.z += b.vz * dt;
       b.ttl -= dt;
-      const ch = g.grid[Math.floor(b.mesh.position.z)]?.[Math.floor(b.mesh.position.x)];
-      if (b.ttl <= 0 || ch === undefined || ch === "#" || ch === "o" || ch === "@") { b.dead = true; continue; }
+      // 빛 꼬리
+      this.sparks.emit({ x: P.x, y: P.y, z: P.z, life: 0.2, size: 0.13, color: 0x38e8ff, alpha: 0.7 });
+      const ch = g.grid[Math.floor(P.z)]?.[Math.floor(P.x)];
+      if (b.ttl <= 0 || ch === undefined || ch === "#" || ch === "o" || ch === "@" || /[123]/.test(ch)) {
+        b.dead = true;
+        if (b.ttl > 0) {
+          // 벽에 맞으면 불꽃이 튄다
+          this.sparks.burst(P.x - b.vx * 0.02, P.y, P.z - b.vz * 0.02, { count: 10, speed: 2.5, up: 2, life: 0.35, size: 0.12, color: 0xffd27a });
+          this.sparks.emit({ x: P.x, y: P.y, z: P.z, life: 0.12, size: 0.7, color: 0x9ffcff });
+        }
+        continue;
+      }
       for (const tg of this.targets.values()) {
         if (tg.done) continue;
-        if (Math.hypot(tg.t.x - b.mesh.position.x, tg.t.y - b.mesh.position.z) < 0.55) {
+        if (Math.hypot(tg.t.x - P.x, tg.t.y - P.z) < 0.55) {
           b.dead = true;
-          this.hitTarget(tg);
+          this.hitTarget(tg, P);
           break;
         }
       }
@@ -594,12 +783,15 @@ export class World3D {
       const s = 1 + tg.flash * 0.6;
       tg.crystal.scale.setScalar(s);
       tg.ring.material.opacity = 0.3 + 0.25 * Math.sin(t * 3) + tg.flash * 0.4;
+      tg.halo.material.opacity = 0.45 + 0.15 * Math.sin(t * 4) + tg.flash * 0.6;
+      tg.halo.position.y = tg.crystal.position.y;
+      tg.crystal.material.emissive.setHex(tg.flash > 0.5 ? 0xffffff : 0xff2fb3);
       if (tg.labelCount !== tg.hits) {
         tg.labelCount = tg.hits;
         this.scene.remove(tg.label);
         disposeLabel(tg.label);
-        tg.label = makeLabel(`🎯 ${tg.hits} / 10`, { bg: "rgba(87,16,64,0.9)", fg: "#ffd6f5", size: 26, height: 0.3 });
-        tg.label.position.set(tg.t.x, 1.9, tg.t.y);
+        tg.label = makeBar(tg.hits);
+        tg.label.position.set(tg.t.x, 1.75, tg.t.y);
         this.scene.add(tg.label);
       }
     }
@@ -630,34 +822,32 @@ export class World3D {
     }
     if (this.prompt) this.prompt.position.set(g.focus.x, 2.05 + Math.sin(t * 3) * 0.05, g.focus.y);
 
-    // 기하 벡터 홀로그램 회전 및 플레이어 발밑 방향 벡터 업데이트
-    if (this.vectorHolograms) {
-      for (const h of this.vectorHolograms) h.rotation.y = t * 0.8;
-    }
-    if (this.playerVectorArrow) {
-      const dir = g.me.dir;
-      const len = Math.hypot(dir[0], dir[1]);
-      this.playerVectorArrow.position.set(g.me.x, 0.08, g.me.y);
-      if (len > 0.01) {
-        this.playerVectorArrow.setDirection(new THREE.Vector3(dir[0] / len, 0, dir[1] / len));
-        this.playerVectorArrow.visible = true;
-      } else {
-        this.playerVectorArrow.visible = false;
-      }
-    }
+    // 제단 위 기하 벡터 홀로그램
+    if (this.vectorHolograms) for (const h of this.vectorHolograms) h.rotation.y = t * 0.8;
 
-    // 카메라: 지면 기준 약 30° 사선 쿼터뷰(아이소메트릭)
-    // 수직 탑다운(90°)이 아닌 30° 완만한 사선으로 캐릭터의 얼굴, 안경, 모자, 망토가 선명하게 보인다
-    const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 12.0 * this.camera.aspect;
-    const camX = Math.min(W - halfW, Math.max(Math.min(halfW, W / 2), g.me.x));
-    const want = new THREE.Vector3(camX, 5.2, g.me.y + 8.8);
-    this.camera.position.lerp(want, this.ready ? 1 - Math.pow(0.002, dt) : 1);
-    this.camera.lookAt(this.camera.position.x, 1.1, g.me.y);
+    this.syncFx(dt, t);
+
+    // 카메라: 약 40° 내려다보는 액션 RPG 시점(얼굴과 지형이 함께 보인다). 진행 방향으로 살짝 앞을 보여 주고, 사격·명중 때 흔들린다.
+    const dir = g.me.dir, dl = Math.hypot(dir[0], dir[1]) || 1;
+    const leadAmt = g.me.moving ? 1.6 : 0.6;
+    this.lead.lerp(new THREE.Vector3((dir[0] / dl) * leadAmt, 0, (dir[1] / dl) * leadAmt * 0.6), 1 - Math.pow(0.05, dt));
+    // 화면 가장자리에 지도 바깥(빈 공간)이 보이지 않도록 카메라 중심을 막는다
+    const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 13.5 * this.camera.aspect;
+    const lx = Math.min(W - halfW * 0.7, Math.max(halfW * 0.7, g.me.x + this.lead.x));
+    const lz = Math.min(H - 4.5, Math.max(4.5, g.me.y + this.lead.z));
+    const look = new THREE.Vector3(lx, 0.5 + (g.me.jumpY ?? 0) * 0.25, lz);
+    this.camLook.lerp(look, this.ready ? 1 - Math.pow(0.004, dt) : 1);
+    this.kick.multiplyScalar(Math.pow(0.0005, dt));
+    this.shake = Math.max(0, this.shake - dt * 1.8);
+    const sh = this.shake * this.shake * 0.35;
+    const jx = (Math.random() - 0.5) * sh, jy = (Math.random() - 0.5) * sh;
+    this.camera.position.set(this.camLook.x + jx + this.kick.x, this.camLook.y + 7.4 + jy, this.camLook.z + 8.6 + this.kick.z);
+    this.camera.lookAt(this.camLook.x + jx * 0.5, this.camLook.y, this.camLook.z);
     this.sun.position.set(g.me.x - 5, 12, g.me.y + 6);
     this.sun.target.position.set(g.me.x, 0, g.me.y);
     this.rim.position.set(g.me.x + 3, 5, g.me.y - 8);
     this.rim.target.position.set(g.me.x, 0, g.me.y);
-    this.fill.position.set(g.me.x, 4, g.me.y + 7);
+    this.fill.position.set(g.me.x, 6, g.me.y + 7);
     this.fill.target.position.set(g.me.x, 1, g.me.y);
     // 서버에서 내 진행 상황을 받은 뒤부터는 상태 변화를 애니메이션으로 보여 준다.
     if (this.h.hasState()) this.ready = true;
@@ -673,16 +863,117 @@ export class World3D {
     if (Math.hypot(e.clientX - sx, e.clientY - sy) < 110) this.h.onInteract(f);
   }
 
+  // 매 프레임 연출: 횃불, 발걸음 먼지, 착지, 조준 화살표, 떠다니는 티끌, 떠오르는 글자
+  syncFx(dt, t) {
+    const g = this.game;
+    // 횃불 일렁임 + 가까운 횃불에 실제 빛 배치
+    for (const tc of this.torches) {
+      const f = 0.85 + 0.15 * Math.sin(t * 13 + tc.seed) * Math.sin(t * 7.3 + tc.seed * 2);
+      tc.flame.scale.setScalar(0.9 * f);
+      tc.core.scale.setScalar(0.35 * (0.9 + 0.1 * Math.sin(t * 21 + tc.seed)));
+      tc.d = Math.hypot(tc.pos.x - g.me.x, tc.pos.z - g.me.y);
+      if (Math.random() < dt * 3) {
+        const p = tc.flame.getWorldPosition(new THREE.Vector3());
+        this.sparks.emit({ x: p.x, y: p.y + 0.05, z: p.z, vy: 0.9, vx: (Math.random() - 0.5) * 0.2, life: 0.6, size: 0.06, color: 0xffc070 });
+      }
+    }
+    const near = [...this.torches].sort((a, b) => a.d - b.d);
+    this.torchLights.forEach((l, i) => {
+      const tc = near[i];
+      if (!tc) { l.intensity = 0; return; }
+      l.position.copy(tc.pos);
+      const fade = Math.max(0, 1 - tc.d / 16);
+      l.intensity = 9 * fade * (0.85 + 0.15 * Math.sin(t * 11 + tc.seed));
+    });
+    this.flashLight.intensity *= Math.pow(0.0001, dt);
+
+    // 발걸음 먼지와 착지 먼지
+    const air = !!g.me.air && (g.me.jumpY ?? 0) > 0.02;
+    if (g.me.moving && !air) {
+      this.stepT -= dt;
+      if (this.stepT <= 0) {
+        this.stepT = 0.14;
+        this.dust.emit({ x: g.me.x + (Math.random() - 0.5) * 0.2, y: 0.08 + (g.me.jumpY ?? 0), z: g.me.y + (Math.random() - 0.5) * 0.2,
+          vy: 0.35, vx: -g.me.dir[0] * 0.4, vz: -g.me.dir[1] * 0.4, life: 0.55, size: 0.28, grow: 1.2, color: 0xb9ab97, alpha: 0.45, drag: 2 });
+      }
+    }
+    if (this.wasAir && !air) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        this.dust.emit({ x: g.me.x, y: 0.08 + (g.me.jumpY ?? 0), z: g.me.y, vx: Math.cos(a) * 1.6, vz: Math.sin(a) * 1.6, vy: 0.2,
+          life: 0.5, size: 0.3, grow: 1.4, color: 0xc4b8a6, alpha: 0.5, drag: 4 });
+      }
+      this.shake = Math.min(1, this.shake + 0.08);
+    }
+    this.wasAir = air;
+
+    // 조준 화살표: 내 앞 바닥에서 숨 쉬듯 빛난다
+    const dir = g.me.dir, dl = Math.hypot(dir[0], dir[1]);
+    if (dl > 0.01) {
+      this.aim.visible = true;
+      this.aim.position.set(g.me.x, 0.04 + (g.me.jumpY ?? 0), g.me.y);
+      this.aim.rotation.y = Math.atan2(-dir[0] / dl, -dir[1] / dl);
+      this.aim.children[0].material.opacity = 0.55 + 0.3 * Math.sin(t * 5);
+    } else this.aim.visible = false;
+
+    // 내 캐릭터 링 맥박 + 사격 반동
+    for (const av of this.avatars.values()) {
+      if (av.ring && av.key === "me") av.ring.scale.setScalar(1 + 0.06 * Math.sin(t * 4));
+      if (av.recoil > 0 && av.model) {
+        av.recoil = Math.max(0, av.recoil - dt * 8);
+        av.model.position.z = -av.recoil * 0.08;
+      }
+    }
+
+    // 공중을 떠다니는 먼지 티끌 (분위기)
+    if (this.quality !== "low" && Math.random() < dt * 10) {
+      this.sparks.emit({
+        x: g.me.x + (Math.random() - 0.5) * 22, y: 0.3 + Math.random() * 2.5, z: 1 + Math.random() * (H - 2),
+        vx: 0.1 + Math.random() * 0.15, vy: 0.05, vz: (Math.random() - 0.5) * 0.1,
+        life: 3 + Math.random() * 3, size: 0.05 + Math.random() * 0.05, color: 0xffe2a8, alpha: 0.5,
+      });
+    }
+
+    this.sparks.update(dt);
+    this.dust.update(dt);
+
+    // 떠오르는 글자
+    this.popTexts = this.popTexts.filter((p) => {
+      p.life -= dt;
+      p.label.position.y += p.vy * dt;
+      p.vy *= Math.pow(0.1, dt);
+      p.label.material.opacity = Math.min(1, p.life / p.max * 2);
+      if (p.life > 0) return true;
+      this.scene.remove(p.label);
+      disposeLabel(p.label);
+      return false;
+    });
+  }
+
   // 표적 명중 1발: 반짝이고, 10발이면 표적이 깨지며 개념 카드 팝업을 연다
-  hitTarget(tg) {
+  hitTarget(tg, at) {
     tg.hits++;
     tg.flash = 1;
+    const x = at?.x ?? tg.t.x, y = at?.y ?? 1.05, z = at?.z ?? tg.t.y;
+    this.sparks.burst(x, y, z, { count: 16, speed: 3, up: 2, life: 0.45, size: 0.14, color: 0xff7ad9 });
+    this.sparks.emit({ x, y, z, life: 0.14, size: 1.1, color: 0xffd6f5 });
+    this.flashLight.position.set(x, y + 0.3, z);
+    this.flashLight.color.set(0xff4fc8);
+    this.flashLight.intensity = 14;
+    this.shake = Math.min(1, this.shake + 0.22);
+    this.popText(tg.hits < 10 ? "HIT!" : "BREAK!", tg.t.x, 2.1, tg.t.y, tg.hits < 10 ? "#ffd6f5" : "#ffe066", tg.hits < 10 ? 0.34 : 0.55);
     if (tg.hits < 10) return;
     tg.done = true;
     tg.crystal.visible = false;
     tg.ring.visible = false;
+    tg.halo.visible = false;
     this.scene.remove(tg.label);
     disposeLabel(tg.label);
+    // 수정이 산산조각: 큰 폭발 + 강한 흔들림
+    this.sparks.burst(tg.t.x, 1.05, tg.t.y, { count: 60, speed: 5, up: 4, life: 0.9, size: 0.2, color: 0xff5fd0 });
+    this.sparks.burst(tg.t.x, 1.05, tg.t.y, { count: 30, speed: 3, up: 3, life: 1.1, size: 0.12, color: 0xffe066 });
+    this.sparks.emit({ x: tg.t.x, y: 1.05, z: tg.t.y, life: 0.25, size: 3.2, color: 0xffffff });
+    this.shake = 1;
     this.h.onTargetHit?.(tg.t);
   }
 }
