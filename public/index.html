@@ -197,33 +197,16 @@
         </div>
         <div class="sheet-buttons">
           <button id="step-unit-back" class="btn" type="button">← 이전</button>
-          <button id="step-unit-next" class="btn primary big" type="button">다음: 난이도 선택 ➔</button>
+          <button id="step-unit-next" class="btn primary big" type="button">다음: 이름 입력 ➔</button>
         </div>
       </div>
 
-      <!-- Step 4: 난이도 선택 & 이름 입력 후 출발 -->
+      <!-- Step 4: 탐험가 이름 입력 후 출발 -->
       <form id="step-launch" class="wizard-step" action="javascript:void(0);" autocomplete="off" hidden>
         <div class="step-head">
           <span class="step-badge" id="step-launch-badge">4단계 / 4</span>
-          <h2 class="step-title">⚔️ 탐험 난이도 & 이름 입력</h2>
-          <p class="muted small">이름을 적고 출발 버튼을 눌러주세요</p>
-        </div>
-        <div class="diff-pick-row">
-          <button type="button" class="diff-btn" data-diff="low">
-            <span class="diff-icon">🟢</span>
-            <b>초심자용</b>
-            <small>개념 탐색 (+70점)</small>
-          </button>
-          <button type="button" class="diff-btn on" data-diff="mid">
-            <span class="diff-icon">🟡</span>
-            <b>기본형</b>
-            <small>중단원 표준 (+100점)</small>
-          </button>
-          <button type="button" class="diff-btn" data-diff="high">
-            <span class="diff-icon">🔴</span>
-            <b>심화 수능형</b>
-            <small>수능 4점 기출 (+150점)</small>
-          </button>
+          <h2 class="step-title">👤 탐험가 이름 입력</h2>
+          <p class="muted small">수업에서 사용할 내 이름을 적고 출발해 주세요</p>
         </div>
         <label class="name-label">내 이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
         <div class="sheet-buttons">

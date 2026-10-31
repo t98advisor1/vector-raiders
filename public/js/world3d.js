@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { loadCharacter, makeCharacter } from "./characters.js";
 import { settings } from "./settings.js";
-import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR, PLATFORMS, TARGETS } from "./game.js";
+import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR, PLATFORMS, TARGETS, TABLETS } from "./game.js";
 
 const DUNGEON = ["floor", "floor-detail", "wall", "gate", "chest", "pot", "barrel", "coin", "key", "stairs", "banner", "column"];
 const BOLT_SPEED = 9; // 사격 탄환의 속도(초당 칸) — game.js의 규칙과 짝을 이룬다
@@ -148,6 +148,7 @@ export class World3D {
     this.buildStatic(models);
     this.buildDoors(models);
     this.buildObjects(models);
+    this.buildTablets(models);
     this.buildBridges();
     this.buildAltar(models);
     this.buildPlatforms();
@@ -254,6 +255,31 @@ export class World3D {
       const mixer = src.animations.length ? new THREE.AnimationMixer(root) : null;
       if (mixer) this.mixers.push(mixer);
       this.objects.set(o.pid, { root, kind: o.model, key, ring, mixer, clip: THREE.AnimationClip.findByName(src.animations, "open"), solved: false, tip: 0 });
+    }
+  }
+
+  // 교과서 핵심 개념·정리 비석: 기둥 모델 위에 빛나는 룬 크리스탈과 바닥 마법진
+  buildTablets(m) {
+    const ringGeo = new THREE.RingGeometry(0.38, 0.52, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.75, depthWrite: false });
+    for (const t of TABLETS) {
+      const col = shadows(m.column.scene.clone(true));
+      col.position.set(t.x + 0.5, 0, t.y + 0.5);
+      col.scale.set(0.9, 0.85, 0.9);
+      this.scene.add(col);
+
+      // 위에 떠 있는 빛나는 비석 엠블럼 (마름모 네온 크리스탈)
+      const rune = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.24),
+        new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 1.6 })
+      );
+      rune.position.set(t.x + 0.5, 1.45, t.y + 0.5);
+      this.scene.add(rune);
+
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(t.x + 0.5, 0.02, t.y + 0.5);
+      this.scene.add(ring);
     }
   }
 
@@ -391,17 +417,17 @@ export class World3D {
   }
 
   // ---------- 캐릭터 ----------
-  avatar(key, n) {
+  avatar(key, n, team = null) {
     let av = this.avatars.get(key);
     if (av) return av;
     const group = new THREE.Group();
     group.rotation.y = Math.PI; // 모델은 -z를 보고 있으므로 처음에는 카메라 쪽(+z)을 보게 돌린다
-    av = { group, n, label: null, labelText: "", model: null, mixer: null, actions: null, current: null };
+    av = { group, n, team, label: null, labelText: "", model: null, mixer: null, actions: null, current: null };
     this.avatars.set(key, av);
     this.scene.add(group);
     loadCharacter(n).then((gltf) => {
       if (this.avatars.get(key) !== av) return; // 그새 나갔으면 버린다
-      const { model, mixer, action } = makeCharacter(gltf, { outline: this.quality !== "low", n });
+      const { model, mixer, action } = makeCharacter(gltf, { outline: this.quality !== "low", n, team });
       model.scale.setScalar(1.45);
       group.add(model);
       Object.assign(av, { model, mixer, actions: { idle: action("idle"), walk: action("walk"), yes: action("emote-yes"), jump: action("jump") } });
@@ -456,12 +482,14 @@ export class World3D {
 
     // 나와 친구들
     if (g.me.n !== null) {
-      const me = this.avatar("me", g.me.n);
+      const myTeam = this.h.teamOf ? this.h.teamOf(g.me.n) : null;
+      const me = this.avatar("me", g.me.n, myTeam);
       this.placeAvatar(me, g.me.x, g.me.y, g.me.dir, g.me.moving, g.me.name, true, g.me.jumpY ?? 0, !!g.me.air);
       me.mixer?.update(dt);
     }
     for (const [n, o] of g.others) {
-      const av = this.avatar(n, n);
+      const otherTeam = this.h.teamOf ? this.h.teamOf(n) : null;
+      const av = this.avatar(n, n, otherTeam);
       this.placeAvatar(av, o.x, o.y, o.dir, o.moving, g.names.get(n) ?? "", false);
       av.mixer?.update(dt);
     }
@@ -618,13 +646,13 @@ export class World3D {
       }
     }
 
-    // 카메라: 쿼터뷰(하이앵글)로 위에서 내려다본다 — 입체 고저차와 발판이 잘 보이게
-    // 지도 밖 빈 공간을 비추지 않게: 화면 절반 폭(바닥 기준)만큼 안쪽에서 멈춘다. 좁은 화면일수록 덜 멈춘다.
-    const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 10.4 * this.camera.aspect;
+    // 카메라: 지면 기준 약 30° 사선 쿼터뷰(아이소메트릭)
+    // 수직 탑다운(90°)이 아닌 30° 완만한 사선으로 캐릭터의 얼굴, 안경, 모자, 망토가 선명하게 보인다
+    const halfW = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 12.0 * this.camera.aspect;
     const camX = Math.min(W - halfW, Math.max(Math.min(halfW, W / 2), g.me.x));
-    const want = new THREE.Vector3(camX, 9.2, g.me.y + 4.8);
+    const want = new THREE.Vector3(camX, 5.2, g.me.y + 8.8);
     this.camera.position.lerp(want, this.ready ? 1 - Math.pow(0.002, dt) : 1);
-    this.camera.lookAt(this.camera.position.x, 0, this.camera.position.z - 4.6);
+    this.camera.lookAt(this.camera.position.x, 1.1, g.me.y);
     this.sun.position.set(g.me.x - 5, 12, g.me.y + 6);
     this.sun.target.position.set(g.me.x, 0, g.me.y);
     this.rim.position.set(g.me.x + 3, 5, g.me.y - 8);
