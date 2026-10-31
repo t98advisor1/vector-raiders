@@ -60,5 +60,13 @@ test("문장 속 수식에 역슬래시가 두 번 들어가 벡터 표시가 �
 
 test("연습 모드에서는 정답표(출력용)를 보내지 않는다", () => {
   const room = fs.readFileSync("src/room.js", "utf8");
-  assert.match(room, /if \(this\.practice \|\| this\.data\.stage !== "done"\) return;/);
+  assert.match(room, /if \(this\.practice\) return;\n\s*const done = this\.data\.stage === "done";\n\s*if \(!done && !st\.escapedAt\) return;/);
+});
+
+test("모든 방을 탈출한 학생은 탐험 중에도 자기 난이도 정답만 받아 풀이 기록을 출력한다", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /mineOnly/);
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.match(stu, /id="mine-btn"/);
+  assert.match(stu, /S\.cls\?\.stage === "done" \|\| iEscaped\(\)/);
 });

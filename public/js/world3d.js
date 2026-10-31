@@ -6,6 +6,7 @@ import { loadCharacter, makeCharacter, teamColor } from "./characters.js";
 import { Particles, glowSprite, brickTexture, slabTexture, lavaTexture, waterTexture, aimTexture } from "./fx.js";
 import { settings } from "./settings.js";
 import { W, H, ROOMS, roomAt, DOORS, DOOR_COLS, DOOR_ROWS, BRIDGES, OBJECTS, ALTAR, PLATFORMS, TARGETS, TABLETS } from "./game.js";
+const RESPAWN_S = 40; // 깨진 수학자 수정이 다시 생기기까지(초)
 
 const DUNGEON = ["floor", "floor-detail", "wall", "gate", "chest", "pot", "barrel", "coin", "key", "stairs", "banner", "column"];
 const BOLT_SPEED = 9; // 사격 탄환의 속도(초당 칸) — game.js의 규칙과 짝을 이룬다
@@ -443,10 +444,38 @@ export class World3D {
   }
 
   // 사격 표적(네온 수정체): 구역마다 하나, 10발을 맞히면 그 구역의 핵심 개념 카드가 열린다
+  // 학생이 많으면(20명 이상) 수정 하나에 몰리므로, 방마다 벽·문 옆에 수정을 하나 더 두고,
+  // 깨진 수정은 RESPAWN_S초 뒤 그 방의 벽·문 옆 빈자리에 다시 생긴다(깰 때마다 다른 수학자 카드).
+  wallSpots(zone) {
+    const i = ["r1", "r2", "r3", "altar"].indexOf(zone);
+    const x0 = i === 0 ? 1 : ROOMS[i - 1].x1 + 1, x1 = ROOMS[i].x1 - 1;
+    const g = this.game.grid, out = [];
+    const objs = [...OBJECTS, ...TABLETS, ALTAR, ...TARGETS];
+    for (let y = 1; y < H - 1; y++) for (let x = x0; x <= x1; x++) {
+      if (g[y][x] !== "." || PLATFORMS.has(`${x},${y}`)) continue;
+      const nearWall = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const c = g[y + dy]?.[x + dx]; return c === "#" || DOORS[c]; });
+      if (!nearWall) continue;
+      if (objs.some((o) => Math.hypot(o.x - x, o.y - y) < 2)) continue;
+      out.push([x + 0.5, y + 0.5]);
+    }
+    return out;
+  }
+
+  placeTarget(tg) {
+    const spots = this.wallSpots(tg.t.zone).filter(([x, y]) => [...this.targets.values()].every((o) => o === tg || Math.hypot(o.t.x - x, o.t.y - y) > 3));
+    if (!spots.length) return;
+    const [x, y] = spots[Math.floor(Math.random() * spots.length)];
+    tg.t = { ...tg.t, x, y };
+    tg.crystal.position.set(x, 1.05, y);
+    tg.ring.position.set(x, 0.03, y);
+    tg.halo.position.set(x, 1.05, y);
+  }
+
   buildTargets() {
     const geo = new THREE.OctahedronGeometry(0.34);
     const ringGeo = new THREE.RingGeometry(0.36, 0.52, 32);
-    for (const t of TARGETS) {
+    const list = [...TARGETS, ...TARGETS.map((t) => ({ ...t, zone: t.zone, key: `${t.zone}-wall`, extra: true }))];
+    for (const t of list) {
       const crystal = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xff8ad8, emissive: 0xff2fb3, emissiveIntensity: 1.5 }));
       crystal.position.set(t.x, 1.05, t.y);
       crystal.castShadow = true;
@@ -460,7 +489,9 @@ export class World3D {
       halo.position.set(t.x, 1.05, t.y);
       this.scene.add(halo);
       this.scene.add(label);
-      this.targets.set(t.zone, { t, crystal, ring, label, halo, labelCount: 0, hits: 0, done: false, flash: 0 });
+      const tg = { t, crystal, ring, label, halo, labelCount: 0, hits: 0, done: false, flash: 0, respawn: 0, breaks: 0 };
+      this.targets.set(t.key ?? t.zone, tg);
+      if (t.extra) { this.placeTarget(tg); label.position.set(tg.t.x, 1.75, tg.t.y); }
     }
   }
 
@@ -569,7 +600,7 @@ export class World3D {
     let av = this.avatars.get(key);
     if (av) return av;
     const group = new THREE.Group();
-    group.rotation.y = Math.PI; // 모델은 -z를 보고 있으므로 처음에는 카메라 쪽(+z)을 보게 돌린다
+    group.rotation.y = 0; // 모델은 +z(카메라 쪽)를 보고 있다. 처음에는 얼굴이 보이게 그대로 둔다
     av = { group, n, team, key, label: null, labelText: "", model: null, mixer: null, actions: null, current: null };
     this.avatars.set(key, av);
     this.scene.add(group);
@@ -623,9 +654,9 @@ export class World3D {
   placeAvatar(av, x, y, dir, moving, name, isMe, jumpY = 0, air = false) {
     av.group.position.set(x, jumpY, y);
     if (moving) {
-      // 모델은 기본 회전(0°)에서 전면(+Z, 카메라 쪽)을 향한다.
-      // 진행 방향(dir)으로 부드럽게 돌아 걷는다: W(전진, -Z)면 등을 보고 전방으로, S(후진, +Z)면 정면을 보고 걷는다.
-      const target = Math.atan2(-dir[0], dir[1]);
+      // 모델은 기본 회전(0°)에서 +Z(카메라 쪽)를 향한다. 회전 θ면 (sinθ, cosθ) 쪽을 본다.
+      // 진행 방향(dir)으로 부드럽게 돌아 걷는다: W·↑(-Z)면 등을 보이며 앞으로, S·↓(+Z)면 얼굴을 보이며, A·D·←·→는 그쪽을 보고 걷는다.
+      const target = Math.atan2(dir[0], dir[1]);
       let d = target - av.group.rotation.y;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       av.group.rotation.y += d * 0.3;
@@ -797,7 +828,20 @@ export class World3D {
 
     // 표적: 반짝이고, 명중 횟수를 이름표에 새기고, 10발이 되면 깨진다
     for (const tg of this.targets.values()) {
-      if (tg.done) continue;
+      if (tg.done) {
+        tg.respawn -= dt;
+        if (tg.respawn > 0) continue;
+        // 다시 생긴다: 벽·문 옆 빈자리에서 반짝이며 나타난다
+        this.placeTarget(tg);
+        tg.done = false;
+        tg.hits = 0;
+        tg.labelCount = -1;
+        tg.crystal.visible = tg.ring.visible = tg.halo.visible = true;
+        tg.label = makeBar(0);
+        tg.label.position.set(tg.t.x, 1.75, tg.t.y);
+        this.scene.add(tg.label);
+        this.sparks.burst(tg.t.x, 1.05, tg.t.y, { count: 24, speed: 2, up: 2, life: 0.6, size: 0.14, color: 0xff7ad9 });
+      }
       tg.crystal.rotation.y = t * 1.6;
       tg.crystal.position.y = 1.05 + Math.sin(t * 2.2) * 0.08;
       tg.flash = Math.max(0, tg.flash - dt * 3);
@@ -985,6 +1029,8 @@ export class World3D {
     this.popText(tg.hits < 10 ? "HIT!" : "BREAK!", tg.t.x, 2.1, tg.t.y, tg.hits < 10 ? "#ffd6f5" : "#ffe066", tg.hits < 10 ? 0.34 : 0.55);
     if (tg.hits < 10) return;
     tg.done = true;
+    tg.breaks++;
+    tg.respawn = RESPAWN_S;
     tg.crystal.visible = false;
     tg.ring.visible = false;
     tg.halo.visible = false;
@@ -995,6 +1041,6 @@ export class World3D {
     this.sparks.burst(tg.t.x, 1.05, tg.t.y, { count: 30, speed: 3, up: 3, life: 1.1, size: 0.12, color: 0xffe066 });
     this.sparks.emit({ x: tg.t.x, y: 1.05, z: tg.t.y, life: 0.25, size: 3.2, color: 0xffffff });
     this.shake = 1;
-    this.h.onTargetHit?.(tg.t);
+    this.h.onTargetHit?.(tg.t, { first: !tg.t.extra && tg.breaks === 1 });
   }
 }

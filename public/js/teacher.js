@@ -1,5 +1,6 @@
 import { connect } from "./net.js";
-import { fmt, watchMath } from "./mathtext.js";
+import { fmt, watchMath, boxedText } from "./mathtext.js";
+import { openPrintDoc } from "./printdoc.js";
 import { PROBLEMS, loadSet, figureHtml, SET } from "./problems.js";
 import { LAB_LEVELS } from "./lab.js";
 import { renderClassBar } from "./classbar.js";
@@ -11,6 +12,8 @@ const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
 const STAGE_TEXT = { lobby: "⏸ 대기", play: "▶ 탐험 중", done: "■ 탐험 끝" };
 let net = null, last = null, answers = null, isMaster = false;
 const joinedCh = new Set(); // 이 비밀번호로 들어간 채널 (중간관리자는 자기 채널만)
+const failedCh = new Set(); // 이 비밀번호로 들어가지 못한 채널 (중간관리자에게 다른 채널은 당연히 실패)
+let loginError = "";
 const setByCh = {}; // 채널 → { set, answers } (채널마다 단원이 다를 수 있다)
 const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)
 const pwByCh = {}; // 채널 번호 → 로그인 비밀번호 (joined 뒤 기억해 두기)
@@ -98,6 +101,7 @@ function printLevels(level) { return level === "all" ? ["low", "mid", "high"] : 
 
 // 형성평가 문제지(sheet)·답지(answer): 학생이 받는 것과 같은 모양을 난이도별로 미리 본다
 function printAssessmentTeacher(kind, level) {
+  const docTitle = `${SET?.meta?.제목 ?? ""} 형성평가 ${kind === "answer" ? "답지" : "문제지"}`;
   const isAnswer = kind === "answer";
   const items = PROBLEMS.flatMap((p, i) => printLevels(level).map((d) => {
     const v = p.diffs[d];
@@ -107,8 +111,8 @@ function printAssessmentTeacher(kind, level) {
     const conds = (v.conditions ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("");
     const head = `<h3>${i + 1}${level === "all" ? `-${LV[d]}` : ""}. ${p.icon} ${p.relic} <small>${v.level} · ${v.points}점</small></h3>`;
     if (!isAnswer) {
-      const fig = figureHtml(p);
-      return `<section class="fa-item">${head}<div class="fa-body"><div class="fa-q"><p class="pr-text">${fmt(v.text)}</p>${conds}${optHtml}</div>${fig ? `<div class="fa-fig">${fig}</div>` : ""}</div><p class="fa-blank"><b>답</b> <span></span></p></section>`;
+      const fig = figureHtml(p, d);
+      return `<section class="fa-item">${head}<div class="fa-body"><div class="fa-q"><div class="pr-text">${boxedText(v.text)}</div>${conds}${optHtml}</div>${fig ? `<div class="fa-fig">${fig}</div>` : ""}</div><p class="fa-blank"><b>답</b> <span></span></p></section>`;
     }
     return `<section class="fa-item">${head}<p class="pr-answer"><b>정답</b> ${fmt(answers[p.id]?.[d] ?? "")}</p><p class="pr-hint"><b>풀이</b> ${fmt(v.hint ?? "")}</p></section>`;
   })).join("");
@@ -117,7 +121,7 @@ function printAssessmentTeacher(kind, level) {
       <h1>${fmt(SET?.meta?.제목 ?? "벡터 유적 탈출")} · 형성평가 ${isAnswer ? '<span class="fa-tag ans">답지</span>' : '<span class="fa-tag">문제지</span>'} <small>${level === "all" ? "하·중·상 전체" : `${LV[level]} 난이도`}</small></h1>
       <p>${new Date().toLocaleDateString("ko-KR")} · ${activeCh}채널</p>
       ${isAnswer ? "" : '<p class="fa-name">이름: ____________ &emsp; 점수: ________</p>'}
-    </header>${items}`);
+    </header>${items}`, docTitle);
 }
 
 // 핵심 카드 모음: 수업 전에 나눠 주거나 칠판에 붙일 수 있게
@@ -126,14 +130,16 @@ function printCards() {
   showPrint(`
     <header class="pr-head fa-head"><h1>${fmt(SET?.meta?.제목 ?? "")} · 핵심 카드 ${cards.length}장</h1><p>게임 속 개념 비석과 같은 내용이에요.</p></header>
     <div class="card-grid">${cards.map((c) => `
-      <section class="print-card"><h3>📚 ${c.tablet}. ${fmt(c.title)}</h3><p class="pc-sum">${fmt(c.summary)}</p><ul>${c.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul></section>`).join("")}</div>`);
+      <section class="print-card"><h3>📚 ${c.tablet}. ${fmt(c.title)}</h3><p class="pc-sum">${fmt(c.summary)}</p><ul>${c.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul></section>`).join("")}</div>`, `${SET?.meta?.제목 ?? ""} 핵심 카드`);
 }
 
-function showPrint(html) {
+function showPrint(html, title = "교사용 출력") {
+  if (openPrintDoc(title, html)) return; // 새 창 미리보기 (팝업이 막혔을 때만 아래 예전 방식)
   const sheet = $("#teacher-print-sheet");
   sheet.innerHTML = html;
   sheet.hidden = false;
-  setTimeout(() => { window.print(); setTimeout(() => { sheet.hidden = true; }, 300); }, 800);
+  window.addEventListener("afterprint", () => { sheet.hidden = true; }, { once: true });
+  window.print();
 }
 
 // 📄 교사용 해설집: 상자마다 하·중·상 문항, 정답, 풀이, 협업 조건, 오답 분석
@@ -141,11 +147,11 @@ function printSheet() {
   const rows = PROBLEMS.map((p, i) => {
     const s = last?.stats?.[p.id];
     const wrong = s?.topWrong?.length ? s.topWrong.map(([w, n]) => `${w} (${n}명)`).join(", ") : "아직 응답 없음";
-    const fig = figureHtml(p);
     const levels = ["low", "mid", "high"].map((d) => {
       const v = p.diffs[d];
+      const fig = figureHtml(p, d);
       const conds = (v.conditions ?? []).map((c) => `<br><b>조건 ${c.label}</b> ${fmt(c.text)}`).join("");
-      return `<p class="tp-text"><b>[${LV[d]} · ${v.points}점${v.coop ? " · 🤝 협업" : ""}]</b> ${fmt(v.text)}${conds}</p>
+      return `${fig ? `<div class="tp-diagram">${fig}</div>` : ""}<p class="tp-text"><b>[${LV[d]} · ${v.points}점${v.coop ? " · 🤝 협업" : ""}]</b> ${boxedText(v.text)}${conds}</p>
         <div class="tp-ans-block"><span class="tp-answer"><b>정답:</b> ${fmt(answers[p.id]?.[d] ?? "–")}</span></div>
         <p class="tp-solution"><b>풀이</b> ${fmt(v.hint)}</p>`;
     }).join("");
@@ -153,7 +159,6 @@ function printSheet() {
       <section class="tp-item">
         <div class="tp-item-header"><h3>${i + 1}. ${p.icon} ${p.relic} <small>${p.room}번 방${p.coop ? " · 상 난이도 2인 협업" : ""} · 개념: ${p.concept}</small></h3></div>
         <div class="tp-item-body">
-          ${fig ? `<div class="tp-diagram">${fig}</div>` : ""}
           ${levels}
           <p class="tp-wrong"><b>[수업 팁·오답 분석]</b> ${wrong}</p>
         </div>
@@ -165,8 +170,7 @@ function printSheet() {
     const lv = LAB_LEVELS.find((l) => l.id === br.lab);
     return `<li><b>${br.title}</b> — ${ROOMS[roomAt(br.cx)].name}의 ${HAZ[br.hazard] ?? "위험지대"} 구간. 벡터 실험실 '${lv?.title ?? br.lab}' 단계를 완료하면 길이 생겨요.</li>`;
   }).join("");
-  const sheet = $("#teacher-print-sheet");
-  sheet.innerHTML = `
+  showPrint(`<div>
     <header class="tp-head">
       <div class="tp-head-left">
         <h1>${fmt(SET?.meta?.제목 ?? "")} 교사용 문제·정답·해설집</h1>
@@ -185,17 +189,13 @@ function printSheet() {
     </section>
     <div class="tp-columns">
       ${rows}
-    </div>`;
-  sheet.hidden = false;
-  // 수식(MathJax) 조판이 끈 뒤 인쇄 창을 연다
-  setTimeout(() => {
-    window.print();
-    setTimeout(() => { sheet.hidden = true; }, 300);
-  }, 600);
+    </div></div>`, "교사용 해설집");
 }
 
 function start(password) {
   net?.close();
+  failedCh.clear();
+  loginError = "";
   for (const ch of CHANNELS) openChannel(ch, password);
   $("#setup-error").textContent = "";
   $("#join-url").textContent = `${location.origin}/?ch=${activeCh}`;
@@ -272,11 +272,23 @@ function onChannelMessage(ch, msg) {
     m.className = `admin-msg ${msg.ok ? "ok" : "bad"}`;
   } else if (msg.type === "error") {
     // 중간관리자는 다른 채널에서 '비밀번호가 맞지 않아요'를 받는다. 이미 들어갔으면 무시한다.
-    if (!joinedCh.size) $("#setup-error").textContent = msg.message;
+    // 모든 채널이 거절했을 때만 로그인 화면에 알린다.
+    if (!joinedCh.has(ch)) loginError = msg.message;
   }
 }
 
 function onChannelStatus(ch, kind, code) {
+  // 중간관리자: 자기 채널이 아닌 곳의 거절은 정상이다. 모든 채널이 거절했을 때만 로그인 화면으로 돌아간다.
+  if (kind === "final" && !joinedCh.has(ch)) {
+    failedCh.add(ch);
+    if (!joinedCh.size && CHANNELS.every((c) => failedCh.has(c))) {
+      $("#dash").hidden = true;
+      $("#setup").hidden = false;
+      remember(null);
+      $("#setup-error").textContent = loginError || "비밀번호가 맞지 않아요.";
+    }
+    return;
+  }
   if (ch !== activeCh) return;
   $("#conn-chip").textContent = kind === "open" ? "🟢 연결됨" : kind === "retry" ? "🟡 다시 연결 중" : "🔴 연결 끊김";
   if (kind === "final") {
@@ -315,6 +327,7 @@ function switchChannel(ch) {
     buildAnswerSheet();
   }
   buildChannelTabs();
+  $("#conn-chip").textContent = joinedCh.has(ch) ? "🟢 연결됨" : "🟡 연결 중";
   $("#join-url").textContent = `${location.origin}/?ch=${ch}`;
   last = dashByCh[ch] ?? null;
   if (last) { renderTeams(last.teams); renderKpis(last); renderDash(last); }

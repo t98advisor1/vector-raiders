@@ -1,5 +1,7 @@
 // 문항 세트 파일(md)을 읽어 상자·문항·핵심 카드 데이터로 바꾼다.
 // 형식은 content/sets/geo-3-1.md 맨 위 설명을 따른다. 서버와 테스트가 같이 쓴다.
+import { checkFigure } from "../public/js/figcore.js";
+
 const LEVEL = { 하: "low", 중: "mid", 상: "high" };
 const POINTS = { low: 70, mid: 100, high: 150 };
 const KIND = { 숫자: "num", 오지선다: "choice", 고르기: "set", 벡터식: "vec" };
@@ -18,7 +20,7 @@ export function parseSet(md) {
     if (!line || line === "---") continue;
     let m;
     if ((m = line.match(/^#\s*상자\s*(\d+)\s*[·•-]?\s*(.*)$/))) {
-      box = { no: Number(m[1]), title: m[2].trim(), room: 1, coop: false, tool: "", concept: "", levels: {} };
+      box = { no: Number(m[1]), title: m[2].trim(), room: 1, coop: false, tool: "", concept: "", howto: "", levels: {} };
       boxes.push(box); level = null; card = null; continue;
     }
     if ((m = line.match(/^#\s*핵심\s*카드\s*[·•-]?\s*(.*)$/))) {
@@ -27,7 +29,7 @@ export function parseSet(md) {
     }
     if (box && (m = line.match(/^##\s*(하|중|상)/))) {
       const key = LEVEL[m[1]];
-      level = box.levels[key] = { level: key, points: POINTS[key], text: "", conditions: [], kind: "", options: [], answer: "", hint: "" };
+      level = box.levels[key] = { level: key, points: POINTS[key], text: "", conditions: [], kind: "", options: [], answer: "", hint: "", figure: "", howto: "" };
       continue;
     }
     if (card) {
@@ -42,6 +44,7 @@ export function parseSet(md) {
       else if (k === "협업") box.coop = /^(예|네|yes|o)/i.test(v);
       else if (k === "그림") box.tool = v === "없음" ? "" : v;
       else if (k === "개념") box.concept = v;
+      else if (k === "조작") box.howto = v;
       continue;
     }
     if (level && (m = field(line))) {
@@ -53,6 +56,8 @@ export function parseSet(md) {
       else if (k === "정답") level.answer = v;
       else if (k === "풀이") level.hint = v;
       else if (k === "점수") level.points = Number(v) || level.points;
+      else if (k === "그림") level.figure = v === "없음" ? "" : v;
+      else if (k === "조작") level.howto = v;
     }
   }
   // 검사: 상자 번호, 난이도 3단계, 필수 칸
@@ -67,6 +72,8 @@ export function parseSet(md) {
       if (!lv.answer) errors.push(`${where}: 정답이 없어요.`);
       if ((lv.kind === "choice" || lv.kind === "set") && !lv.options.length) errors.push(`${where}: 보기가 없어요.`);
       if (b.coop && key === "high" && lv.conditions.length < 2) errors.push(`${where}: 협업 상자는 조건 ㉠·㉡이 필요해요.`);
+      const figErr = checkFigure(lv.figure || b.tool);
+      if (figErr) errors.push(`${where}: 그림을 읽을 수 없어요 — ${figErr}`);
     }
   });
   return { meta, boxes, cards, errors };

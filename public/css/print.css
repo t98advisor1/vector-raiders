@@ -1,0 +1,197 @@
+/* 인쇄 미리보기 페이지 (교사용 해설집·형성평가지·핵심 카드·오답 정리)
+   style.css의 인쇄용 규칙을 화면에서도 그대로 보이게 모은 것 — 미리 보고 '인쇄 / PDF로 저장'을 누른다 */
+@page { size: A4 portrait; margin: 12mm 10mm; }
+html, body { margin: 0; background: #e5e7eb; }
+body.print-doc { font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Pretendard", sans-serif; color: #0f172a; font-size: 10.5pt; line-height: 1.6; }
+.print-bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
+  padding: 10px 14px; background: #111827; color: #fff; }
+.print-bar button { font: inherit; font-size: 1.05rem; font-weight: 800; border: 0; border-radius: 12px; padding: 10px 18px; cursor: pointer; }
+.print-bar .go { background: #f59e0b; color: #2a1700; }
+.print-bar .close { background: #374151; color: #fff; }
+.print-bar small { color: #cbd5e1; flex-basis: 100%; text-align: center; }
+.print-page { max-width: 190mm; margin: 14px auto; padding: 12mm 10mm; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+.print-page[data-wait="1"]::before { content: "수식을 그리는 중…"; display: block; color: #64748b; margin-bottom: 8px; }
+@media print {
+  html, body { background: #fff; }
+  .print-bar { display: none !important; }
+  .print-page { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+}
+/* ---- 아래는 style.css의 인쇄 규칙에서 옮겨 온 것 ---- */
+.pr-head { border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 14px; }
+.pr-head h1 { font-size: 16pt; }
+.pr-head p { margin: 2px 0 0; color: #444; }
+.pr-item { break-inside: avoid; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px dashed #bbb; }
+.pr-item h3 { font-size: 11.5pt; margin: 0 0 4px; }
+.pr-item h3 small { font-weight: 400; color: #555; }
+.pr-item .pr-status { float: right; font-size: 9.5pt; font-weight: 700; color: #0f766e; }
+.pr-text { margin: 4px 0; }
+.pr-wrongs { color: #b91c1c; margin: 4px 0; }
+.pr-answer { margin: 4px 0; font-weight: 600; }
+.pr-hint { margin: 4px 0 0; color: #333; }
+mjx-container { font-size: 100% !important; }
+.tp-head {
+    border-bottom: 2.5px solid #0f172a;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+.tp-head-left h1 {
+    font-size: 14pt;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.4px;
+    color: #0f172a;
+  }
+.tp-head-left p {
+    margin: 2px 0 0;
+    font-size: 8.2pt;
+    color: #475569;
+  }
+.tp-head-meta {
+    text-align: right;
+    font-size: 8.2pt;
+    color: #334155;
+    line-height: 1.35;
+  }
+.tp-labs {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 5px 10px;
+    margin-bottom: 10px;
+    font-size: 8.2pt;
+  }
+.tp-labs h2 {
+    font-size: 9pt;
+    margin: 0 0 2px;
+    color: #0f766e;
+    font-weight: 700;
+  }
+.tp-labs ul {
+    margin: 0;
+    padding-left: 14px;
+  }
+.tp-tip {
+    color: #64748b;
+    font-size: 7.8pt;
+    margin: 3px 0 0;
+  }
+/* 2단 편집 (Two-column layout) */
+  .tp-columns {
+    column-count: 2;
+    column-gap: 8mm;
+    column-rule: 1px dashed #cbd5e1;
+  }
+.tp-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 11pt;
+    padding-bottom: 9pt;
+    border-bottom: 1px dotted #cbd5e1;
+  }
+.tp-item:last-child {
+    border-bottom: none;
+  }
+.tp-item-header h3 {
+    font-size: 10pt;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: #0f172a;
+    border-left: 3px solid #0f766e;
+    padding-left: 5px;
+  }
+.tp-item-header h3 small {
+    font-weight: 400;
+    font-size: 7.8pt;
+    color: #64748b;
+    margin-left: 4px;
+  }
+.tp-item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+.tp-text {
+    margin: 0;
+    font-size: 8.8pt;
+    line-height: 1.45;
+    color: #1e293b;
+    text-align: justify;
+  }
+.tp-diagram {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 4px auto;
+    background: #fafafa;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 3px;
+    width: fit-content;
+  }
+.tp-svg {
+    display: block;
+    max-width: 145px;
+    max-height: 115px;
+    height: auto;
+  }
+.tp-ans-block {
+    margin: 2px 0;
+    padding: 2px 6px;
+    background: #f0fdf4;
+    border-left: 2.5px solid #16a34a;
+    border-radius: 3px;
+  }
+.tp-answer {
+    font-weight: 700;
+    color: #15803d;
+    font-size: 8.8pt;
+  }
+.tp-solution {
+    margin: 2px 0;
+    font-size: 8.4pt;
+    color: #334155;
+    line-height: 1.4;
+    background: #f8fafc;
+    padding: 3px 6px;
+    border-radius: 4px;
+  }
+.tp-wrong {
+    margin: 2px 0 0;
+    font-size: 8pt;
+    color: #b91c1c;
+  }
+mjx-container {
+    font-size: 95% !important;
+  }
+.fa-head h1 { display: flex; align-items: center; gap: 10px; }
+.fa-tag { font-size: 11pt; border: 2px solid #111; border-radius: 6px; padding: 1px 10px; }
+.fa-tag.ans { background: #111; color: #fff; }
+.fa-name { margin-top: 6px !important; color: #111 !important; font-size: 11pt; }
+.fa-guide { margin: 0 0 10px; color: #333; }
+.fa-item { break-inside: avoid; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px dashed #bbb; }
+.fa-item h3 { font-size: 11.5pt; margin: 0 0 4px; }
+.fa-item h3 small { font-weight: 400; color: #555; }
+.fa-item .pr-status { float: right; font-size: 9.5pt; font-weight: 700; color: #0f766e; }
+.fa-body { display: flex; gap: 12px; align-items: flex-start; }
+.fa-q { flex: 1; }
+.fa-q .pr-text { white-space: pre-line; }
+.fa-opts { margin: 4px 0; }
+.fa-fig svg { width: 120px; height: auto; }
+.fa-blank { margin: 10px 0 0; display: flex; align-items: center; gap: 8px; }
+.fa-blank span { display: inline-block; width: 50%; border-bottom: 1.5px solid #111; height: 1.4em; }
+.fa-check { margin: 4px 0 0; color: #555; font-size: 9.5pt; }
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.print-card { break-inside: avoid; border: 2px solid #111; border-radius: 10px; padding: 8px 12px; }
+.print-card h3 { margin: 0 0 4px; font-size: 12pt; }
+.print-card .pc-sum { font-weight: 700; margin: 0 0 4px; }
+.print-card ul { margin: 0; padding-left: 1.1em; }
+.tp-diagram svg { width: 130px; height: auto; }
+.bogi-box { border: 1.5px solid #111; padding: 10px 12px 6px; margin: 10px 0 6px; animation: none; }
+.bogi-title { border: 1.5px solid #111; font-size: 9.5pt; }
+.bogi-line { font-size: 10.5pt; padding: 2px 0; }
+
+/* 문제 글씨는 명조체로, 줄바꿈을 살린다 */
+.pr-text, .tp-text, .fa-q, .bogi-line { font-family: "함초롬바탕", "HCR Batang", "한컴바탕", "Nanum Myeongjo", "AppleMyungjo", "Batang", "바탕", serif; }
