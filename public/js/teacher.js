@@ -1,4 +1,5 @@
 import { connect } from "./net.js";
+import { openManual } from "./manual.js";
 import { fmt, watchMath, boxedText } from "./mathtext.js";
 import { openPrintDoc } from "./printdoc.js";
 import { PROBLEMS, loadSet, figureHtml, cardFigureHtml, SET } from "./problems.js";
@@ -86,6 +87,8 @@ $("#invite-copy").onclick = async () => {
 // 📄 해설집(하·중·상 전체) · 📝 형성평가 문제지 · ✅ 답지 · 📚 핵심 카드. 난이도는 출력 창에서 고른다.
 const LV = { low: "하", mid: "중", high: "상" };
 $("#print-sheet-btn").onclick = () => openPrintMenu();
+// 📘 사용 설명서: AI로 문항 세트 만들기 (로그인 전에도 볼 수 있다)
+for (const b of document.querySelectorAll(".open-manual")) b.onclick = () => openManual();
 $("#print-answer-btn").onclick = () => { openPrintMenu(); runPrint("answer"); };
 $("#print-menu-close").onclick = () => { $("#print-menu").hidden = true; };
 $("#print-menu").addEventListener("pointerdown", (e) => { if (e.target.id === "print-menu") $("#print-menu").hidden = true; });
@@ -122,7 +125,7 @@ function printAssessmentTeacher(kind, level) {
     const v = p.diffs[d];
     const opts = v.answer.options ?? [];
     const optHtml = v.answer.kind === "choice" ? `<p class="fa-opts">${opts.map((o) => fmt(o)).join("&emsp;")}</p>`
-      : v.answer.kind === "multi" ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${fmt(`[${o}]`)}`).join("&emsp;")}</p>` : "";
+      : v.answer.kind === "multi" ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${(/^[A-Z]{1,3}$/.test(o) ? fmt(`[${o}]`) : fmt(o))}`).join("&emsp;")}</p>` : "";
     const conds = (v.conditions ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("");
     const head = `<h3>${i + 1}${level === "all" ? `-${LV[d]}` : ""}. ${p.icon} ${p.relic} <small>${v.level} · ${v.points}점</small></h3>`;
     if (!isAnswer) {
@@ -250,7 +253,7 @@ function onChannelMessage(ch, msg) {
     if (msg.set) setByCh[ch] = { set: msg.set, answers: msg.answers };
     if (msg.sets) { setListByCh[ch] = msg.sets; if (ch === activeCh) fillSetSelect(msg.sets); }
     if (ch === activeCh || !$("#uploaded-sets").children.length) renderUploaded();
-    if (ch === activeCh) conns[ch]?.send({ type: "imageList" });
+    if (ch === activeCh) { conns[ch]?.send({ type: "imageList" }); conns[ch]?.send({ type: "changeLogGet" }); }
     $("#upload-scope").textContent = isMaster ? "· 전체 관리자: 모든 채널에서 고를 수 있어요" : `· ${ch}채널 전용: 이 채널에서만 보이고 바뀌어요`;
     if (msg.set && (ch === activeCh || !PROBLEMS.length)) { loadSet(msg.set); fillSetSelect(null, msg.set.id); }
     if (ch === activeCh || !answers) answers = msg.answers ?? null;
@@ -281,10 +284,12 @@ function onChannelMessage(ch, msg) {
     }
   } else if (msg.type === "uploadResult") {
     onUploadResult(msg, ch);
+  } else if (msg.type === "changeLog") {
+    onChangeLog(msg, ch);
   } else if (msg.type === "imageResult") {
     if (ch === activeCh) onImageResult(msg);
   } else if (msg.type === "setExample") {
-    download("문항세트_형식예시_geo-3-1.md", msg.md, "text/markdown");
+    download(msg.name ?? "문항세트_형식예시_geo-3-1.md", msg.md, "text/markdown");
   } else if (msg.type === "admin") {
     renderAdmin(msg);
   } else if (msg.type === "adminResult") {
@@ -346,6 +351,7 @@ function switchChannel(ch) {
     fillSetSelect(setListByCh[ch] ?? null, setByCh[ch].set.id);
     renderUploaded();
     conns[ch]?.send({ type: "imageList" });
+    conns[ch]?.send({ type: "changeLogGet" });
     $("#problems").replaceChildren();
     buildAnswerSheet();
   }
@@ -720,7 +726,9 @@ function download(name, text, type) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
   a.download = name;
+  document.body.appendChild(a); // 일부 브라우저는 문서에 붙은 링크여야 파일 이름을 따른다
   a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 async function sendSetFile(check) {
@@ -772,9 +780,44 @@ function onImageResult(msg) {
   if (!ul.children.length) ul.innerHTML = "<li class='muted'>아직 올린 그림이 없어요.</li>";
 }
 
+// ---------- 문항 변경 기록: 목록 + CSV ----------
+let changeEntries = [];
+const kst = (t) => new Date(t + 9 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 16);
+function onChangeLog(msg, ch) {
+  // 전체 관리자는 어느 채널 연결에서 받아도 같은 전체 기록, 중간관리자는 자기 채널 기록
+  if (!isMaster && ch !== activeCh) return;
+  changeEntries = msg.entries ?? [];
+  $("#changelog-scope").textContent = isMaster ? "· 모든 채널" : `· ${activeCh}채널`;
+  const rows = $("#changelog-rows");
+  rows.replaceChildren(...changeEntries.slice(0, 30).map((e) => {
+    const tr = document.createElement("tr");
+    for (const v of [kst(e.at), `${e.ch}채널`, e.by, e.action + (e.from ? ` (전: ${e.from})` : ""), `${e.title ?? ""} ${e.id ? `(${e.id})` : ""}`, e.scope ?? ""]) {
+      const td = document.createElement("td");
+      td.textContent = v;
+      tr.appendChild(td);
+    }
+    return tr;
+  }));
+  if (!changeEntries.length) rows.innerHTML = "<tr><td colspan='6' class='muted'>아직 변경 기록이 없어요.</td></tr>";
+  // 새로 바뀐 것이 있으면 눈에 띄게 알린다
+  if (msg.fresh) {
+    const a = $("#changelog-alert"), e = msg.fresh;
+    a.hidden = false;
+    a.className = "upload-result ok";
+    a.textContent = `🔔 ${kst(e.at)} · ${e.ch}채널 · ${e.by}: ${e.action} — ${e.title || e.id}`;
+  }
+}
+$("#changelog-csv").onclick = () => {
+  const head = ["시각(한국)", "채널", "누가", "무엇을", "바꾸기 전 단원", "세트·그림 이름", "아이디", "범위"];
+  const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [head, ...changeEntries.map((e) => [kst(e.at), e.ch, e.by, e.action, e.from ?? "", e.title ?? "", e.id ?? "", e.scope ?? ""])].map((r) => r.map(cell).join(","));
+  download(`문항변경기록_${isMaster ? "전체" : `${activeCh}채널`}_${kst(Date.now()).slice(0, 10)}.csv`, "\ufeff" + lines.join("\r\n"), "text/csv");
+};
+
 $("#set-check").onclick = () => sendSetFile(true);
 $("#set-upload").onclick = () => sendSetFile(false);
-$("#set-example").onclick = () => net?.send({ type: "setExample" });
+$("#set-example").onclick = () => net?.send({ type: "setExample", kind: "math" });
+$("#set-example-other").onclick = () => net?.send({ type: "setExample", kind: "other" });
 
 function onUploadResult(msg, ch = activeCh) {
   const box = $("#upload-result");

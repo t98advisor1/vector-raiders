@@ -4,7 +4,7 @@ import { checkFigure } from "../public/js/figcore.js";
 
 const LEVEL = { 하: "low", 중: "mid", 상: "high" };
 const POINTS = { low: 70, mid: 100, high: 150 };
-const KIND = { 숫자: "num", 오지선다: "choice", 고르기: "set", 벡터식: "vec" };
+const KIND = { 숫자: "num", 오지선다: "choice", 고르기: "set", 벡터식: "vec", 단답형: "text", 글자: "text" };
 
 export function parseSet(md) {
   const text = String(md).replace(/\r\n/g, "\n").replace(/<!--[\s\S]*?-->/g, "");
@@ -12,8 +12,8 @@ export function parseSet(md) {
   const fm = text.match(/^---\n([\s\S]*?)\n---/);
   if (fm) for (const line of fm[1].split("\n")) { const m = line.match(/^([^:]+):\s*(.*)$/); if (m) meta[m[1].trim()] = m[2].trim(); }
   const body = fm ? text.slice(fm[0].length) : text;
-  const boxes = [], cards = [], errors = [];
-  let box = null, level = null, card = null;
+  const boxes = [], cards = [], people = [], errors = [];
+  let box = null, level = null, card = null, person = null;
   const field = (line) => line.match(/^-?\s*([^:：]+?)\s*[:：]\s*(.*)$/);
   for (const raw of body.split("\n")) {
     const line = raw.trim();
@@ -25,11 +25,29 @@ export function parseSet(md) {
     }
     if ((m = line.match(/^#\s*핵심\s*카드\s*[·•-]?\s*(.*)$/))) {
       card = { title: m[1].trim(), tablet: cards.length + 1, summary: "", points: [] };
-      cards.push(card); box = null; level = null; continue;
+      cards.push(card); box = null; level = null; person = null; continue;
+    }
+    // 인물 카드: 수정을 깨면 나오는 인물(수학자·과학자·작가 …) 이야기. 없으면 기본 수학자 카드가 나온다.
+    if ((m = line.match(/^#\s*인물\s*카드\s*[·•-]?\s*(.*)$/))) {
+      person = { id: `p${String.fromCharCode(97 + people.length)}`, name: m[1].trim(), era: "", title: "", badge: "", quote: "", story: "", image: "", bonus: 80, custom: true };
+      people.push(person); box = null; level = null; card = null; continue;
     }
     if (box && (m = line.match(/^##\s*(하|중|상)/))) {
       const key = LEVEL[m[1]];
       level = box.levels[key] = { level: key, points: POINTS[key], text: "", conditions: [], kind: "", options: [], answer: "", hint: "", figure: "", howto: "" };
+      continue;
+    }
+    if (person) {
+      const f = field(line);
+      if (f) {
+        const k = f[1].replace(/^-\s*/, ""), v = f[2].trim();
+        if (k === "시대") person.era = v;
+        else if (k === "업적") person.title = v;
+        else if (k === "분야") person.badge = v;
+        else if (k === "명언") person.quote = v;
+        else if (k === "이야기") person.story = v.replace(/\\n/g, "\n");
+        else if (k === "그림") person.image = v === "없음" ? "" : v;
+      }
       continue;
     }
     if (card) {
@@ -81,7 +99,11 @@ export function parseSet(md) {
     const figErr = checkFigureSpec(c.figure);
     if (figErr) errors.push(`핵심 카드 '${c.title}': 그림을 읽을 수 없어요 — ${figErr}`);
   }
-  return { meta, boxes, cards, errors };
+  for (const p of people) {
+    if (!p.story) errors.push(`인물 카드 '${p.name}': 이야기가 없어요.`);
+    if (p.image && !IMAGE_RE.test(p.image)) errors.push(`인물 카드 '${p.name}': 그림은 교사 화면에서 올린 '/img/…' 주소로 써 주세요.`);
+  }
+  return { meta, boxes, cards, people, errors };
 }
 
 // 벡터식 정답 "−a+2b", "3/2a+b" → { a: -1, b: 2 }
@@ -136,8 +158,8 @@ export function validateSet(md, grade) {
     for (const [k, lv] of Object.entries(b.levels)) {
       const name = { low: "하", mid: "중", high: "상" }[k];
       if (!lv.kind || !lv.answer) continue; // 위에서 이미 알렸다
-      const input = lv.kind === "set" ? lv.answer.split(",").map((x) => x.trim()) : lv.kind === "choice" ? (lv.answer.match(/\d/)?.[0] ?? lv.answer) : lv.answer;
-      if (grade && grade(lv, input)?.ok !== true) errors.push(`상자 ${b.no} ${name}: 정답 '${lv.answer}'을(를) 채점기가 읽지 못해요. 숫자는 2√5, 1/2, π/2처럼, 벡터식은 -a+2b처럼 써 주세요.`);
+      const input = lv.kind === "set" ? lv.answer.split(",").map((x) => x.trim()) : lv.kind === "choice" ? (lv.answer.match(/\d/)?.[0] ?? lv.answer) : lv.kind === "text" ? lv.answer.split("|")[0].trim() : lv.answer;
+      if (grade && grade(lv, input)?.ok !== true) errors.push(`상자 ${b.no} ${name}: 정답 '${lv.answer}'을(를) 채점기가 읽지 못해요. 숫자는 2√5, 1/2, π/2처럼, 벡터식은 -a+2b처럼, 단답형은 글자로(여러 답은 | 로) 써 주세요.`);
       if (lv.kind === "choice" && lv.options.length !== 5) errors.push(`상자 ${b.no} ${name}: 오지선다는 보기가 5개여야 해요.`);
     }
   }
@@ -145,6 +167,7 @@ export function validateSet(md, grade) {
   // 제목·개념·그림 칸은 화면에 그대로 들어가므로 HTML 글자를 지운다 (본문·풀이는 화면에서 따로 막는다)
   for (const b of set.boxes) { b.title = strip(b.title); b.concept = strip(b.concept); b.tool = strip(b.tool); }
   for (const c of set.cards) c.title = strip(c.title);
+  for (const p of set.people) for (const k of ["name", "era", "title", "badge", "quote"]) p[k] = strip(p[k]);
   for (const k of Object.keys(set.meta)) set.meta[k] = strip(set.meta[k]);
   return {
     ok: errors.length === 0, errors: errors.slice(0, 30), id, set,

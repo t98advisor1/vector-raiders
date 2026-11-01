@@ -12,13 +12,20 @@ export function gradeLevel(lv, answer) {
   if (!lv) return null;
   if (lv.kind === "set") {
     if (!Array.isArray(answer) || answer.length > 12) return null;
-    const picked = [...new Set(answer.filter((x) => typeof x === "string" && x.length <= 12).map((x) => x.trim()))].sort();
+    const picked = [...new Set(answer.filter((x) => typeof x === "string" && x.length <= 40).map((x) => x.trim()))].sort();
     if (!picked.length) return null;
     const want = lv.answer.split(",").map((s) => s.trim()).filter(Boolean).sort();
     return { ok: picked.length === want.length && picked.every((x, i) => x === want[i]), display: picked.join(", ") };
   }
   const raw = String(answer ?? "").trim();
   if (!raw || raw.length > 60) return null;
+  // 단답형: 띄어쓰기·문장부호·대소문자·전각을 무시하고, 정답이 여럿이면 | 로 나눈 것 중 하나와 같으면 정답
+  if (lv.kind === "text") {
+    const key = (t) => String(t).normalize("NFKC").toLowerCase().replace(/[\s.,·!?'"“”‘’()\[\]{}~\-_/^]/g, "");
+    const got = key(raw);
+    if (!got) return null;
+    return { ok: lv.answer.split("|").some((w) => key(w) === got), display: raw.slice(0, 40) };
+  }
   if (lv.kind === "choice") return { ok: norm(raw) === norm(lv.answer).match(/^\d/)?.[0], display: raw };
   if (lv.kind === "vec") {
     const got = parseVecExpr(raw), want = parseVecExpr(lv.answer);
@@ -38,7 +45,8 @@ export function gradeLevel(lv, answer) {
 export function answerText(lv) {
   if (!lv) return "";
   if (lv.kind === "choice") return lv.options[Number(norm(lv.answer)[0]) - 1] ?? lv.answer;
-  if (lv.kind === "set") return lv.answer.split(",").map((s) => `[${s.trim()}]`).join(", ");
+  if (lv.kind === "set") return lv.answer.split(",").map((s) => (/^[A-Z]{1,3}$/.test(s.trim()) ? `[${s.trim()}]` : s.trim())).join(", ");
+  if (lv.kind === "text") return lv.answer.split("|").map((s) => s.trim()).join(" 또는 ");
   if (lv.kind === "vec") {
     const c = parseVecExpr(lv.answer) ?? {};
     const term = (k, v, first) => {

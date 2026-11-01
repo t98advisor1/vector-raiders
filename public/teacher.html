@@ -25,6 +25,7 @@
       <button id="chat-download" class="chip soft print-sheet-btn" type="button">💬 학생 채팅 기록 다운로드</button>
       <button id="print-sheet-btn" class="chip soft print-sheet-btn" type="button">🖨️ 문항·핵심 카드 PDF 출력</button>
       <button id="print-answer-btn" class="chip soft print-sheet-btn" type="button">✅ 교사용 답안 PDF</button>
+      <button class="chip soft print-sheet-btn open-manual" type="button">📘 사용 설명서</button>
     </div>
   </header>
 
@@ -65,7 +66,9 @@
         <input id="set-file" type="file" accept=".md,.txt,text/markdown,text/plain" aria-label="문항 세트 md 파일">
         <button id="set-check" class="btn" type="button">🔎 검사만 하기</button>
         <button id="set-upload" class="btn primary" type="button">📤 검사 후 저장</button>
-        <button id="set-example" class="btn" type="button">📄 형식 예시 받기 (3-1 세트)</button>
+        <button id="set-example" class="btn" type="button">📄 수학 예시 받기 (3-1 세트)</button>
+        <button id="set-example-other" class="btn" type="button">📄 다른 교과 예시 받기 (과학)</button>
+        <button class="btn primary open-manual" type="button">📘 AI로 세트 만드는 법</button>
       </div>
       <div id="upload-result" class="upload-result" role="status"></div>
       <ul id="uploaded-sets" class="uploaded-sets"></ul>
@@ -77,6 +80,11 @@
       </div>
       <div id="img-result" class="upload-result" role="status"></div>
       <ul id="uploaded-imgs" class="uploaded-sets"></ul>
+      <h3>📜 문항 변경 기록 <small class="muted" id="changelog-scope"></small></h3>
+      <small>세트·그림을 올리거나 지우고, 채널 단원을 바꾸면 여기에 자동으로 남아요.</small>
+      <div class="upload-row"><button id="changelog-csv" class="btn" type="button">⬇️ 변경 기록 CSV 내려받기</button></div>
+      <div id="changelog-alert" class="upload-result" role="status" hidden></div>
+      <div class="table-wrap"><table class="table changelog-table"><thead><tr><th>시각</th><th>채널</th><th>누가</th><th>무엇을</th><th>세트·그림</th><th>범위</th></tr></thead><tbody id="changelog-rows"></tbody></table></div>
     </div>
     <div id="kpi-row" class="kpi-row" hidden>
       <div id="kpi-people" class="kpi-card"></div>
@@ -141,5 +149,7 @@
       <p id="print-msg" class="print-msg" role="status"></p>
     </div>
   </div>
+  <!-- 사용 설명서 (캐러셀 + 프롬프트 생성기): public/js/manual.js -->
+  <div id="manual-pop" class="print-pop manual-pop" hidden role="dialog" aria-modal="true" aria-label="사용 설명서"></div>
 </body>
 </html>

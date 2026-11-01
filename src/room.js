@@ -3,7 +3,7 @@
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
 import { gradeLevel, answerText } from "./answers.js";
-import { builtinSet, builtinRaw, UNIT_SET, DEFAULT_SET, SET_LIST } from "./sets.js";
+import { builtinSet, UNIT_SET, DEFAULT_SET, SET_LIST, EXAMPLES } from "./sets.js";
 import { parseSet, validateSet } from "./setfile.js";
 import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, cleanDate, todayKst, parseChannelPasswords } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
@@ -181,6 +181,14 @@ export class Room extends DurableObject {
       await this.ctx.storage.put("imgIndex", index);
       return Response.json(index);
     }
+    // 문항 변경 기록 (세트 올림·지움·채널 적용, 그림 올림·지움): 최근 500건
+    if (url.pathname === "/admin/logs") return Response.json((await this.ctx.storage.get("changeLog")) ?? []);
+    if (url.pathname === "/admin/logput" && request.method === "POST") {
+      const entry = await request.json();
+      const log = [...((await this.ctx.storage.get("changeLog")) ?? []), entry].slice(-500);
+      await this.ctx.storage.put("changeLog", log);
+      return Response.json({ ok: true });
+    }
     if (url.pathname === "/admin/set" && request.method === "POST") {
       const { ch, cfg } = await request.json();
       const all = (await this.ctx.storage.get("channels")) ?? {};
@@ -242,7 +250,7 @@ export class Room extends DurableObject {
   publicSet() {
     const s = this.set();
     return {
-      id: s.id, meta: s.meta, cards: s.cards,
+      id: s.id, meta: s.meta, cards: s.cards, people: s.people ?? [],
       boxes: s.boxes.map((b) => ({
         no: b.no, title: b.title, room: b.room, coop: b.coop, tool: b.tool, concept: b.concept, howto: b.howto,
         levels: Object.fromEntries(LEVELS.map((k) => {
@@ -324,6 +332,42 @@ export class Room extends DurableObject {
       }
     }
     return out;
+  }
+
+  // ---------- 문항 변경 기록 ----------
+  // 문항이 자동으로 바뀌는 구조라서, 세트·그림을 올리거나 지우고 채널 단원을 바꿀 때마다 기록을 남기고
+  // 교사 화면(목록·CSV)과, 설정되어 있으면 메일로 알린다.
+  async recordChange(ws, info) {
+    const master = !!ws?.deserializeAttachment()?.master;
+    const ch = String(this.channel ?? "1");
+    const entry = { at: Date.now(), ch, by: master ? "전체 관리자" : `${ch}채널 교사`, ...info };
+    try { await this.adminStub().fetch("https://admin/admin/logput", { method: "POST", body: JSON.stringify(entry) }); } catch {}
+    // 이 채널의 교사 화면들에 새 기록을 보낸다
+    for (const other of this.ctx.getWebSockets()) {
+      const a = other.deserializeAttachment();
+      if (a?.role === "teacher") this.send(other, { type: "changeLog", entries: await this.changeLog(!!a.master), fresh: entry });
+    }
+    this.notifyMail(entry);
+  }
+  async changeLog(master) {
+    let all = [];
+    try { all = await (await this.adminStub().fetch("https://admin/admin/logs")).json(); } catch {}
+    const ch = String(this.channel ?? "1");
+    return (master ? all : all.filter((e) => e.ch === ch)).slice(-200).reverse();
+  }
+  // 변경 안내 메일 (선택): 비밀 값 RESEND_API_KEY와 NOTIFY_EMAIL이 있을 때만 보낸다. README 참고.
+  notifyMail(entry) {
+    const key = this.env.RESEND_API_KEY, to = this.env.NOTIFY_EMAIL;
+    if (!key || !to) return;
+    const when = new Date(entry.at + 9 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 16);
+    const body = {
+      from: this.env.NOTIFY_FROM || "Vector Raiders <onboarding@resend.dev>",
+      to: String(to).split(",").map((s) => s.trim()).filter(Boolean),
+      subject: `[벡터 유적 탈출] ${entry.ch}채널 · ${entry.action}: ${entry.title || entry.id}`,
+      text: [`시각(한국): ${when}`, `채널: ${entry.ch}`, `누가: ${entry.by}`, `무엇을: ${entry.action}`, `세트/그림: ${entry.title} (${entry.id})`, entry.from ? `바꾸기 전 단원: ${entry.from}` : "", `범위: ${entry.scope ?? ""}`].filter(Boolean).join("\n"),
+    };
+    const send = fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+    try { this.ctx.waitUntil(send); } catch {}
   }
 
   // 전체 관리자가 저장한 채널 설정 { "1": { passwords, from, until }, ... }
@@ -553,13 +597,13 @@ export class Room extends DurableObject {
   async onAdmin(ws, msg) {
     const master = !!ws.deserializeAttachment()?.master;
     // 문항 세트 올리기·지우기는 중간관리자도 한다(자기 채널 전용). 나머지(채널 비밀번호·기간)는 전체 관리자만.
-    const SET_MSGS = ["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList"];
+    const SET_MSGS = ["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList", "changeLogGet"];
     if (!master && !SET_MSGS.includes(msg.type)) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
     const ch = String(this.channel ?? "1");
     const who = master ? "전체 관리자" : `${ch}채널 교사`;
     const lists = async () => ({ sets: await this.setList(), ...(master ? { allSets: await this.setList(true) } : {}) });
     // ---------- 문항 세트 올리기·지우기·예시 ----------
-    if (msg.type === "setExample") return this.send(ws, { type: "setExample", md: builtinRaw(DEFAULT_SET) });
+    if (msg.type === "setExample") { const ex = EXAMPLES[msg.kind] ?? EXAMPLES.math; return this.send(ws, { type: "setExample", md: ex.md, name: ex.name }); }
     if (msg.type === "uploadSet") {
       const r = validateSet(msg.md, gradeLevel);
       if (r.ok && SET_LIST.includes(r.id)) r.errors.push(`'${r.id}'은(는) 기본 세트 이름이에요. 다른 이름을 써 주세요.`);
@@ -573,6 +617,7 @@ export class Room extends DurableObject {
       await this.adminStub().fetch("https://admin/admin/setput", { method: "POST", body: JSON.stringify({ id: r.id, md: msg.md, info: { title: r.summary.title, at: Date.now(), owner } }) });
       if (this.uploaded?.id === r.id) this.uploaded = { id: r.id, ...r.set }; // 이 채널이 쓰던 세트를 고쳐 올렸으면 바로 바꾼다
       this.log({ type: "관리자", name: who, detail: `문항 세트 올림: ${r.id}${owner ? ` (${owner}채널 전용)` : " (모든 채널)"}` });
+      await this.recordChange(ws, { action: existing ? "세트 고쳐 올림" : "세트 올림", id: r.id, title: r.summary.title, scope: owner ? `${owner}채널 전용` : "모든 채널" });
       return this.send(ws, { type: "uploadResult", ok: true, saved: true, summary: r.summary, id: r.id, owner, ...(await lists()) });
     }
     if (msg.type === "deleteSet" && typeof msg.id === "string" && !SET_LIST.includes(msg.id)) {
@@ -581,9 +626,11 @@ export class Room extends DurableObject {
       if (!master && (existing.owner ?? null) !== ch) return this.send(ws, { type: "uploadResult", ok: false, errors: ["이 채널에서 올린 세트만 지울 수 있어요."] });
       await this.adminStub().fetch("https://admin/admin/setdel", { method: "POST", body: JSON.stringify({ id: msg.id }) });
       this.log({ type: "관리자", name: who, detail: `문항 세트 지움: ${msg.id}` });
+      await this.recordChange(ws, { action: "세트 지움", id: msg.id, title: existing.title ?? "", scope: existing.owner ? `${existing.owner}채널 전용` : "모든 채널" });
       return this.send(ws, { type: "uploadResult", ok: true, deleted: msg.id, ...(await lists()) });
     }
     if (msg.type === "setListGet") return this.send(ws, { type: "uploadResult", ok: true, ...(await lists()) });
+    if (msg.type === "changeLogGet") return this.send(ws, { type: "changeLog", entries: await this.changeLog(master) });
     // ---------- 그림 파일(png·jpg·gif·webp) 올리기: 문항·카드의 '그림: /img/…'에 쓴다 ----------
     const images = async () => {
       let idx = [];
@@ -598,12 +645,14 @@ export class Room extends DurableObject {
       const name = String(msg.name ?? "").replace(/[<>&"]/g, "").slice(0, 60);
       await this.adminStub().fetch("https://admin/admin/imgput", { method: "POST", body: JSON.stringify({ id, mime: r.mime, data: msg.data, info: { name, at: Date.now(), owner: master ? null : ch, size: r.size } }) });
       this.log({ type: "관리자", name: who, detail: `그림 올림: ${name} → /img/${id}` });
+      await this.recordChange(ws, { action: "그림 올림", id: `/img/${id}`, title: name, scope: master ? "모든 채널" : `${ch}채널 전용` });
       return this.send(ws, { type: "imageResult", ok: true, saved: `/img/${id}`, images: await images() });
     }
     if (msg.type === "deleteImage" && typeof msg.id === "string") {
       const rec = (await images()).find((x) => x.id === msg.id);
       if (!rec) return this.send(ws, { type: "imageResult", ok: false, message: "이 채널에서 올린 그림만 지울 수 있어요." });
       await this.adminStub().fetch("https://admin/admin/imgdel", { method: "POST", body: JSON.stringify({ id: msg.id }) });
+      await this.recordChange(ws, { action: "그림 지움", id: `/img/${msg.id}`, title: rec.name ?? "", scope: rec.owner ? `${rec.owner}채널 전용` : "모든 채널" });
       return this.send(ws, { type: "imageResult", ok: true, deleted: msg.id, images: await images() });
     }
     if (msg.type === "adminSet") {
@@ -645,7 +694,7 @@ export class Room extends DurableObject {
   }
 
   async onTeacher(ws, msg) {
-    if (["adminGet", "adminSet", "uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList"].includes(msg.type)) return this.onAdmin(ws, msg);
+    if (["adminGet", "adminSet", "uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList", "changeLogGet"].includes(msg.type)) return this.onAdmin(ws, msg);
     if (msg.type === "stage" && STAGES.includes(msg.stage)) {
       this.data.stage = msg.stage;
       await this.save();
@@ -676,6 +725,10 @@ export class Room extends DurableObject {
       // 새 수업: 이전 반의 학생과 기록을 지우고, 접속한 학생은 다시 들어오게 한다.
       // 단원(문항 세트)을 바꿀 때도 기록이 섞이지 않게 새 수업으로 시작한다.
       const setId = msg.type === "setSet" ? msg.setId : this.data.setId;
+      if (msg.type === "setSet" && setId !== this.data.setId) {
+        const title = (await this.setList()).find((x) => x.id === setId)?.title ?? "";
+        await this.recordChange(ws, { action: "채널 단원 바꿈", id: setId, title, scope: `${this.channel ?? "1"}채널`, from: this.data.setId ?? DEFAULT_SET });
+      }
       this.data = freshData();
       this.data.setId = setId ?? DEFAULT_SET;
       this.coop = null;

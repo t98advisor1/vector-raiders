@@ -3,7 +3,7 @@
 // 확인 도구는 관계를 보여 줄 뿐 정답 수치를 직접 보여 주지 않는다.
 // 그림은 저절로 움직이는 모션으로 시작하고(ui.autoplay), 학생이 만지면 멈춘다.
 import { Board, C, el, add, sub, mul, dist } from "./svg.js";
-import { fmt } from "./mathtext.js";
+import { fmt, setAutoMath } from "./mathtext.js";
 import { figureTool } from "./figure.js";
 
 // 2022 개정 교육과정 기하 3단원 벡터 (단원마다 content/sets/의 문항 세트를 쓴다)
@@ -37,10 +37,20 @@ export const TOOLS = {
 
 // 서버가 보낸 세트 → 화면에서 쓰는 문제 목록. 다른 파일이 PROBLEMS를 그대로 쓰도록 배열 안을 바꾼다.
 export const PROBLEMS = [];
-export let SET = null; // { id, meta, cards, boxes }
+export let SET = null; // { id, meta, cards, boxes, people }
+// 글 속 수식 자동 변환: 머리말 '수식: 켬/끔'을 따르고, 없으면 수학 교과(또는 교과를 적지 않음)일 때만 켠다.
+// 끄면 $…$로 쓴 것만 수식이 된다 (영어·국어·사회 문장이 수식 글꼴로 바뀌지 않게).
+export function mathOn(meta = {}) {
+  const v = String(meta.수식 ?? "").trim();
+  if (/^(켬|on|예)/i.test(v)) return true;
+  if (/^(끔|off|아니오)/i.test(v)) return false;
+  const subj = String(meta.교과 ?? "").trim();
+  return !subj || /수학|기하|미적분|대수|확률|통계|math/i.test(subj);
+}
 export function loadSet(set) {
   SET = set;
-  const KIND = { num: "expr", vec: "expr", choice: "choice", set: "multi" };
+  const KIND = { num: "expr", vec: "expr", choice: "choice", set: "multi", text: "text" };
+  setAutoMath(mathOn(set.meta));
   PROBLEMS.length = 0;
   for (const b of set.boxes) {
     const tool = TOOLS[b.tool];
@@ -52,7 +62,7 @@ export function loadSet(set) {
         fig, howto: lv.howto || b.howto || fig.help,
         level: LEVEL_NAME[k] + (lv.coop ? " · 🤝 협업" : ""), points: lv.points, source: set.meta?.제목 ?? "",
         text: lv.text, hint: lv.hint, coop: !!lv.coop, conditions: lv.conditions ?? null, conditionLabels: lv.conditionLabels ?? [],
-        answer: { kind: KIND[lv.kind] ?? "expr", vec: lv.kind === "vec", options: lv.options, label: lv.kind === "vec" ? "벡터식 =" : "정답 =" },
+        answer: { kind: KIND[lv.kind] ?? "expr", vec: lv.kind === "vec", options: lv.options, label: lv.kind === "vec" ? "벡터식 =" : lv.kind === "text" ? "답:" : "정답 =" },
         answerText: lv.answerText ?? "",
       };
     }

@@ -53,12 +53,16 @@ function autoMath(text) {
   });
 }
 
+// 수식 자동 변환 켜기·끄기 (문항 세트의 교과에 따라 problems.js의 loadSet이 정한다)
+let AUTO_MATH = true;
+export function setAutoMath(on) { AUTO_MATH = !!on; }
+
 export function fmt(src) {
   return String(src)
     .split(/\$([^$]+)\$/)
     .map((part, i) => {
       if (i % 2 === 1) return `\\(${esc(part)}\\)`;
-      return esc(autoMath(part)); // 수식 덩어리에는 < > & 가 들어가지 않는다
+      return esc(AUTO_MATH ? autoMath(part) : part); // 수식 덩어리에는 < > & 가 들어가지 않는다
     })
     .join("");
 }

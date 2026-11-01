@@ -1177,8 +1177,10 @@ const awardConcept = (key) => {
 
 // 기하를 빛낸 위대한 수학자 히든 카드 이벤트 팝업
 let mathCardIdx = 0;
+// 문항 세트에 '# 인물 카드'가 있으면 그 인물들을, 없으면 기본 수학자 카드를 차례로 보여 준다
 function triggerMathematicianEvent(next = closeModal) {
-  const m = MATHEMATICIANS[mathCardIdx % MATHEMATICIANS.length];
+  const list = SET?.people?.length ? SET.people : MATHEMATICIANS;
+  const m = list[mathCardIdx % list.length];
   mathCardIdx++;
   showMathematicianCard(m, next);
 }
@@ -1189,7 +1191,7 @@ function showMathematicianCard(m, next) {
   body.innerHTML = `
     ${mathematicianCard(m)}
     <div class="summary-actions" style="margin-top: 14px;">
-      <button class="btn primary big" type="button" id="math-card-ok">기하 탐험 계속하기 ➔</button>
+      <button class="btn primary big" type="button" id="math-card-ok">탐험 계속하기 ➔</button>
     </div>`;
   // 이야기는 타자 소리와 함께 한 글자씩 (누르면 바로 다 보임)
   setTimeout(() => { const el = $(".math-story-text", body); if (el?.isConnected) typeText(el, m.story); }, 900);
@@ -1436,8 +1438,8 @@ function buildAnswer(p, root, spec = null) {
       const c = document.createElement("button");
       c.type = "button";
       c.className = "chip-btn";
-      c.innerHTML = fmt(`[${o}]`);
-      c.setAttribute("aria-label", `벡터 ${o}`);
+      c.innerHTML = /^[A-Z]{1,3}$/.test(o) ? fmt(`[${o}]`) : fmt(o);
+      c.setAttribute("aria-label", /^[A-Z]{1,3}$/.test(o) ? `벡터 ${o}` : o);
       c.setAttribute("aria-pressed", "false");
       c.onclick = () => {
         if (picked.has(o)) picked.delete(o); else picked.add(o);
@@ -1459,11 +1461,12 @@ function buildAnswer(p, root, spec = null) {
   const label = document.createElement("label");
   label.textContent = ansSpec.label ?? "정답 =";
   const input = document.createElement("input");
-  Object.assign(input, { type: "text", maxLength: 40, placeholder: ansSpec.vec ? "예: -a+2b, 3/2a+b, a-b+c" : "예: 2√5, 1/2, π/2, −3", autocomplete: "off" });
+  const isText = ansSpec.kind === "text"; // 단답형: 글자로 답한다 (수 자판 없음)
+  Object.assign(input, { type: "text", maxLength: 40, placeholder: isText ? "답을 글자로 쓰세요" : ansSpec.vec ? "예: -a+2b, 3/2a+b, a-b+c" : "예: 2√5, 1/2, π/2, −3", autocomplete: "off" });
   label.appendChild(input);
   const pad = document.createElement("div");
   pad.className = "keypad";
-  for (const k of ansSpec.vec ? ["a", "b", "c", "+", "−", "/", "⌫"] : ["√", "π", "/", "−", "(", ")", "⌫"]) {
+  for (const k of isText ? [] : ansSpec.vec ? ["a", "b", "c", "+", "−", "/", "⌫"] : ["√", "π", "/", "−", "(", ")", "⌫"]) {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = k;
@@ -1626,7 +1629,7 @@ function printAssessment(kind) {
     const optHtml = v.answer?.kind === "choice"
       ? `<p class="fa-opts">${opts.map((o) => fmt(o)).join("&emsp;")}</p>`
       : v.answer?.kind === "multi"
-        ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${fmt(`[${o}]`)}`).join("&emsp;")}</p>`
+        ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${(/^[A-Z]{1,3}$/.test(o) ? fmt(`[${o}]`) : fmt(o))}`).join("&emsp;")}</p>`
         : "";
     const head = `<h3>${i + 1}. ${p.icon} ${p.relic} <small>${DIFF_NAME[d] ?? ""} · ${v.points ?? ""}점</small></h3>`;
     if (!isAnswer) {
@@ -1670,7 +1673,7 @@ function printReview(all = false) {
     const v = p.diffs?.[d] ?? p;
     const opts = v.answer?.options ?? [];
     const optHtml = v.answer?.kind === "choice" ? `<p class="fa-opts">${opts.map((o) => fmt(o)).join("&emsp;")}</p>`
-      : v.answer?.kind === "multi" ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${fmt(`[${o}]`)}`).join("&emsp;")}</p>` : "";
+      : v.answer?.kind === "multi" ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${(/^[A-Z]{1,3}$/.test(o) ? fmt(`[${o}]`) : fmt(o))}`).join("&emsp;")}</p>` : "";
     const conds = (reviewConds?.[p.id]?.[d] ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("");
     const fig = figureHtml(p, d);
     return `
