@@ -225,3 +225,16 @@ test("코드 그림 안내와 webp 압축", () => {
   const t = fs.readFileSync("public/js/teacher.js", "utf8");
   assert.match(t, /c\.toBlob\(r, "image\/webp", 0\.8\)/);
 });
+
+test("연습 모드도 모든 방을 탈출하면 결과 창이 열리고, 소감을 쓰면 관상 연구소가 열린다", () => {
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.match(stu, /S\.mode === "practice" && !wasDone && iEscaped\(\)/);
+  assert.match(stu, /S\.mode === "practice" \? !!r\.feel : REWARD_STEPS\.every/);
+  assert.match(stu, /vr-reward-\$\{S\.mode\}/); // 수업·연습 보상 기록을 따로 둔다
+});
+
+test("배경음악은 같은 장을 다시 돌 때마다 조금씩 바뀐다", () => {
+  const snd = fs.readFileSync("public/js/sound.js", "utf8");
+  assert.match(snd, /this\.cycle = \(this\.cycle \?\? 0\) \+ 1/);
+  assert.match(snd, /const shift = \[0, 2, -2, 3\]\[cyc % 4\]/);
+});
