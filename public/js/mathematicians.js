@@ -109,11 +109,15 @@ const letters = (t) => [...t].map((c, i) => `<span class="ch" style="--i:${i}">$
 
 export function mathematicianCard(m) {
   const [ko, en] = m.name.split(" (");
+  // 문항 세트의 인물 카드(m.custom): 올린 그림이 있으면 초상화로, 없으면 기본 초상화 모양
+  const safeImg = m.image && /^\/img\/[a-z0-9]{6,40}\.(png|jpe?g|gif|webp)$/i.test(m.image) ? m.image : "";
+  const portrait = safeImg ? `<img class="person-img" src="${safeImg}" alt="">` : portraitSvg(m);
+  const icon = (m.badge || "🌟").split(" ")[0];
   return `
     <div class="math-card">
-      <div class="math-card-badge">🌟 기하를 빛낸 수학자 카드 해금!</div>
+      <div class="math-card-badge">${m.custom ? "🌟 인물 카드 해금!" : "🌟 기하를 빛낸 수학자 카드 해금!"}</div>
       <div class="math-card-head">
-        <div class="math-card-portrait">${portraitSvg(m)}<span class="math-card-icon">${m.badge.split(" ")[0]}</span></div>
+        <div class="math-card-portrait">${portrait}<span class="math-card-icon">${icon}</span></div>
         <div>
           <h2 class="math-card-name" aria-label="${ko}">${letters(ko)}</h2>
           ${en ? `<div class="math-card-en">${en.replace(")", "")}</div>` : ""}
@@ -121,13 +125,13 @@ export function mathematicianCard(m) {
           <div class="math-card-era">${m.era}</div>
         </div>
       </div>
-      <blockquote class="math-card-quote">${m.quote}</blockquote>
+      ${m.quote ? `<blockquote class="math-card-quote">${m.quote}</blockquote>` : ""}
       <div class="math-card-story">
-        <b>💡 기하학 속 이야기</b>
+        <b>${m.custom ? "💡 이야기" : "💡 기하학 속 이야기"}</b>
         <p class="math-story-text"></p>
       </div>
       <div class="math-card-bonus">
-        <span>🎁 수학자 탐구 보너스 마일리지</span>
+        <span>${m.custom ? "🎁 인물 탐구 보너스 마일리지" : "🎁 수학자 탐구 보너스 마일리지"}</span>
         <b>+${m.bonus}점</b>
       </div>
     </div>`;

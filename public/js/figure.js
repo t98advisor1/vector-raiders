@@ -4,7 +4,7 @@
 // 학생이 만지기 전에는 조절기가 저절로 움직이거나(평면) 천천히 돌아간다(공간).
 import { Board, C } from "./svg.js";
 import { fmt } from "./mathtext.js";
-import { parseFigure, evalScene, evalExpr as evalStrict, niceValue } from "./figcore.js";
+import { parseFigure, evalScene, evalExpr as evalStrict, niceValue, withX } from "./figcore.js";
 
 // 괄호 없이 쓴 성분(3,3)도 읽는다
 const evalExpr = (src, env) => { try { return evalStrict(src, env); } catch (e) { if (String(src).includes(",")) return evalStrict(`(${src})`, env); throw e; } };
@@ -123,6 +123,26 @@ function mount(ui, fig) {
       const span = (is3 ? R * 1.6 : Math.max(xr[1] - xr[0], yr[1] - yr[0])) / Math.hypot(...u);
       bd.line(P(p0.map((c, i) => c - span * u[i])), P(p0.map((c, i) => c + span * u[i])), { color: C.target, width: 1.8, dash: "6 4" });
     }
+    // 넓이: 곡선과 x축 사이 (정적분의 뜻)
+    for (const [n, aE, bE] of fig.areas) {
+      const src = fig.curves[Number(n) - 1];
+      let a, b;
+      try { a = evalExpr(aE, env); b = evalExpr(bE, env); } catch { continue; }
+      if (!(Number.isFinite(a) && Number.isFinite(b)) || a === b) continue;
+      const pts = [[a, 0]], N = 80;
+      for (let i = 0; i <= N; i++) { const x = a + ((b - a) * i) / N; let y; try { y = evalExpr(src, withX(env, x)); } catch { y = 0; } pts.push([x, Number.isFinite(y) ? Math.max(yr[0], Math.min(yr[1], y)) : 0]); }
+      pts.push([b, 0]);
+      bd.polygon(pts, { color: "transparent", width: 0, fill: "rgba(245,158,11,0.28)" });
+    }
+    // 접선: 곡선 위 x=a에서
+    for (const [n, aE] of fig.tangents) {
+      let a, y0, m;
+      try { a = evalExpr(aE, env); y0 = evalExpr(`f${n}(x)`, withX(env, a)); m = evalExpr(`d${n}(x)`, withX(env, a)); } catch { continue; }
+      if (![a, y0, m].every(Number.isFinite)) continue;
+      const w = xr[1] - xr[0];
+      bd.line([a - w, y0 - m * w], [a + w, y0 + m * w], { color: C.red, width: 2, dash: "5 4" });
+      bd.point([a, y0], { color: C.red, r: 5 });
+    }
     // 곡선: y = f(x) 그래프 (평면)
     const CURVE_COLORS = [C.a, C.b, C.sum, C.target];
     fig.curves.forEach((src, k) => {
@@ -131,7 +151,7 @@ function mount(ui, fig) {
       for (let i = 0; i <= n; i++) {
         const x = xr[0] + i * step;
         let y;
-        try { y = evalExpr(src, { ...env, x }); } catch { y = NaN; }
+        try { y = evalExpr(src, withX(env, x)); } catch { y = NaN; }
         const ok = typeof y === "number" && Number.isFinite(y) && Math.abs(y) < 1e6;
         // 점근선처럼 값이 크게 튀는 곳은 잇지 않는다
         if (ok && prev && Math.abs(y - prev[1]) < span * 2) bd.line(prev, [x, y], { color: CURVE_COLORS[k % CURVE_COLORS.length], width: 2.4 });

@@ -76,7 +76,7 @@ test("중간관리자가 올린 문항 세트는 그 채널에만 보이고, 그
   assert.match(room, /filter\(\(x\) => all \|\| !x\.owner \|\| x\.owner === ch\)/);
   assert.match(room, /const owner = master \? existing\?\.owner \?\? null : ch;/);
   assert.match(room, /이 채널에서 올린 세트만 지울 수 있어요/);
-  assert.match(room, /SET_MSGS = \["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList"\]/);
+  assert.match(room, /SET_MSGS = \["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList", "changeLogGet"\]/);
 });
 
 test("그림: 칸은 그림 줄·내장 도구·안전한 이미지 주소만 받고, 카드에도 그림을 붙인다", async () => {
@@ -100,4 +100,53 @@ test("팀 문은 같은 팀 절반 이상이 열면 열리고, 그림의 재생=
   assert.equal(checkFigure("공간 직육면체=2,2,2 재생=회전,8"), null);
   assert.match(checkFigure("평면 a=1,1 재생=회전,8") ?? "", /공간/);
   assert.match(checkFigure("평면 a=1,1 재생=k,3") ?? "", /슬라이더/);
+});
+
+test("다른 교과 예시 세트는 검사를 통과하고, 단답형·인물 카드·수식 끔을 쓴다", async () => {
+  const { validateSet } = await import("../src/setfile.js");
+  const { gradeLevel, answerText } = await import("../src/answers.js");
+  const r = validateSet(fs.readFileSync("content/examples/sci-motion.md", "utf8"), gradeLevel);
+  assert.equal(r.ok, true, r.errors.join("\n"));
+  assert.equal(r.set.people.length, 2);
+  assert.ok(r.set.boxes.some((b) => Object.values(b.levels).some((lv) => lv.kind === "text")));
+  const lv = { kind: "text", answer: "m/s² | 미터 매 초 제곱" };
+  assert.equal(gradeLevel(lv, "m/s^2").ok, true);
+  assert.equal(gradeLevel(lv, "M / S2").ok, true);
+  assert.equal(gradeLevel(lv, "m/s").ok, false);
+  assert.equal(answerText({ kind: "set", answer: "m/s, km/h" }), "m/s, km/h");
+  assert.equal(answerText({ kind: "set", answer: "AB, CD" }), "[AB], [CD]");
+});
+
+test("수식 자동 변환은 수학 교과만 켜고, 머리말 '수식:'이 우선한다", async () => {
+  const { mathOn } = await import("../public/js/problems.js").catch(() => ({}));
+  if (!mathOn) return; // problems.js가 브라우저 전용 모듈을 부르면 건너뛴다
+  assert.equal(mathOn({}), true);
+  assert.equal(mathOn({ 교과: "기하" }), true);
+  assert.equal(mathOn({ 교과: "과학" }), false);
+  assert.equal(mathOn({ 교과: "과학", 수식: "켬" }), true);
+  assert.equal(mathOn({ 교과: "수학", 수식: "끔" }), false);
+});
+
+test("미적분 그림 문법: f1·d1·int1, 접선, 넓이", async () => {
+  const { parseFigure, evalScene, evalExpr, checkFigure } = await import("../public/js/figcore.js");
+  const spec = "평면 범위=-1,4,-1,9 곡선=x^2 슬라이더=a,0,3,0.5;b,0,3,0.5 접선=1,a 넓이=1,0,b 보기=기울기:d1(a);넓이:int1(0,b)";
+  assert.equal(checkFigure(spec), null);
+  const env = evalScene(parseFigure(spec), { a: 2, b: 3 });
+  assert.equal(evalExpr("f1(a)", env), 4);
+  assert.ok(Math.abs(evalExpr("d1(a)", env) - 4) < 1e-6);
+  assert.ok(Math.abs(evalExpr("int1(0,b)", env) - 9) < 1e-6);
+  assert.match(checkFigure("평면 곡선=x 접선=2,1") ?? "", /곡선 2/);
+});
+
+test("사용 설명서의 프롬프트 생성기는 단계·그림 종류에 맞는 규칙을 넣는다", async () => {
+  const { buildPrompt } = await import("../public/js/manual.js");
+  const p = buildPrompt({ subject: "미적분", unit: "미분", stage: "3", figs: ["graph", "motion"], kinds: ["num"], people: true });
+  assert.match(p, /접선=1,a/);
+  assert.match(p, /재생=t,4/);
+  assert.match(p, /인물 카드/);
+  const q = buildPrompt({ subject: "사회", unit: "지도", stage: "1", figs: ["image"], kinds: ["text"], images: "/img/abc123def456.png 지도" });
+  assert.match(q, /설계표/);
+  const r = buildPrompt({ subject: "영어", stage: "3", figs: ["none"], kinds: ["text", "choice"], math: "off" });
+  assert.match(r, /수식: 끔/);
+  assert.match(r, /단답형/);
 });

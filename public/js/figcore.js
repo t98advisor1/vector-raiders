@@ -16,10 +16,12 @@
 //   끌기=a,A   슬라이더=t,-3,3,0.5;k,0,2,0.1   보기=라벨:식;식   화살표=a,b,AB   선분=AB,BC
 //   다각형=ABCD   직선=A,u   원=C,r   (공간) 평면=n,d (n·x + d = 0)   구=C,r   직육면체=가로,세로,높이   자취=P
 //   곡선=x^2-2*x;2^x  (평면, y = f(x) 그래프. x를 변수로, 조절기 값도 쓸 수 있다)
+//   접선=1,a  (곡선 1의 x=a에서의 접선)   넓이=1,a,b  (곡선 1과 x축 사이, x=a~b를 색칠)
+//   식에서 곡선 부르기: f1(x) 곡선 1의 값, d1(x) 곡선 1의 미분계수, int1(a,b) 곡선 1의 정적분 (f2, d2, int2 …)
 //   재생=t,4;회전,10   모션그래픽: 조절기 t를 4초 동안 최소→최대→최소로 부드럽게, 공간 그림을 10초에 한 바퀴. 재생=없음이면 멈춤
 // 수 함수: x^2(거듭제곱) π √ |x| sqrt() abs() exp() ln() log()(밑 10) tan() — cos·sin·tan은 도 단위, 라디안은 cosr·sinr·tanr
 
-const RESERVED = new Set(["범위", "끌기", "슬라이더", "보기", "화살표", "선분", "다각형", "직선", "원", "평면", "구", "직육면체", "자취", "숨김", "곡선", "재생"]);
+const RESERVED = new Set(["범위", "끌기", "슬라이더", "보기", "화살표", "선분", "다각형", "직선", "원", "평면", "구", "직육면체", "자취", "숨김", "곡선", "재생", "접선", "넓이"]);
 
 // ---------- 식 계산 ----------
 function tokenize(src) {
@@ -32,6 +34,7 @@ function tokenize(src) {
     let m;
     if ((m = /^\d+(\.\d+)?/.exec(s.slice(i)))) { out.push({ t: "num", v: Number(m[0]) }); i += m[0].length; continue; }
     if ((m = /^각선|^각/.exec(s.slice(i)))) { out.push({ t: "fn", v: m[0] }); i += m[0].length; continue; }
+    if ((m = /^(int|f|d)([1-9])(?=\()/.exec(s.slice(i)))) { out.push({ t: "fn", v: m[0] }); i += m[0].length; continue; }
     if ((m = /^(mid|div|cen|cosr|sinr|tanr|cos|sin|tan|sqrt|abs|exp|ln|log)(?=\()/.exec(s.slice(i)))) { out.push({ t: "fn", v: m[1] }); i += m[1].length; continue; }
     if (c === "π") { out.push({ t: "num", v: Math.PI }); i++; continue; }
     if ((m = /^[A-Z]+[0-9]*'?/.exec(s.slice(i)))) { out.push({ t: "up", v: m[0] }); i += m[0].length; continue; }
@@ -131,6 +134,8 @@ export function evalExpr(src, env) {
       if (t.v === "cos") return Math.cos((args[0] * Math.PI) / 180); // 각은 도 단위
       if (t.v === "sin") return Math.sin((args[0] * Math.PI) / 180);
       if (t.v === "tan") return Math.tan((args[0] * Math.PI) / 180);
+      const cm = /^(int|f|d)([1-9])$/.exec(t.v);
+      if (cm) return curveCall(cm[1], Number(cm[2]), args, env);
       const NUM = { cosr: Math.cos, sinr: Math.sin, tanr: Math.tan, sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10 };
       if (NUM[t.v]) { if (isVec(args[0])) throw new Error(`${t.v}() 안에는 수를 써요`); return NUM[t.v](args[0]); }
       if (t.v === "mid") return vmul(0.5, vadd(args[0], args[1]));
@@ -143,6 +148,22 @@ export function evalExpr(src, env) {
   if (p < tk.length) throw new Error(`'${tk[p].v}' 근처를 읽을 수 없어요`);
   return v;
 }
+
+// 곡선 부르기: f1(x) 값, d1(x) 미분계수(중앙 차분), int1(a,b) 정적분(심프슨 공식)
+function curveCall(kind, n, args, env) {
+  const src = env.__curves?.[n - 1];
+  if (!src) throw new Error(`곡선 ${n}이 없어요 (곡선=식;식 순서대로 1, 2 …)`);
+  if (args.some(isVec)) throw new Error(`${kind}${n}() 안에는 수를 써요`);
+  const f = (x) => { const v = evalExpr(src, withX(env, x)); if (isVec(v)) throw new Error("곡선은 수가 나오는 식으로 써요"); return v; };
+  if (kind === "f") return f(args[0]);
+  if (kind === "d") { const x = args[0], h = 1e-4 * Math.max(1, Math.abs(x)); return (f(x + h) - f(x - h)) / (2 * h); }
+  const [a, b] = args, N = 200, h = (b - a) / N;
+  let sum = f(a) + f(b);
+  for (let i = 1; i < N; i++) sum += f(a + i * h) * (i % 2 ? 4 : 2);
+  return (sum * h) / 3;
+}
+// env를 그대로 두고 x만 더한 새 env (곡선 목록 같은 숨은 값도 물려받는다)
+export const withX = (env, x) => Object.assign(Object.create(env), { x });
 
 // "1/3", "-2", "√2" 같은 조절기 값
 function numberOf(x) { const v = evalExpr(String(x), {}); if (Array.isArray(v)) throw new Error("조절기 값은 수로 써요"); return v; }
@@ -160,7 +181,7 @@ export function parseFigure(spec) {
   const parts = String(spec ?? "").trim().split(/\s+/).filter(Boolean);
   const kind = parts[0] === "평면" ? "2d" : parts[0] === "공간" ? "3d" : null;
   if (!kind) return null;
-  const fig = { kind, defs: [], starts: {}, sliders: [], drag: [], show: [], arrows: null, segs: [], polys: [], lines: [], circles: [], planes: [], spheres: [], box: null, trail: [], hide: [], range: null, curves: [], play: [], playOff: false };
+  const fig = { kind, defs: [], starts: {}, sliders: [], drag: [], show: [], arrows: null, segs: [], polys: [], lines: [], circles: [], planes: [], spheres: [], box: null, trail: [], hide: [], range: null, curves: [], tangents: [], areas: [], play: [], playOff: false };
   for (const part of parts.slice(1)) {
     const eq = part.indexOf("=");
     if (eq < 1) throw new Error(`'${part}'는 '이름=값'으로 써 주세요`);
@@ -180,6 +201,8 @@ export function parseFigure(spec) {
     else if (key === "직육면체") fig.box = list().map(Number);
     else if (key === "자취") fig.trail = list();
     else if (key === "곡선") fig.curves = list(";");
+    else if (key === "접선") fig.tangents = list(";").map((s) => s.split(","));
+    else if (key === "넓이") fig.areas = list(";").map((s) => s.split(","));
     else if (key === "재생") {
       if (val === "없음") fig.playOff = true;
       else fig.play = list(";").map((s) => { const [name, sec] = s.split(","); return { name, sec: Math.max(1, Math.min(60, Number(sec) || 4)) }; });
@@ -199,6 +222,7 @@ export function parseFigure(spec) {
 // 장면 계산: 직육면체 꼭짓점 → 조절기 → 정의(위에서 아래로) 순서로 env를 채운다
 export function evalScene(fig, state = {}) {
   const env = {};
+  Object.defineProperty(env, "__curves", { value: fig.curves ?? [], enumerable: false }); // f1(x)·d1(x)·int1(a,b)용
   if (fig.box) {
     const [w, d, h] = fig.box;
     Object.assign(env, {
@@ -227,13 +251,15 @@ export function checkFigure(spec) {
     for (const [c, r] of [...fig.spheres, ...fig.circles]) { evalExpr(c, env); evalExpr(r, env); }
     for (const name of fig.drag) if (!(name in env)) throw new Error(`끌기 '${name}'가 정의되지 않았어요`);
     if (fig.curves.length && fig.kind !== "2d") throw new Error("곡선은 평면 그림에서만 써요");
+    for (const [n, a] of fig.tangents) { if (!fig.curves[Number(n) - 1]) throw new Error(`접선: 곡선 ${n}이 없어요`); evalExpr(a, env); }
+    for (const [n, a, b] of fig.areas) { if (!fig.curves[Number(n) - 1]) throw new Error(`넓이: 곡선 ${n}이 없어요`); evalExpr(a, env); evalExpr(b, env); }
     for (const p of fig.play) {
       if (p.name === "회전") { if (fig.kind !== "3d") throw new Error("재생=회전은 공간 그림에서만 써요"); continue; }
       if (!fig.sliders.some((s) => s.name === p.name)) throw new Error(`재생 '${p.name}'은(는) 슬라이더 이름이나 '회전'으로 써요`);
     }
     for (const c of fig.curves) {
       // x 여러 값에서 계산해 보아 식이 읽히는지, 수가 나오는지 확인한다 (어떤 x에서는 정의되지 않아도 된다)
-      const vals = [-2, -0.5, 0.5, 1, 2, 3].map((x) => evalExpr(c, { ...env, x }));
+      const vals = [-2, -0.5, 0.5, 1, 2, 3].map((x) => { try { return evalExpr(c, withX(env, x)); } catch (e) { if (/읽을|몰라요|필요|끝났/.test(e.message)) throw e; return NaN; } });
       if (vals.some(isVec)) throw new Error(`곡선 '${c}'은 수가 나오는 식(y = f(x))으로 써요`);
     }
     return null;
