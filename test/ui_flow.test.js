@@ -157,3 +157,16 @@ test("사용 설명서가 쓰는 모의 진행 그림이 모두 있다", () => {
   assert.ok(names.length >= 15, `그림 ${names.length}개`);
   for (const n of names) assert.ok(fs.existsSync(`public/img/manual/${n}.webp`), `${n}.webp`);
 });
+
+test("협업 짝 정보는 저장소에 남고, 다시 열면 같은 조건을 다시 받는다 (4인 모의 진행 B팀 사례)", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /this\.data\.coop \?\?= \{ wait: \{\}, pairs: \{\}, solo: \[\] \}/);
+  assert.doesNotMatch(room, /this\.coop\b(?!Ready)/);
+  assert.match(room, /if \(pair\?\.includes\(cid\)\) \{\n\s*return this\.send\(ws, \{ type: "coop"/);
+  const css = fs.readFileSync("public/css/style.css", "utf8");
+  assert.match(css, /\.chat-toggle, \.chat-panel \{ z-index: 60; \}/);
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.doesNotMatch(stu, /문제는 같고 배점만 달라요/);
+  const game = fs.readFileSync("public/js/game.js", "utf8");
+  assert.match(game, /BIAS = \{ bridge: -1\.0, tablet: 0\.4 \}/);
+});

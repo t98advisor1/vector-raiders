@@ -334,10 +334,15 @@ export class Game {
       this.needSend = true;
     }
 
-    let best = null, bestD = REACH;
+    // 가장 가까운 것을 고르되, 용암 다리(벡터 점프)는 가운데가 용암 속이라 조금 앞당기고,
+    // 개념 비석은 조금 뒤로 미룬다 (모의 수업에서 용암 앞 E가 비석을 여는 문제가 있었다).
+    const BIAS = { bridge: -1.0, tablet: 0.4 };
+    let best = null, bestScore = Infinity;
     for (const t of this.targets()) {
       const d = Math.hypot(t.x - this.me.x, t.y - this.me.y);
-      if (d < bestD) { best = t; bestD = d; }
+      if (d >= REACH) continue;
+      const score = d + (BIAS[t.kind] ?? 0);
+      if (score < bestScore) { best = t; bestScore = score; }
     }
     this.focus = best;
 

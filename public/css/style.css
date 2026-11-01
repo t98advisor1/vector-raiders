@@ -1306,3 +1306,6 @@ body.touch-device .chat-panel { right: 96px; bottom: calc(14px + env(safe-area-i
 }
 .changelog-table td, .changelog-table th { font-size: 0.85rem; }
 @media (max-width: 600px) { .manual-track { padding: 12px; } .mn-table { font-size: 0.82rem; } }
+
+/* 채팅은 문제 창(모달) 위에 둔다: 협업 문제를 풀며 채팅해도 문제 창이 닫히지 않게 */
+.chat-toggle, .chat-panel { z-index: 60; }
