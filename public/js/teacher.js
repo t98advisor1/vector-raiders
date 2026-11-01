@@ -15,6 +15,8 @@ const joinedCh = new Set(); // 이 비밀번호로 들어간 채널 (중간관�
 const failedCh = new Set(); // 이 비밀번호로 들어가지 못한 채널 (중간관리자에게 다른 채널은 당연히 실패)
 let loginError = "";
 const setByCh = {}; // 채널 → { set, answers } (채널마다 단원이 다를 수 있다)
+const setListByCh = {}; // 채널 → 그 채널에서 고를 수 있는 세트 목록 (중간관리자가 올린 세트는 그 채널에만)
+let allSetList = null; // 전체 관리자: 모든 채널의 올린 세트
 const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)
 const pwByCh = {}; // 채널 번호 → 로그인 비밀번호 (joined 뒤 기억해 두기)
 const dashByCh = {}; // 채널 번호 → 마지막 받은 대시보드 (통합 뷰용)
@@ -246,7 +248,9 @@ function onChannelMessage(ch, msg) {
     if (!msg.master && msg.period) $(".admin-banner").dataset.period = `📅 ${ch}채널 사용 기간: ${msg.period}`;
     // 채널마다 단원(문항 세트)이 다를 수 있어서 채널별로 기억해 두고, 보고 있는 채널의 세트를 쓴다
     if (msg.set) setByCh[ch] = { set: msg.set, answers: msg.answers };
-    if (msg.sets) fillSetSelect(msg.sets);
+    if (msg.sets) { setListByCh[ch] = msg.sets; if (ch === activeCh) fillSetSelect(msg.sets); }
+    if (ch === activeCh || !$("#uploaded-sets").children.length) renderUploaded();
+    $("#upload-scope").textContent = isMaster ? "· 전체 관리자: 모든 채널에서 고를 수 있어요" : `· ${ch}채널 전용: 이 채널에서만 보이고 바뀌어요`;
     if (msg.set && (ch === activeCh || !PROBLEMS.length)) { loadSet(msg.set); fillSetSelect(null, msg.set.id); }
     if (ch === activeCh || !answers) answers = msg.answers ?? null;
     $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
@@ -275,7 +279,7 @@ function onChannelMessage(ch, msg) {
       fillSetSelect(null, msg.set.id);
     }
   } else if (msg.type === "uploadResult") {
-    onUploadResult(msg);
+    onUploadResult(msg, ch);
   } else if (msg.type === "setExample") {
     download("문항세트_형식예시_geo-3-1.md", msg.md, "text/markdown");
   } else if (msg.type === "admin") {
@@ -336,7 +340,8 @@ function switchChannel(ch) {
   if (setByCh[ch]) {
     loadSet(setByCh[ch].set);
     answers = setByCh[ch].answers;
-    fillSetSelect(null, setByCh[ch].set.id);
+    fillSetSelect(setListByCh[ch] ?? null, setByCh[ch].set.id);
+    renderUploaded();
     $("#problems").replaceChildren();
     buildAnswerSheet();
   }
@@ -706,7 +711,7 @@ $("#set-select")?.addEventListener("change", (e) => {
   net?.send({ type: "setSet", setId: id });
 });
 
-// ---------- 전체 관리자: 문항 세트(md) 올리기 ----------
+// ---------- 문항 세트(md) 올리기: 중간관리자는 자기 채널 전용, 전체 관리자는 모든 채널 ----------
 function download(name, text, type) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
@@ -726,7 +731,7 @@ $("#set-check").onclick = () => sendSetFile(true);
 $("#set-upload").onclick = () => sendSetFile(false);
 $("#set-example").onclick = () => net?.send({ type: "setExample" });
 
-function onUploadResult(msg) {
+function onUploadResult(msg, ch = activeCh) {
   const box = $("#upload-result");
   const sum = msg.summary ? `「${msg.summary.title}」 상자 ${msg.summary.boxes}개 · 문항 ${msg.summary.items}개 · 핵심 카드 ${msg.summary.cards}장 · 협업 상자 ${msg.summary.coop}개` : "";
   if (!msg.ok) {
@@ -735,22 +740,43 @@ function onUploadResult(msg) {
   } else if (msg.checked) {
     box.className = "upload-result ok"; box.textContent = `✅ 형식과 정답이 모두 괜찮아요. ${sum} — '검사 후 저장'을 누르면 저장돼요.`;
   } else if (msg.saved) {
-    box.className = "upload-result ok"; box.textContent = `✅ 저장했어요 (세트 이름: ${msg.id}). ${sum} — 채널마다 "이 채널 단원"에서 고르세요.`;
+    box.className = "upload-result ok";
+    box.textContent = msg.owner
+      ? `✅ ${msg.owner}채널 전용으로 저장했어요 (세트 이름: ${msg.id}). ${sum} — 다른 채널에는 보이지 않아요.`
+      : `✅ 저장했어요 (세트 이름: ${msg.id}). ${sum} — 모든 채널의 "이 채널 단원"에서 고를 수 있어요.`;
   } else if (msg.deleted) {
     box.className = "upload-result ok"; box.textContent = `🗑️ '${msg.deleted}' 세트를 지웠어요.`;
   }
+  if (msg.allSets) allSetList = msg.allSets;
   if (msg.sets) {
-    fillSetSelect(msg.sets);
-    const ul = $("#uploaded-sets");
-    ul.replaceChildren(...msg.sets.filter((x) => x.uploaded).map((x) => {
-      const li = document.createElement("li");
-      li.textContent = `📤 ${x.title} (${x.id}) · ${x.at ? new Date(x.at).toLocaleString("ko-KR") : ""} `;
-      const del = document.createElement("button");
-      del.type = "button"; del.className = "btn danger"; del.textContent = "지우기";
-      del.onclick = () => { if (confirm(`'${x.title}' 세트를 지울까요? 이 세트를 쓰는 채널은 '새 수업 시작' 때 기본 세트로 돌아가요.`)) net?.send({ type: "deleteSet", id: x.id }); };
-      li.appendChild(del);
-      return li;
-    }));
-    if (!ul.children.length) ul.innerHTML = "<li class='muted'>아직 올린 세트가 없어요.</li>";
+    setListByCh[ch] = msg.sets;
+    if (ch === activeCh) fillSetSelect(msg.sets);
+    renderUploaded();
   }
+  // 중간관리자: 저장한 세트를 지금 이 채널에 바로 적용할지 묻는다 (적용하면 새 수업으로 시작)
+  if (msg.saved && msg.owner && ch === activeCh) {
+    const n = last?.students?.length ?? 0;
+    if (confirm(`방금 올린 세트를 ${ch}채널에 지금 적용할까요?\n학생 ${n}명의 기록이 지워지고 새 수업으로 시작해요. 먼저 CSV를 내려받아 두세요.\n(나중에 '이 채널 단원'에서 골라도 돼요)`)) {
+      net?.send({ type: "setSet", setId: msg.id });
+    }
+  }
+}
+
+// 올린 세트 목록: 전체 관리자는 모든 채널의 세트, 중간관리자는 자기 채널 전용 세트만 (지우기 가능)
+function renderUploaded() {
+  const ul = $("#uploaded-sets");
+  if (!ul) return;
+  const list = isMaster ? (allSetList ?? setListByCh[activeCh] ?? []) : (setListByCh[activeCh] ?? []);
+  const mine = list.filter((x) => x.uploaded && (isMaster || x.owner === activeCh));
+  ul.replaceChildren(...mine.map((x) => {
+    const li = document.createElement("li");
+    li.textContent = `📤 ${x.title} (${x.id}) · ${x.owner ? `${x.owner}채널 전용` : "모든 채널"} · ${x.at ? new Date(x.at).toLocaleString("ko-KR") : ""} `;
+    const del = document.createElement("button");
+    del.type = "button"; del.className = "btn danger"; del.textContent = "지우기";
+    const conn = x.owner && conns[x.owner] ? conns[x.owner] : net;
+    del.onclick = () => { if (confirm(`'${x.title}' 세트를 지울까요? 이 세트를 쓰는 채널은 '새 수업 시작' 때 기본 세트로 돌아가요.`)) conn?.send({ type: "deleteSet", id: x.id }); };
+    li.appendChild(del);
+    return li;
+  }));
+  if (!ul.children.length) ul.innerHTML = `<li class='muted'>${isMaster ? "아직 올린 세트가 없어요." : `아직 ${activeCh}채널에 올린 세트가 없어요.`}</li>`;
 }
