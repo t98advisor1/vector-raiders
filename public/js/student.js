@@ -483,7 +483,7 @@ function onMessage(msg) {
     $("#me-chip").textContent = `👤 ${msg.name}`;
     $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : `🏫 수업 참여 · ${S.ch}채널`;
     $("#restart-btn").hidden = S.mode !== "practice";
-    $("#exit-btn").hidden = S.mode !== "class";
+    $("#exit-btn").hidden = false; // 수업: 중간 출력 / 연습: 탈출했으면 결과 창(완주 선물)
     if (!S.game) startWorld();
     S.game.setMe(msg.n, msg.name);
     if (msg.pos) { S.game.me.x = msg.pos.x; S.game.me.y = msg.pos.y; } // 새로고침해도 하던 자리에서
@@ -965,6 +965,10 @@ function announceProgress(before, now) {
   const wasDone = PROBLEMS.every((p) => before.probs[p.id]?.solved);
   if (S.mode === "class" && S.cls?.stage !== "done" && !wasDone && iEscaped()) {
     toast("🏁 모든 방을 탈출했어요! 내가 푼 문제를 PDF로 출력할 수 있어요.", "ok");
+    sound.ending();
+    setTimeout(() => { closeModal(); showSummary(); }, 1800);
+  } else if (S.mode === "practice" && !wasDone && iEscaped()) {
+    toast("🏁 연습 유적을 모두 탈출했어요! 소감을 쓰면 완주 선물이 열려요.", "ok");
     sound.ending();
     setTimeout(() => { closeModal(); showSummary(); }, 1800);
   }
@@ -1612,9 +1616,9 @@ function showSummary() {
   const wait = reviewAnswers ? "" : "disabled";
   body.innerHTML = `
     <div class="done">
-      <h2>${early ? "🏁 모든 방 탈출 성공!" : "탐험 끝!"}</h2>
-      ${early ? `<p class="muted">팀 친구들이 아직 풀고 있어도, 내가 푼 문제는 지금 바로 PDF로 출력할 수 있어요.</p>` : ""}
-      <p class="big-num">우리 반이 깨운 유물 <b>${unlocked}</b> / ${PROBLEMS.length}</p>
+      <h2>${S.mode === "practice" ? (iEscaped() ? "🏁 연습 유적 탈출 성공!" : "연습 기록") : early ? "🏁 모든 방 탈출 성공!" : "탐험 끝!"}</h2>
+      ${early && S.mode === "class" ? `<p class="muted">팀 친구들이 아직 풀고 있어도, 내가 푼 문제는 지금 바로 PDF로 출력할 수 있어요.</p>` : ""}
+      ${S.mode === "class" ? `<p class="big-num">우리 반이 깨운 유물 <b>${unlocked}</b> / ${PROBLEMS.length}</p>` : ""}
       <p>내가 연 상자 <b>${mine}</b> / ${PROBLEMS.length} · 벡터 점프 ${S.me?.lab.length ?? 0} / ${LAB_LEVELS.length}</p>
       ${canPrint ? `<div class="print-box">
         <b>📝 한 번 더 복습하기 · 형성평가 출력</b>
@@ -1632,6 +1636,18 @@ function showSummary() {
         <textarea id="feel-text" maxlength="400" rows="3" placeholder="예: 협업 문제에서 친구와 조건을 나눠 풀면서 벡터의 내적이 무엇인지 알게 됐어요.">${esc(rewardState().feelText ?? "")}</textarea>
         <button id="feel-send" class="btn" type="button">✍️ 소감 보내기</button>
         <ul class="reward-check">${REWARD_STEPS.map(([k, t]) => `<li data-k="${k}">${t}</li>`).join("")}</ul>
+        <div id="cookie-box" class="cookie-box" hidden>
+          <p><b>🎁 쿠키 선물이 열렸어요!</b><br>끝까지 탐험한 여러분에게 드리는 작은 선물, 조선 수묵화 풍 <b>관상 연구소</b>예요.
+          재미로만 보는 놀이이고, 카메라 영상은 이 기기 밖으로 나가지 않아요. 카메라 없이 그림 모드로도 할 수 있어요.</p>
+          <a class="btn primary" href="/gwansang" target="_blank" rel="noopener">🖌️ 관상 연구소 열기</a>
+        </div>
+      </div>` : ""}
+      ${S.mode === "practice" && iEscaped() ? `<div class="reward-box">
+        <b>🍪 완주 선물 받기</b>
+        <small>연습 유적을 모두 탈출했어요! 탐험 소감을 쓰면 깜짝 선물이 열려요.</small>
+        <textarea id="feel-text" maxlength="400" rows="3" placeholder="예: 그림을 움직여 보니 벡터의 덧셈이 평행사변형으로 보였어요.">${esc(rewardState().feelText ?? "")}</textarea>
+        <button id="feel-send" class="btn" type="button">✍️ 소감 쓰고 선물 열기</button>
+        <ul class="reward-check"><li data-k="feel">✍️ 소감 쓰기</li></ul>
         <div id="cookie-box" class="cookie-box" hidden>
           <p><b>🎁 쿠키 선물이 열렸어요!</b><br>끝까지 탐험한 여러분에게 드리는 작은 선물, 조선 수묵화 풍 <b>관상 연구소</b>예요.
           재미로만 보는 놀이이고, 카메라 영상은 이 기기 밖으로 나가지 않아요. 카메라 없이 그림 모드로도 할 수 있어요.</p>
@@ -1661,12 +1677,22 @@ function showSummary() {
     };
     sound.ending(); // 탐험을 마친 뒤의 맺음 음악
     renderReward();
+  } else if (S.mode === "practice" && iEscaped()) {
+    // 연습 모드: 출력이 없으므로 소감만 쓰면 선물이 열린다(소감은 이 기기에만 남는다)
+    $("#feel-send", body).onclick = () => {
+      const text = $("#feel-text", body).value.trim();
+      if (text.length < 5) return toast("소감을 다섯 글자 이상 써 주세요.");
+      saveReward({ ...rewardState(), feelText: text });
+      markReward("feel");
+    };
+    sound.ending();
+    renderReward();
   }
 }
 
 // ---------- 완주 선물(쿠키): 소감 + 형성평가 자료 4가지를 모두 받으면 관상 연구소가 열린다 ----------
 const REWARD_STEPS = [["feel", "✍️ 소감 쓰기"], ["sheet", "📝 형성평가 문제지"], ["answer", "✅ 형성평가 답지"], ["mine", "🗂️ 나의 풀이 기록"], ["review", "📄 나의 오답 정리"]];
-const rewardKey = () => `vr-reward-${S.ch}-${SET?.id ?? ""}-${S.name ?? ""}`;
+const rewardKey = () => `vr-reward-${S.mode}-${S.ch}-${SET?.id ?? ""}-${S.name ?? ""}`;
 function rewardState() { try { return JSON.parse(localStorage.getItem(rewardKey()) ?? "{}") ?? {}; } catch { return {}; } }
 function saveReward(r) { try { localStorage.setItem(rewardKey(), JSON.stringify(r)); } catch {} }
 function markReward(k) {
@@ -1679,7 +1705,7 @@ function renderReward() {
   document.querySelectorAll(".reward-check li").forEach((li) => li.classList.toggle("ok", !!r[li.dataset.k]));
   const box = $("#cookie-box");
   if (!box) return;
-  const all = REWARD_STEPS.every(([k]) => r[k]);
+  const all = S.mode === "practice" ? !!r.feel : REWARD_STEPS.every(([k]) => r[k]);
   if (all && box.hidden) {
     box.hidden = false;
     sound.sfx("relic");
@@ -1695,6 +1721,13 @@ function renderReward() {
 
 // ---------- 🚪 중간에 나가기: 다 못 끝내도 지금까지 한 만큼 학습 자료를 출력해 간다 ----------
 function showExit() {
+  if (S.mode === "practice") {
+    if (iEscaped()) return showSummary();
+    if (!confirm("연습을 마치고 첫 화면으로 나갈까요? 기록은 이 기기에 남아 다시 들어오면 이어서 할 수 있어요.")) return;
+    try { sessionStorage.removeItem("vr-autojoin"); } catch {}
+    location.href = location.pathname;
+    return;
+  }
   if (S.mode !== "class") return;
   if (S.cls?.stage === "done" || iEscaped()) return showSummary();
   S.net?.send({ type: "review", partial: true }); // 내가 푼 문제의 정답·풀이만 받는다
