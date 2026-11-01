@@ -276,7 +276,8 @@ export class Room extends DurableObject {
   coopReady(cid, pid) {
     if (this.practice) return true;
     const st = this.data.students[cid];
-    return !!(this.coop?.pairs.get(`${st?.team}:${pid}`)?.includes(cid) || this.coop?.solo.has(`${cid}:${pid}`));
+    const c = this.data.coop;
+    return !!(c?.pairs?.[`${st?.team}:${pid}`]?.includes(cid) || c?.solo?.includes(`${cid}:${pid}`));
   }
 
   sendTo(cid, msg) {
@@ -292,29 +293,35 @@ export class Room extends DurableObject {
     const pid = msg.pid;
     if (!this.isCoop(pid, "high")) return;
     const conds = this.level(pid, "high").conditions;
-    this.coop ??= { wait: new Map(), pairs: new Map(), solo: new Set() };
+    // 짝 정보는 저장소(this.data)에 둔다. 서버가 잠들었다 깨어나도(WebSocket Hibernation) 짝이 풀리지 않게.
+    const c = (this.data.coop ??= { wait: {}, pairs: {}, solo: [] });
     const key = `${st.team}:${pid}`;
     if (this.practice || msg.type === "coopSolo" || !st.team) {
-      this.coop.solo.add(`${cid}:${pid}`);
+      if (!c.solo.includes(`${cid}:${pid}`)) c.solo.push(`${cid}:${pid}`);
+      await this.save();
       return this.send(ws, { type: "coop", pid, solo: true, conditions: conds });
     }
-    const pair = this.coop.pairs.get(key);
+    // 이미 짝이 된 학생이 창을 닫았다가 다시 열면 같은 짝·같은 조건을 다시 보낸다
+    const pair = c.pairs[key];
     if (pair?.includes(cid)) {
-      return this.send(ws, { type: "coop", pid, conditions: [conds[pair.indexOf(cid)]], partner: this.data.students[pair.find((c) => c !== cid)]?.name });
+      return this.send(ws, { type: "coop", pid, conditions: [conds[pair.indexOf(cid)] ?? conds[0]], partner: this.data.students[pair.find((x) => x !== cid)]?.name });
     }
-    const waiting = this.coop.wait.get(key);
+    const waiting = c.wait[key];
     const me = this.pos.get(cid);
-    const near = (other) => { const o = this.pos.get(other); return me && o && Math.hypot(o.x - me.x, o.y - me.y) <= COOP_REACH; };
-    if (waiting && waiting.cid !== cid && Date.now() - waiting.at < COOP_WAIT_MS && near(waiting.cid)) {
-      this.coop.wait.delete(key);
-      this.coop.pairs.set(key, [waiting.cid, cid]);
+    // 위치를 모르면(서버가 막 깨어나 아직 위치를 못 받음) 가까이 있다고 본다. 같은 상자를 연 팀원이므로.
+    const near = (other) => { const o = this.pos.get(other); return !me || !o || Math.hypot(o.x - me.x, o.y - me.y) <= COOP_REACH; };
+    if (waiting && waiting.cid !== cid && Date.now() - waiting.at < COOP_WAIT_MS && near(waiting.cid) && !c.pairs[key]) {
+      delete c.wait[key];
+      c.pairs[key] = [waiting.cid, cid];
+      await this.save();
       const mate = this.data.students[waiting.cid];
       this.sendTo(waiting.cid, { type: "coop", pid, conditions: [conds[0]], partner: st.name });
       this.send(ws, { type: "coop", pid, conditions: [conds[1] ?? conds[0]], partner: mate?.name });
       this.log({ type: "협업 시작", name: `${mate?.name} & ${st.name}`, problem: problemName(pid) });
       return;
     }
-    this.coop.wait.set(key, { cid, at: Date.now() });
+    c.wait[key] = { cid, at: Date.now() };
+    await this.save();
     this.send(ws, { type: "coop", pid, waiting: true });
   }
 
@@ -731,7 +738,6 @@ export class Room extends DurableObject {
       }
       this.data = freshData();
       this.data.setId = setId ?? DEFAULT_SET;
-      this.coop = null;
       await this.ensureSet();
       this.pos.clear();
       this.lastPos.clear();
@@ -890,7 +896,7 @@ export class Room extends DurableObject {
 
         if (p.openedAt) p.timeMs = p.solvedAt - p.openedAt;
         // 협업 상자: 짝이 된 팀원도 함께 해결로 인정한다. 혼자 푼 협업 문제는 중 배점(soloCoop).
-        const pair = this.coop?.pairs.get(`${st.team}:${msg.pid}`);
+        const pair = this.data.coop?.pairs?.[`${st.team}:${msg.pid}`];
         if (this.isCoop(msg.pid, p.diff)) {
           if (pair?.includes(cid)) {
             const mateCid = pair.find((c) => c !== cid);

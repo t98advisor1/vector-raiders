@@ -603,7 +603,16 @@ $("#chat-form").addEventListener("submit", (e) => {
   if (!text) return;
   S.net?.send({ type: "chat", text });
   input.value = "";
-  input.focus();
+  input.focus(); // 대화를 이어서 쓸 수 있게 둔다. 빈 칸에서 Enter 또는 Esc를 누르면 게임 조작으로 돌아간다
+});
+// 채팅 입력 중 Esc, 또는 빈 칸에서 Enter: 입력에서 빠져나와 바로 이동·E 조작을 할 수 있게
+$("#chat-input").addEventListener("keydown", (e) => {
+  if (e.key === "Escape" || (e.key === "Enter" && !e.target.value.trim())) {
+    e.preventDefault();
+    e.stopPropagation(); // Esc가 열려 있는 문제 창까지 닫지 않게
+    e.target.blur();
+    $("#world")?.focus();
+  }
 });
 
 // ---------- 터치 기기용 가상 조작판 ----------
@@ -1155,7 +1164,7 @@ function showDifficulty(pid) {
   const body = openModal();
   body.innerHTML = `
     <div class="p-head"><span class="p-icon">${obj.icon}</span>
-      <div><h2>난이도를 고르세요</h2><small>높은 난이도를 고를수록 받는 점수가 커져요. 문제는 같고 배점만 달라요.</small></div></div>
+      <div><h2>난이도를 고르세요</h2><small>난이도마다 문제가 달라요. 하는 기본, 중은 표준, 상은 사고력 문제이고 높을수록 점수가 커져요.</small></div></div>
     <div class="diff-row">
       ${DIFFICULTY.map((d) => `
         <button class="diff-btn" type="button" data-diff="${d.key}">

@@ -421,6 +421,8 @@ function cell(tag, text, className) {
 
 function probMark(p) {
   const hint = p?.hinted ? "💡" : "";
+  // 협업 짝이 맞혀서 함께 받은 열쇠: 직접 제출은 없지만 해결한 것이다 (모의 수업에서 '–'로 보여 헷갈렸다)
+  if (p?.solved && !p.tries && p.coopWith) return ["🤝", "ok"];
   if (!p || !p.tries) return [hint || "–", "none"];
   if (p.solved) return p.firstTry ? ["★", "first"] : [`✓${hint}`, "ok"];
   return [`✗${p.tries}${hint}`, "bad"];
@@ -518,12 +520,13 @@ function renderDash(d) {
   const roster = $("#roster");
   roster.replaceChildren();
   const rh = document.createElement("tr");
-  for (const h of ["순위", "이름", "팀", "점수", "맞힌 문제", "오답", "접속", "들어온 시각", "탈출 시각", "위치", "벡터 점프", "활동", "관리"]) rh.appendChild(cell("th", h));
+  for (const h of ["순위", "이름", "팀", "점수", "맞힌 문제", "오답", "접속", "들어온 시각", "탈출 시각", "위치", "벡터 점프", "활동"]) rh.appendChild(cell("th", h));
   PROBLEMS.forEach((p, i) => {
     const th = cell("th", `${i + 1}`);
     th.title = `${i + 1}. ${p.relic}`;
     rh.appendChild(th);
   });
+  rh.appendChild(cell("th", "관리")); // 줄마다 강퇴 버튼이 문제 칸 뒤에 오므로 머리글도 맨 끝에
   roster.appendChild(rh);
   if (!d.students.length) {
     const tr = document.createElement("tr");
@@ -592,7 +595,8 @@ function detailRow(st, span) {
   PROBLEMS.forEach((p, i) => {
     const r = st.probs[p.id];
     let text;
-    if (!r || !r.tries) text = r?.hinted ? "힌트만 봄" : "아직 안 풂";
+    if (r?.solved && !r.tries && r.coopWith) text = `🤝 협업 짝(${r.coopWith})이 맞혀 함께 열쇠 받음`;
+    else if (!r || !r.tries) text = r?.hinted ? "힌트만 봄" : "아직 안 풂";
     else if (r.solved) text = r.firstTry ? "★ 한 번에 정답" : `✓ ${r.tries}번 만에 정답`;
     else text = `✗ ${r.tries}번 시도, 아직 못 맞힘`;
     if (r?.hinted && r?.tries) text += " · 💡 힌트 봄";
@@ -621,6 +625,7 @@ function downloadCsv(d) {
     const marks = PROBLEMS.map((p) => {
       const r = st.probs[p.id];
       const hint = r?.hinted ? ", 힌트" : "";
+      if (r?.solved && !r.tries && r.coopWith) return `협업 해결(상, 짝:${r.coopWith})`;
       if (!r || !r.tries) return r?.hinted ? "미응시(힌트 봄)" : "미응시";
       const lv = r.diff ? `${{ low: "하", mid: "중", high: "상" }[r.diff]}, ` : "";
       const co = r.coopWith ? `, 협업:${r.coopWith}` : "";
