@@ -15,13 +15,15 @@
 //   범위=xmin,xmax,ymin,ymax (평면) / 범위=r (공간)
 //   끌기=a,A   슬라이더=t,-3,3,0.5;k,0,2,0.1   보기=라벨:식;식   화살표=a,b,AB   선분=AB,BC
 //   다각형=ABCD   직선=A,u   원=C,r   (공간) 평면=n,d (n·x + d = 0)   구=C,r   직육면체=가로,세로,높이   자취=P
+//   곡선=x^2-2*x;2^x  (평면, y = f(x) 그래프. x를 변수로, 조절기 값도 쓸 수 있다)
+// 수 함수: x^2(거듭제곱) π √ |x| sqrt() abs() exp() ln() log()(밑 10) tan() — cos·sin·tan은 도 단위, 라디안은 cosr·sinr·tanr
 
-const RESERVED = new Set(["범위", "끌기", "슬라이더", "보기", "화살표", "선분", "다각형", "직선", "원", "평면", "구", "직육면체", "자취", "숨김"]);
+const RESERVED = new Set(["범위", "끌기", "슬라이더", "보기", "화살표", "선분", "다각형", "직선", "원", "평면", "구", "직육면체", "자취", "숨김", "곡선"]);
 
 // ---------- 식 계산 ----------
 function tokenize(src) {
   const out = [];
-  const s = String(src).replace(/−/g, "-").replace(/×/g, "*").replace(/⋅/g, "·");
+  const s = String(src).replace(/−/g, "-").replace(/×/g, "*").replace(/⋅/g, "·").replace(/²/g, "^2").replace(/³/g, "^3");
   let i = 0;
   while (i < s.length) {
     const c = s[i];
@@ -29,10 +31,11 @@ function tokenize(src) {
     let m;
     if ((m = /^\d+(\.\d+)?/.exec(s.slice(i)))) { out.push({ t: "num", v: Number(m[0]) }); i += m[0].length; continue; }
     if ((m = /^각선|^각/.exec(s.slice(i)))) { out.push({ t: "fn", v: m[0] }); i += m[0].length; continue; }
-    if ((m = /^(mid|div|cen|cos|sin)(?=\()/.exec(s.slice(i)))) { out.push({ t: "fn", v: m[1] }); i += m[1].length; continue; }
+    if ((m = /^(mid|div|cen|cosr|sinr|tanr|cos|sin|tan|sqrt|abs|exp|ln|log)(?=\()/.exec(s.slice(i)))) { out.push({ t: "fn", v: m[1] }); i += m[1].length; continue; }
+    if (c === "π") { out.push({ t: "num", v: Math.PI }); i++; continue; }
     if ((m = /^[A-Z]+[0-9]*'?/.exec(s.slice(i)))) { out.push({ t: "up", v: m[0] }); i += m[0].length; continue; }
     if ((m = /^[a-z][0-9]*/.exec(s.slice(i)))) { out.push({ t: "lo", v: m[0] }); i += m[0].length; continue; }
-    if ("+-*/·(),|√".includes(c)) { out.push({ t: "op", v: c }); i++; continue; }
+    if ("+-*/·(),|√^".includes(c)) { out.push({ t: "op", v: c }); i++; continue; }
     throw new Error(`읽을 수 없는 글자 '${c}'`);
   }
   return out;
@@ -84,7 +87,15 @@ export function evalExpr(src, env) {
   function unary() {
     if (eat("-")) { const v = unary(); return isVec(v) ? vmul(-1, v) : -v; }
     if (eat("+")) return unary();
-    return factor();
+    return power();
+  }
+  // 거듭제곱 (오른쪽부터): 2^x^2 = 2^(x^2), -x^2 = -(x^2)
+  function power() {
+    const b = factor();
+    if (!eat("^")) return b;
+    const e = unary();
+    if (isVec(b) || isVec(e)) throw new Error("^ 는 수에만 써요");
+    return b ** e;
   }
   function lookup(name) {
     if (name in env) return env[name];
@@ -118,6 +129,9 @@ export function evalExpr(src, env) {
       }
       if (t.v === "cos") return Math.cos((args[0] * Math.PI) / 180); // 각은 도 단위
       if (t.v === "sin") return Math.sin((args[0] * Math.PI) / 180);
+      if (t.v === "tan") return Math.tan((args[0] * Math.PI) / 180);
+      const NUM = { cosr: Math.cos, sinr: Math.sin, tanr: Math.tan, sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10 };
+      if (NUM[t.v]) { if (isVec(args[0])) throw new Error(`${t.v}() 안에는 수를 써요`); return NUM[t.v](args[0]); }
       if (t.v === "mid") return vmul(0.5, vadd(args[0], args[1]));
       if (t.v === "cen") return vmul(1 / 3, vadd(vadd(args[0], args[1]), args[2]));
       if (t.v === "div") { const [A, B, m, n] = args; return vmul(1 / (m + n), vadd(vmul(n, A), vmul(m, B))); }
@@ -145,7 +159,7 @@ export function parseFigure(spec) {
   const parts = String(spec ?? "").trim().split(/\s+/).filter(Boolean);
   const kind = parts[0] === "평면" ? "2d" : parts[0] === "공간" ? "3d" : null;
   if (!kind) return null;
-  const fig = { kind, defs: [], starts: {}, sliders: [], drag: [], show: [], arrows: null, segs: [], polys: [], lines: [], circles: [], planes: [], spheres: [], box: null, trail: [], hide: [], range: null };
+  const fig = { kind, defs: [], starts: {}, sliders: [], drag: [], show: [], arrows: null, segs: [], polys: [], lines: [], circles: [], planes: [], spheres: [], box: null, trail: [], hide: [], range: null, curves: [] };
   for (const part of parts.slice(1)) {
     const eq = part.indexOf("=");
     if (eq < 1) throw new Error(`'${part}'는 '이름=값'으로 써 주세요`);
@@ -164,6 +178,7 @@ export function parseFigure(spec) {
     else if (key === "구") fig.spheres = list(";").map((s) => s.split(","));
     else if (key === "직육면체") fig.box = list().map(Number);
     else if (key === "자취") fig.trail = list();
+    else if (key === "곡선") fig.curves = list(";");
     else if (key === "숨김") fig.hide = list();
     else if (/^[A-Za-z][A-Za-z0-9]*$/.test(key) && !RESERVED.has(key)) {
       const [expr, start] = val.split("@");
@@ -206,6 +221,12 @@ export function checkFigure(spec) {
     for (const [n, d] of fig.planes) { evalExpr(n, env); evalExpr(d, env); }
     for (const [c, r] of [...fig.spheres, ...fig.circles]) { evalExpr(c, env); evalExpr(r, env); }
     for (const name of fig.drag) if (!(name in env)) throw new Error(`끌기 '${name}'가 정의되지 않았어요`);
+    if (fig.curves.length && fig.kind !== "2d") throw new Error("곡선은 평면 그림에서만 써요");
+    for (const c of fig.curves) {
+      // x 여러 값에서 계산해 보아 식이 읽히는지, 수가 나오는지 확인한다 (어떤 x에서는 정의되지 않아도 된다)
+      const vals = [-2, -0.5, 0.5, 1, 2, 3].map((x) => evalExpr(c, { ...env, x }));
+      if (vals.some(isVec)) throw new Error(`곡선 '${c}'은 수가 나오는 식(y = f(x))으로 써요`);
+    }
     return null;
   } catch (e) {
     return e.message;

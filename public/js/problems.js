@@ -71,14 +71,14 @@ export function resolveFigure(spec) {
   if (TOOLS[name]) return { has: true, fn: (ui) => TOOLS[name].fn(ui, arg), help: TOOLS[name].help };
   const fn = /^(평면|공간)\s/.test(spec) ? figureTool(spec) : null;
   if (fn) return { has: true, fn, help: spec.startsWith("공간") ? "그림을 끌어서 돌려 보며 확인해 보세요." : "점이나 화살표 끝(동그라미)을 끌거나 조절기를 움직이며 값이 어떻게 바뀌는지 보세요." };
-  if (/^https?:\/\//.test(spec)) return { has: false, image: spec, help: "" };
+  if (/^(https:\/\/[^\s"'<>()]+|\/img\/[a-z0-9]+\.(png|jpe?g|gif|webp))$/i.test(spec)) return { has: false, image: spec, help: "그림을 보며 문제를 풀어 보세요." };
   return { has: false, help: "" };
 }
 
 // 조작 그림을 인쇄용 SVG 글자로 (자동 재생 없이 한 장면). d를 주면 그 난이도의 그림
 export function figureHtml(p, d = "mid") {
   const fig = p.diffs?.[d]?.fig ?? { has: p.hasTool, fn: p.tool, image: p.image };
-  if (!fig.has) return fig.image ? `<img src="${fig.image}" alt="" style="max-width:160px">` : "";
+  if (!fig.has) return fig.image ? `<img src="${fig.image}" alt="" style="max-width:100%">` : "";
   const box = document.createElement("div");
   const dummy = document.createElement("div");
   try { fig.fn({ board: box, info: dummy, ctrl: dummy, autoplay: false }); } catch { return ""; }
@@ -360,4 +360,25 @@ function circleTool(ui) {
   });
   setT(0);
   autoplay(ui, () => { tt += Math.PI / 12; setT(tt); }, 260);
+}
+
+// 핵심 카드의 그림: 게임에서는 움직이는 그림(또는 이미지)으로 붙이고, 인쇄용은 한 장면 SVG/이미지 글자로
+export function mountCardFigure(card, root) {
+  const fig = resolveFigure(card?.figure);
+  if (!root) return false;
+  if (fig.has) {
+    root.innerHTML = `<div class="board-wrap"></div><div class="tool-info"></div><div class="tool-ctrl"></div>`;
+    try { fig.fn({ board: root.querySelector(".board-wrap"), info: root.querySelector(".tool-info"), ctrl: root.querySelector(".tool-ctrl"), autoplay: true }); } catch { root.innerHTML = ""; return false; }
+    return true;
+  }
+  if (fig.image) { root.innerHTML = `<img class="card-img" src="${fig.image}" alt="">`; return true; }
+  return false;
+}
+export function cardFigureHtml(card) {
+  const fig = resolveFigure(card?.figure);
+  if (fig.image) return `<img src="${fig.image}" alt="" style="max-width:100%">`;
+  if (!fig.has) return "";
+  const box = document.createElement("div"), dummy = document.createElement("div");
+  try { fig.fn({ board: box, info: dummy, ctrl: dummy, autoplay: false }); } catch { return ""; }
+  return box.innerHTML;
 }

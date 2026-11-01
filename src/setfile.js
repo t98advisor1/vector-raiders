@@ -34,6 +34,7 @@ export function parseSet(md) {
     }
     if (card) {
       if ((m = line.match(/^-\s*비석\s*[:：]\s*(\d+)/))) card.tablet = Number(m[1]);
+      else if ((m = line.match(/^-?\s*그림\s*[:：]\s*(.*)$/))) card.figure = m[1].trim() === "없음" ? "" : m[1].trim();
       else if ((m = line.match(/^요약\s*[:：]\s*(.*)$/))) card.summary = m[1];
       else if (line.startsWith("- ")) card.points.push(line.slice(2).trim());
       continue;
@@ -72,10 +73,14 @@ export function parseSet(md) {
       if (!lv.answer) errors.push(`${where}: 정답이 없어요.`);
       if ((lv.kind === "choice" || lv.kind === "set") && !lv.options.length) errors.push(`${where}: 보기가 없어요.`);
       if (b.coop && key === "high" && lv.conditions.length < 2) errors.push(`${where}: 협업 상자는 조건 ㉠·㉡이 필요해요.`);
-      const figErr = checkFigure(lv.figure || b.tool);
+      const figErr = checkFigureSpec(lv.figure || b.tool);
       if (figErr) errors.push(`${where}: 그림을 읽을 수 없어요 — ${figErr}`);
     }
   });
+  for (const c of cards) {
+    const figErr = checkFigureSpec(c.figure);
+    if (figErr) errors.push(`핵심 카드 '${c.title}': 그림을 읽을 수 없어요 — ${figErr}`);
+  }
   return { meta, boxes, cards, errors };
 }
 
@@ -102,6 +107,18 @@ export function parseVecExpr(src) {
 // ---------- 올린 세트 검사 (전체 관리자 업로드용) ----------
 // 형식 오류에 더해, 정답을 그 정답 그대로 채점했을 때 맞게 나오는지까지 확인한다.
 // grade는 answers.js의 gradeLevel (순환 import를 피하려고 인자로 받는다).
+// '그림:' 칸에 쓸 수 있는 것: 없음 · 내장 도구(hex, cuboid …) · 평면/공간 그림 줄 · 이미지 주소(교사 화면에서 올린 /img/… 또는 https://…)
+const BUILTIN_TOOLS = ["hex", "square", "sector", "parallel", "collinear", "cuboid", "circle"];
+export const IMAGE_RE = /^(\/img\/[a-z0-9]{6,40}\.(png|jpe?g|gif|webp)|https:\/\/[^\s"'<>()]+)$/i;
+export function checkFigureSpec(spec) {
+  const s = String(spec ?? "").trim();
+  if (!s) return null;
+  if (/^(평면|공간)(\s|$)/.test(s)) return checkFigure(s);
+  if (BUILTIN_TOOLS.includes(s.split(/\s+/)[0])) return null;
+  if (/^(\/img\/|https?:)/i.test(s)) return IMAGE_RE.test(s) ? null : "이미지 주소는 교사 화면에서 올린 '/img/…' 주소나 https:// 주소로 써 주세요";
+  return `'${s.slice(0, 20)}'는 모르는 그림이에요 (평면 …, 공간 …, 이미지 주소, 없음 중 하나)`;
+}
+
 export const SET_ID_RE = /^[a-z0-9][a-z0-9-]{2,29}$/;
 const strip = (s) => String(s ?? "").replace(/[<>"'`]/g, "").trim();
 

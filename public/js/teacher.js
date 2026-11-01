@@ -1,7 +1,7 @@
 import { connect } from "./net.js";
 import { fmt, watchMath, boxedText } from "./mathtext.js";
 import { openPrintDoc } from "./printdoc.js";
-import { PROBLEMS, loadSet, figureHtml, SET } from "./problems.js";
+import { PROBLEMS, loadSet, figureHtml, cardFigureHtml, SET } from "./problems.js";
 import { LAB_LEVELS } from "./lab.js";
 import { renderClassBar } from "./classbar.js";
 import { ROOMS, BRIDGES, roomAt } from "./game.js";
@@ -145,7 +145,7 @@ function printCards() {
   showPrint(`
     <header class="pr-head fa-head"><h1>${fmt(SET?.meta?.제목 ?? "")} · 핵심 카드 ${cards.length}장</h1><p>게임 속 개념 비석과 같은 내용이에요.</p></header>
     <div class="card-grid">${cards.map((c) => `
-      <section class="print-card"><h3>📚 ${c.tablet}. ${fmt(c.title)}</h3><p class="pc-sum">${fmt(c.summary)}</p><ul>${c.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul></section>`).join("")}</div>`, `${SET?.meta?.제목 ?? ""} 핵심 카드`);
+      <section class="print-card"><h3>📚 ${c.tablet}. ${fmt(c.title)}</h3><p class="pc-sum">${fmt(c.summary)}</p><ul>${c.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul>${(() => { const f = cardFigureHtml(c); return f ? `<div class="pc-fig">${f}</div>` : ""; })()}</section>`).join("")}</div>`, `${SET?.meta?.제목 ?? ""} 핵심 카드`);
 }
 
 function showPrint(html, title = "교사용 출력") {
@@ -250,6 +250,7 @@ function onChannelMessage(ch, msg) {
     if (msg.set) setByCh[ch] = { set: msg.set, answers: msg.answers };
     if (msg.sets) { setListByCh[ch] = msg.sets; if (ch === activeCh) fillSetSelect(msg.sets); }
     if (ch === activeCh || !$("#uploaded-sets").children.length) renderUploaded();
+    if (ch === activeCh) conns[ch]?.send({ type: "imageList" });
     $("#upload-scope").textContent = isMaster ? "· 전체 관리자: 모든 채널에서 고를 수 있어요" : `· ${ch}채널 전용: 이 채널에서만 보이고 바뀌어요`;
     if (msg.set && (ch === activeCh || !PROBLEMS.length)) { loadSet(msg.set); fillSetSelect(null, msg.set.id); }
     if (ch === activeCh || !answers) answers = msg.answers ?? null;
@@ -280,6 +281,8 @@ function onChannelMessage(ch, msg) {
     }
   } else if (msg.type === "uploadResult") {
     onUploadResult(msg, ch);
+  } else if (msg.type === "imageResult") {
+    if (ch === activeCh) onImageResult(msg);
   } else if (msg.type === "setExample") {
     download("문항세트_형식예시_geo-3-1.md", msg.md, "text/markdown");
   } else if (msg.type === "admin") {
@@ -342,6 +345,7 @@ function switchChannel(ch) {
     answers = setByCh[ch].answers;
     fillSetSelect(setListByCh[ch] ?? null, setByCh[ch].set.id);
     renderUploaded();
+    conns[ch]?.send({ type: "imageList" });
     $("#problems").replaceChildren();
     buildAnswerSheet();
   }
@@ -727,6 +731,47 @@ async function sendSetFile(check) {
   box.className = "upload-result"; box.textContent = "검사하는 중…";
   net?.send({ type: "uploadSet", md: await f.text(), check });
 }
+// 그림 파일 올리기: base64로 보내고, 받은 주소를 '그림: /img/…' 줄로 보여 준다
+$("#img-upload").onclick = async () => {
+  const f = $("#img-file").files?.[0];
+  const box = $("#img-result");
+  if (!f) { box.className = "upload-result bad"; box.textContent = "먼저 그림 파일을 골라 주세요."; return; }
+  if (f.size > 700_000) { box.className = "upload-result bad"; box.textContent = `그림이 너무 커요 (${Math.round(f.size / 1000)}KB). 700KB 이하로 줄여 주세요.`; return; }
+  const buf = new Uint8Array(await f.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+  box.className = "upload-result"; box.textContent = "올리는 중…";
+  net?.send({ type: "uploadImage", name: f.name, data: btoa(bin) });
+};
+function onImageResult(msg) {
+  const box = $("#img-result");
+  if (!msg.ok) { box.className = "upload-result bad"; box.textContent = `⚠️ ${msg.message}`; }
+  else if (msg.saved) {
+    box.className = "upload-result ok";
+    box.innerHTML = `✅ 올렸어요. md 파일에 이 줄을 붙여 넣으세요: <code>그림: ${msg.saved}</code> `;
+    const copy = document.createElement("button");
+    copy.type = "button"; copy.className = "btn"; copy.textContent = "📋 복사";
+    copy.onclick = () => navigator.clipboard?.writeText(`그림: ${msg.saved}`).then(() => { copy.textContent = "✅ 복사됨"; });
+    box.appendChild(copy);
+  } else if (msg.deleted) { box.className = "upload-result ok"; box.textContent = "🗑️ 그림을 지웠어요."; }
+  if (!msg.images) return;
+  const ul = $("#uploaded-imgs");
+  ul.replaceChildren(...msg.images.map((x) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<img src="/img/${x.id}" alt="" class="img-thumb"> `;
+    li.append(`${x.name || x.id} · ${x.owner ? `${x.owner}채널 전용` : "모든 채널"} · 그림: /img/${x.id} `);
+    const copy = document.createElement("button");
+    copy.type = "button"; copy.className = "btn"; copy.textContent = "📋 복사";
+    copy.onclick = () => navigator.clipboard?.writeText(`그림: /img/${x.id}`).then(() => { copy.textContent = "✅ 복사됨"; });
+    const del = document.createElement("button");
+    del.type = "button"; del.className = "btn danger"; del.textContent = "지우기";
+    del.onclick = () => { if (confirm("이 그림을 지울까요? 이 그림을 쓰는 문항·카드에서는 그림이 보이지 않게 돼요.")) net?.send({ type: "deleteImage", id: x.id }); };
+    li.append(copy, del);
+    return li;
+  }));
+  if (!ul.children.length) ul.innerHTML = "<li class='muted'>아직 올린 그림이 없어요.</li>";
+}
+
 $("#set-check").onclick = () => sendSetFile(true);
 $("#set-upload").onclick = () => sendSetFile(false);
 $("#set-example").onclick = () => net?.send({ type: "setExample" });

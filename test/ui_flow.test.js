@@ -76,5 +76,18 @@ test("중간관리자가 올린 문항 세트는 그 채널에만 보이고, 그
   assert.match(room, /filter\(\(x\) => all \|\| !x\.owner \|\| x\.owner === ch\)/);
   assert.match(room, /const owner = master \? existing\?\.owner \?\? null : ch;/);
   assert.match(room, /이 채널에서 올린 세트만 지울 수 있어요/);
-  assert.match(room, /SET_MSGS = \["uploadSet", "deleteSet", "setExample", "setListGet"\]/);
+  assert.match(room, /SET_MSGS = \["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList"\]/);
+});
+
+test("그림: 칸은 그림 줄·내장 도구·안전한 이미지 주소만 받고, 카드에도 그림을 붙인다", async () => {
+  const { checkFigureSpec, parseSet } = await import("../src/setfile.js");
+  assert.equal(checkFigureSpec("평면 범위=-3,3,-2,6 곡선=x^2-2*x;a*x 슬라이더=a,-2,2,0.5"), null);
+  assert.equal(checkFigureSpec("/img/a1b2c3d4e5f6.png"), null);
+  assert.equal(checkFigureSpec("hex BC"), null);
+  assert.match(checkFigureSpec("/img/../x.png") ?? "", /이미지 주소/);
+  assert.match(checkFigureSpec('https://x.com/a.png" onerror="x') ?? "", /이미지 주소/);
+  assert.match(checkFigureSpec("공간 곡선=x") ?? "", /평면/);
+  const md = fs.readFileSync("content/sets/geo-3-1.md", "utf8").replace("# 핵심 카드 · 벡터의 뜻과 크기", "# 핵심 카드 · 벡터의 뜻과 크기\n그림: 평면 a=3,4 끌기=a 보기=|a|");
+  const set = parseSet(md);
+  assert.equal(set.cards.find((c) => c.title === "벡터의 뜻과 크기")?.figure, "평면 a=3,4 끌기=a 보기=|a|");
 });

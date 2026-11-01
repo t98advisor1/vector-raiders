@@ -9,6 +9,21 @@ import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, clea
 import { SheetLog } from "./sheets.js";
 
 const STAGES = ["lobby", "play", "done"];
+const MAX_IMAGE = 700_000; // 그림 파일 한 장 최대 크기(바이트). 웹소켓 메시지 1MB 안에 들어가게
+
+// 올린 그림 파일 검사: base64를 풀어 파일 머리(매직 바이트)로 종류를 정한다. SVG는 받지 않는다(스크립트가 들 수 있어서).
+export function checkImage(b64) {
+  if (typeof b64 !== "string" || !/^[A-Za-z0-9+/]+=*$/.test(b64)) return { ok: false, message: "그림 파일을 읽을 수 없어요." };
+  const size = Math.floor((b64.length * 3) / 4) - (b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0);
+  if (size > MAX_IMAGE) return { ok: false, message: `그림이 너무 커요 (${Math.round(size / 1000)}KB). 700KB 이하로 줄여 주세요.` };
+  const h = atob(b64.slice(0, 24));
+  const at = (i) => h.charCodeAt(i);
+  if (at(0) === 0x89 && h.slice(1, 4) === "PNG") return { ok: true, ext: "png", mime: "image/png", size };
+  if (at(0) === 0xff && at(1) === 0xd8 && at(2) === 0xff) return { ok: true, ext: "jpg", mime: "image/jpeg", size };
+  if (h.slice(0, 4) === "GIF8") return { ok: true, ext: "gif", mime: "image/gif", size };
+  if (h.slice(0, 4) === "RIFF" && h.slice(8, 12) === "WEBP") return { ok: true, ext: "webp", mime: "image/webp", size };
+  return { ok: false, message: "png, jpg, gif, webp 그림만 올릴 수 있어요." };
+}
 const MAP_W = 74, MAP_H = 15, ROOM_COUNT = 4; // public/js/game.js의 지도 크기
 const POS_TICK_MS = 200; // 위치는 모아서 0.2초마다 한 번 보낸다
 const POS_IDLE_TICKS = 150; // 30초 동안 아무도 움직이지 않으면 타이머를 멈춘다
@@ -141,6 +156,29 @@ export class Room extends DurableObject {
       const index = ((await this.ctx.storage.get("setIndex")) ?? []).filter((x) => x.id !== id);
       await this.ctx.storage.delete(`set:${id}`);
       await this.ctx.storage.put("setIndex", index);
+      return Response.json(index);
+    }
+    // 올린 그림 파일: 목록(imgIndex)과 그림마다 { mime, data(base64) }
+    if (url.pathname === "/admin/imgs") return Response.json((await this.ctx.storage.get("imgIndex")) ?? []);
+    if (url.pathname === "/admin/img") {
+      const rec = await this.ctx.storage.get(`img:${url.searchParams.get("id")}`);
+      if (!rec) return new Response("not found", { status: 404 });
+      const bin = Uint8Array.from(atob(rec.data), (c) => c.charCodeAt(0));
+      return new Response(bin, { headers: { "Content-Type": rec.mime, "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" } });
+    }
+    if (url.pathname === "/admin/imgput" && request.method === "POST") {
+      const { id, mime, data, info } = await request.json();
+      const index = ((await this.ctx.storage.get("imgIndex")) ?? []).filter((x) => x.id !== id);
+      index.push({ id, ...info });
+      await this.ctx.storage.put(`img:${id}`, { mime, data });
+      await this.ctx.storage.put("imgIndex", index);
+      return Response.json(index);
+    }
+    if (url.pathname === "/admin/imgdel" && request.method === "POST") {
+      const { id } = await request.json();
+      const index = ((await this.ctx.storage.get("imgIndex")) ?? []).filter((x) => x.id !== id);
+      await this.ctx.storage.delete(`img:${id}`);
+      await this.ctx.storage.put("imgIndex", index);
       return Response.json(index);
     }
     if (url.pathname === "/admin/set" && request.method === "POST") {
@@ -515,7 +553,7 @@ export class Room extends DurableObject {
   async onAdmin(ws, msg) {
     const master = !!ws.deserializeAttachment()?.master;
     // 문항 세트 올리기·지우기는 중간관리자도 한다(자기 채널 전용). 나머지(채널 비밀번호·기간)는 전체 관리자만.
-    const SET_MSGS = ["uploadSet", "deleteSet", "setExample", "setListGet"];
+    const SET_MSGS = ["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList"];
     if (!master && !SET_MSGS.includes(msg.type)) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
     const ch = String(this.channel ?? "1");
     const who = master ? "전체 관리자" : `${ch}채널 교사`;
@@ -546,6 +584,28 @@ export class Room extends DurableObject {
       return this.send(ws, { type: "uploadResult", ok: true, deleted: msg.id, ...(await lists()) });
     }
     if (msg.type === "setListGet") return this.send(ws, { type: "uploadResult", ok: true, ...(await lists()) });
+    // ---------- 그림 파일(png·jpg·gif·webp) 올리기: 문항·카드의 '그림: /img/…'에 쓴다 ----------
+    const images = async () => {
+      let idx = [];
+      try { idx = await (await this.adminStub().fetch("https://admin/admin/imgs")).json(); } catch {}
+      return idx.filter((x) => master || !x.owner || x.owner === ch);
+    };
+    if (msg.type === "imageList") return this.send(ws, { type: "imageResult", ok: true, images: await images() });
+    if (msg.type === "uploadImage") {
+      const r = checkImage(msg.data);
+      if (!r.ok) return this.send(ws, { type: "imageResult", ok: false, message: r.message });
+      const id = `${[...crypto.getRandomValues(new Uint8Array(6))].map((b) => b.toString(16).padStart(2, "0")).join("")}.${r.ext}`;
+      const name = String(msg.name ?? "").replace(/[<>&"]/g, "").slice(0, 60);
+      await this.adminStub().fetch("https://admin/admin/imgput", { method: "POST", body: JSON.stringify({ id, mime: r.mime, data: msg.data, info: { name, at: Date.now(), owner: master ? null : ch, size: r.size } }) });
+      this.log({ type: "관리자", name: who, detail: `그림 올림: ${name} → /img/${id}` });
+      return this.send(ws, { type: "imageResult", ok: true, saved: `/img/${id}`, images: await images() });
+    }
+    if (msg.type === "deleteImage" && typeof msg.id === "string") {
+      const rec = (await images()).find((x) => x.id === msg.id);
+      if (!rec) return this.send(ws, { type: "imageResult", ok: false, message: "이 채널에서 올린 그림만 지울 수 있어요." });
+      await this.adminStub().fetch("https://admin/admin/imgdel", { method: "POST", body: JSON.stringify({ id: msg.id }) });
+      return this.send(ws, { type: "imageResult", ok: true, deleted: msg.id, images: await images() });
+    }
     if (msg.type === "adminSet") {
       const ch = String(msg.ch);
       if (!CHANNEL_IDS.includes(ch)) return;
@@ -585,7 +645,7 @@ export class Room extends DurableObject {
   }
 
   async onTeacher(ws, msg) {
-    if (["adminGet", "adminSet", "uploadSet", "deleteSet", "setExample", "setListGet"].includes(msg.type)) return this.onAdmin(ws, msg);
+    if (["adminGet", "adminSet", "uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList"].includes(msg.type)) return this.onAdmin(ws, msg);
     if (msg.type === "stage" && STAGES.includes(msg.stage)) {
       this.data.stage = msg.stage;
       await this.save();
