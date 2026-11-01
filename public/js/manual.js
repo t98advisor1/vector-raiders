@@ -111,63 +111,87 @@ ${file}의 [${subj}] ${unit}${pages} 내용으로, 예시 파일과 똑같은 �
 // ---------- 캐러셀 ----------
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const copyBtn = (id, label = "📋 복사") => `<button class="btn copy-btn" type="button" data-copy="${id}">${label}</button>`;
+// 화면 그림 (6인 모의 진행 캡처). 누르면 크게 본다.
+const shot = (name, cap) => `<figure class="mn-shot"><img src="/img/manual/${name}.webp" alt="${esc(cap)}" loading="lazy" data-zoom><figcaption>${cap}</figcaption></figure>`;
+const shots = (...list) => `<div class="mn-shots n${list.length}">${list.map(([n, c]) => shot(n, c)).join("")}</div>`;
+const keys = (title, items) => `<div class="mn-keys"><b>✅ ${title}</b><ul>${items.map((t) => `<li>${t}</li>`).join("")}</ul></div>`;
+const flow = (...steps) => `<ol class="mn-steps">${steps.map((t) => `<li>${t}</li>`).join("")}</ol>`;
+const tip = (t) => `<p class="mn-tip">${t}</p>`;
 
+// 1부: 수업 운영 (6인 모의 진행: A팀 3명, B팀 3명, 교사 1명), 2부: AI로 문항 세트 만들기
 const SLIDES = [
-  {
-    title: "1. 한눈에 보기",
-    html: `<p>교과서 파일을 AI에게 주고 <b>md 파일 한 개</b>를 받아 올리면, 그 채널의 게임 문항·개념 카드·그림·인물 카드·출력물이 모두 바뀝니다.</p>
-      <ol class="mn-flow">
-        <li><b>📄 교과서 준비</b><span>필요한 소단원 쪽만 PDF로</span></li>
-        <li><b>📥 예시 파일 받기</b><span>수학 또는 다른 교과 예시 md</span></li>
-        <li><b>🤖 AI에게 요청</b><span>교과서 + 예시 + 프롬프트 (3단계)</span></li>
-        <li><b>🔎 검사만 하기</b><span>형식·정답·그림을 서버가 점검</span></li>
-        <li><b>📤 저장·적용</b><span>내 채널에만 적용, 변경 기록 자동</span></li>
-        <li><b>🎮 수업·🖨️ 출력</b><span>게임, 형성평가, 해설집, 카드</span></li>
-      </ol>
-      <p class="mn-tip">💡 머지나 배포는 필요 없습니다. 교사 화면에서 올리면 바로 반영됩니다.</p>`,
-  },
-  {
-    title: "2. md 파일이 게임에서 어디에 나오나요?",
-    html: `<table class="mn-table"><thead><tr><th>md 파일</th><th>게임 화면</th></tr></thead><tbody>
-      <tr><td><code># 상자 1 ~ 9</code>, <code>- 방: 1~4</code></td><td>방마다 놓인 상자 9개 (방 1: 상자 1~3, 방 2: 4~5, 방 3: 6~7, 방 4: 8~9)</td></tr>
+  { part: "class", title: "수업 운영 한눈에 보기", html: `
+    <p class="mn-lead">6명(A팀 3명, B팀 3명)이 1채널에서 실제로 진행한 모의 수업 화면으로 안내합니다. 그림을 누르면 크게 볼 수 있어요.</p>
+    ${shots(["s-start", "학생 화면: 탐험 중 (팀 랭킹·지도·채팅)"], ["t-dash-top", "교사 화면: 채널 관제 (유물·팀 점수)"])}
+    ${flow("🔑 교사 로그인·단원 고르기", "🧑‍🎓 학생 입장 (채널 → 팀 → 이름)", "▶ 탐험 시작", "📦 상자 풀기 (개념 → 조작 → 제출)", "🤝 협업·💬 채팅·🚪 팀 문", "🏁 탐험 종료", "🖨️ 형성평가·기록 출력")}
+    ${keys("핵심", ["학생은 <b>방 코드 없이</b> 채널 번호만 고르면 들어옵니다.", "교사 화면은 수업 내내 <b>켜 두세요</b>. 채팅 기록이 교사 화면에 모입니다.", "모든 기록(점수·풀이 시간·오답·협업)은 교사 화면과 CSV에 남습니다."])}` },
+  { part: "class", title: "1. 수업 전 준비 (교사)", html: `
+    ${shots(["t-login", "교사 비밀번호로 로그인"], ["t-dash-top", "채널 관제 화면: 단원·시작·CSV·새 수업"])}
+    ${keys("순서", ["교사 비밀번호(중간관리자는 채널 비밀번호)로 들어갑니다. 내 채널만 열립니다.", "<b>이 채널 단원</b>에서 오늘 단원을 고릅니다.", "지난 반 기록이 있으면 <b>CSV 내려받기</b> 후 <b>새 수업 시작</b>.", "<b>학생 초대 링크 복사</b>로 주소(…/?ch=채널)를 학생에게 보냅니다."])}` },
+  { part: "class", title: "2. 학생 입장: 채널 → 팀 → 이름", html: `
+    ${shots(["s-menu", "① '수업 참가' 고르기"], ["s-channel", "② 채널 고르기"], ["s-team", "③ 팀 고르기 (최대 8명)"], ["s-name", "④ 번호와 이름 쓰기"])}
+    ${keys("안내할 말", ["\"수업 참가 → 선생님이 말한 채널 → 우리 팀 → <b>번호+이름</b>(예: 1번 이서연)\"", "새로고침하거나 연결이 끊겨도 같은 기기에서는 기록이 이어집니다.", "연습 모드는 혼자 하는 복습용이라 교사 화면에 남지 않습니다."])}` },
+  { part: "class", title: "3. 탐험 시작", html: `
+    ${shots(["s-start", "탐험이 시작되면 상자와 문이 열립니다"])}
+    ${keys("두 가지 방법", ["교사 화면의 <b>▶ 탐험 시작</b> 버튼", "학생 화면 위쪽 띠의 <b>🔑 선생님: 탐험 시작</b> → 시작 비밀번호 (교실 앞 화면에서)", "시작 전에는 학생이 돌아다니기만 할 수 있습니다."])}` },
+  { part: "class", title: "4. 상자 풀기: 개념 → 조작 → 제출", html: `
+    ${shots(["s-concept", "① 상자를 열면 먼저 핵심 카드"], ["s-diff", "② 난이도 고르기 (하 70 · 중 100 · 상 150)"], ["s-problem", "③ 그림을 움직이며 풀기"])}
+    ${flow("상자 앞에서 E (또는 화면 버튼)", "핵심 카드 읽기 (+50점)", "난이도 고르기", "그림 끌기·조절기·돌리기", "답 제출", "2번 틀리면 힌트")}
+    ${keys("지도 포인트", ["합답형은 <b>[보기] 상자</b>에 ㄱ·ㄴ·ㄷ이 한 줄씩, 그림 아래에 양쪽 값이 나옵니다.", "힌트를 보고 맞히면 '한 번에 정답' 보너스는 받지 못합니다.", "키보드: WASD·방향키 이동 · E 열기 · M/Tab 지도 · G 사격 · H 점프"])}` },
+  { part: "class", title: "5. 팀 문: 절반 이상이 열면 함께", html: `
+    ${shots(["s-teamdoor", "A팀 2명이 1번 방 문을 열자 이서연에게도 문이 열림"])}
+    ${keys("규칙", ["방의 열쇠(상자)를 모두 모으면 그 방의 문이 열립니다.", "같은 팀(2명 이상)의 <b>절반 이상</b>이 열면 <b>그 팀의 나머지</b>에게도 열립니다. 다른 팀은 각자 열어야 합니다.", "예: 3명 팀 → 2명, 4명 팀 → 2명, 5명 팀 → 3명", "잠긴 문 앞에서 '팀원 2명이 열면 함께 열려요 (지금 1/3명)'처럼 진행 상황이 보입니다."])}` },
+  { part: "class", title: "6. 협업 문항 (3·4번 방의 상 난이도)", html: `
+    ${shots(["s-coop-wait", "① 짝 기다리기"], ["s-coop", "② 짝 연결: 나는 조건 ㉠만 보임"], ["s-coop-solved", "③ 한 명이 맞히면 둘 다 해결"])}
+    ${flow("같은 팀 2명이 같은 상자 4칸 안에", "둘 다 '상' 문제 열기", "한 명은 조건 ㉠, 한 명은 조건 ㉡", "채팅으로 조건 알려 주기", "한 명이 맞히면 둘 다 열쇠")}
+    ${keys("알아 둘 것", ["1분을 기다려도 짝이 없으면 <b>혼자 풀기</b>(두 조건 모두, 중 배점 100점)를 고를 수 있습니다.", "교사 화면 학생 기록에 <b>🤝 협업한 짝</b>이 남습니다.", "연습 모드에서는 처음부터 두 조건이 모두 보입니다."])}` },
+  { part: "class", title: "7. 채팅과 채팅 기록", html: `
+    ${shots(["s-chat", "학생 채팅: 팀 색 표시, 오른쪽 아래"])}
+    ${keys("채팅 기록 받기", ["교사 화면 위쪽 <b>💬 학생 채팅 기록 다운로드 (N)</b> → CSV 파일", "<b>교사 화면이 켜져 있는 동안</b> 모든 채널의 채팅이 모입니다. 수업 중에는 교사 화면을 닫지 마세요.", "한 줄 100자, 줄바꿈·특수 문자는 지워져 전달됩니다."])}
+    <table class="mn-table"><thead><tr><th>시각</th><th>채널</th><th>팀</th><th>이름</th><th>내용</th></tr></thead><tbody>
+      <tr><td>10:01:54</td><td>1채널</td><td>A팀</td><td>2번 김민준</td><td>안녕! 우리 A팀 1번 상자부터 가자</td></tr>
+      <tr><td>10:02:31</td><td>1채널</td><td>A팀</td><td>1번 이서연</td><td>그림 돌려 보니까 ㄱ이 맞아</td></tr>
+      <tr><td>10:02:33</td><td>1채널</td><td>B팀</td><td>6번 윤서준</td><td>B팀 문 열렸다!</td></tr>
+    </tbody></table>` },
+  { part: "class", title: "8. 교사용 기록 보기", html: `
+    ${shots(["t-roster", "학생별: 이름을 누르면 문제마다 결과·난이도·풀이 시간·협업"], ["t-problems", "문제별: 도전·정답 인원, 첫 시도 정답률, 자주 나온 오답"])}
+    ${keys("어디서 무엇을", ["<b>학생별 집계</b>: 순위·점수·맞힌 문제·오답 수·접속·들어온/탈출 시각·위치·벡터 점프·활동", "기호: ★ 첫 시도 정답 · ✓ 정답 · ✗n n번 오답 · 💡 힌트 봄 · – 미응시", "<b>문제별 현황</b>: 정답률 50% 미만은 빨간색 → 다음 시간 다시 짚을 문제", "<b>CSV 내려받기</b>: 학생 × 문제 결과·풀이 시간(초)·오답을 엑셀로"])}` },
+  { part: "class", title: "9. 탐험 종료와 학생 출력", html: `
+    ${shots(["s-escaped", "상자 9개를 모두 풀면 바로 결과 창"], ["s-summary", "결과 창: 형성평가·풀이 기록·오답 정리"], ["s-fa-sheet", "형성평가 문제지 미리보기 (2단, 그림 포함)"])}
+    ${keys("학생이 받는 것", ["<b>📝 형성평가 문제지 / ✅ 답지</b>: 탐험에서 푼 난이도의 문제 9개", "<b>🗂️ 나의 풀이 기록</b>: 푼 문제 전부(그림·내 답·정답·풀이)", "<b>📄 나의 오답 정리</b>: 틀리거나 여러 번 시도한 문제만", "모든 방을 탈출하면 팀원이 아직 풀고 있어도 바로 출력할 수 있습니다(그때는 자기 난이도의 정답만).", "교사가 <b>■ 탐험 종료</b>를 누르면 모두에게 결과 창이 열립니다."])}` },
+  { part: "class", title: "10. 교사용 출력 (PDF)", html: `
+    ${shots(["t-printmenu", "🖨️ 출력 창: 난이도를 고르고 미리보기"], ["s-mine", "출력 미리보기 창의 '인쇄 / PDF로 저장'"])}
+    ${keys("출력물", ["<b>📝 형성평가 문제지 / ✅ 교사용 답안</b>: 하·중·상 전체 또는 한 난이도, 2단, 그림 포함", "<b>📚 핵심 카드</b>: 비석 카드 모음", "<b>📄 교사용 해설집</b>: 상자마다 하·중·상 문제·정답·풀이·협업 조건·자주 나온 오답", "새 창의 <b>🖨️ 인쇄 / PDF로 저장</b> → 대상 'PDF로 저장'. 아이패드는 공유 → 프린트에서 두 손가락으로 벌리면 PDF"])}` },
+  { part: "class", title: "11. 다음 반 수업과 변경 기록", html: `
+    ${shots(["t-upload", "문항 세트·그림 올리기와 📜 문항 변경 기록"])}
+    ${flow("CSV 내려받기", "💬 채팅 기록 받기", "새 수업 시작 (기록 지우기)", "필요하면 단원 바꾸기", "학생 입장")}
+    ${keys("기억할 것", ["새 수업 시작·단원 바꾸기는 그 채널의 기록을 지웁니다. 먼저 내려받으세요.", "세트·그림을 올리거나 단원을 바꾸면 <b>📜 문항 변경 기록</b>에 자동으로 남고 CSV로 받을 수 있습니다.", "24시간 동안 아무도 들어오지 않으면 기록이 자동으로 지워집니다."])}` },
+
+  { part: "make", title: "AI로 문항 세트 만들기: 한눈에", html: `
+    <p class="mn-lead">교과서 파일을 AI에게 주고 <b>md 파일 한 개</b>를 받아 올리면, 그 채널의 문항·카드·그림·인물 카드·출력물이 모두 바뀝니다. 머지·배포는 필요 없습니다.</p>
+    ${flow("📄 교과서 PDF", "📥 예시 md 받기", "🤖 AI: 설계표 → 카드 → 문항", "🔎 검사만 하기", "📤 저장·적용", "🎮 수업·🖨️ 출력")}
+    <table class="mn-table"><thead><tr><th>md 파일</th><th>게임 화면</th></tr></thead><tbody>
+      <tr><td><code># 상자 1~9</code>, <code>- 방: 1~4</code></td><td>방마다 놓인 상자 (방 1: 1~3, 방 2: 4~5, 방 3: 6~7, 방 4: 8~9)</td></tr>
       <tr><td><code>## 하 / 중 / 상</code></td><td>상자를 열면 고르는 난이도 (70 / 100 / 150점)</td></tr>
-      <tr><td><code>- 협업: 예</code> + <code>조건 ㉠ ㉡</code></td><td>상 난이도에서 두 학생이 조건을 하나씩 받아 채팅으로 함께 풀기</td></tr>
-      <tr><td><code>그림:</code> + <code>조작:</code></td><td>문제 창의 움직이는 그림과 안내 문장 (끌기·조절기·그래프·재생)</td></tr>
-      <tr><td><code># 핵심 카드</code> + <code>- 비석:</code></td><td>방 안 비석을 열면 나오는 개념 카드, 상자 머리의 <code>- 개념:</code>과 연결</td></tr>
-      <tr><td><code># 인물 카드</code></td><td>수정을 깨면 나오는 인물 이야기 (없으면 기본 수학자)</td></tr>
-      <tr><td><code>풀이:</code></td><td>두 번 틀리면 보이는 힌트, 해설집·풀이 기록 출력</td></tr>
-    </tbody></table>`,
-  },
-  {
-    title: "3. 교과서 파일은 PDF로 주세요",
-    html: `<table class="mn-table"><thead><tr><th>가진 파일</th><th>이렇게 주세요</th><th>이유</th></tr></thead><tbody>
-      <tr><td>📕 출판사 교과서 PDF</td><td><b>그대로 (권장)</b>. 필요한 소단원 쪽만 잘라서</td><td>대부분의 AI가 글·그림·표·수식을 함께 읽습니다</td></tr>
-      <tr><td>📘 한글 파일 (hwp·hwpx)</td><td>한글에서 <b>파일 → PDF로 저장</b> 후 PDF를 주기</td><td>AI 대부분이 hwpx를 바로 읽지 못하거나 수식·그림이 빠집니다</td></tr>
-      <tr><td>📷 사진·스캔본</td><td>쪽마다 반듯하게, 밝게</td><td>수식·숫자를 잘못 읽을 수 있어 정답 검산을 꼭 하세요</td></tr>
-      <tr><td>📝 학습지·교사용 자료</td><td>PDF로 저장해 함께 주기</td><td>문제 유형과 수업 의도를 AI가 더 잘 따라 합니다</td></tr>
+      <tr><td><code>- 협업: 예</code> + <code>조건 ㉠ ㉡</code></td><td>상 난이도 2인 협업</td></tr>
+      <tr><td><code>그림:</code> + <code>조작:</code></td><td>문제 창의 움직이는 그림과 안내</td></tr>
+      <tr><td><code># 핵심 카드</code> / <code># 인물 카드</code></td><td>비석 개념 카드 / 수정을 깨면 나오는 인물 이야기</td></tr>
+      <tr><td><code>풀이:</code></td><td>두 번 틀리면 힌트, 해설집·풀이 기록</td></tr>
+    </tbody></table>` },
+  { part: "make", title: "교과서 파일은 PDF로", html: `
+    <table class="mn-table"><thead><tr><th>가진 파일</th><th>이렇게 주세요</th><th>이유</th></tr></thead><tbody>
+      <tr><td>📕 출판사 교과서 PDF</td><td><b>그대로 (권장)</b>, 필요한 쪽만</td><td>글·그림·표·수식을 함께 읽습니다</td></tr>
+      <tr><td>📘 한글 파일 (hwp·hwpx)</td><td>한글에서 <b>파일 → PDF로 저장</b></td><td>AI 대부분이 hwpx를 바로 못 읽거나 수식·그림이 빠집니다</td></tr>
+      <tr><td>📷 사진·스캔</td><td>반듯하고 밝게</td><td>수식·숫자 오인식 → 정답 검산 필수</td></tr>
     </tbody></table>
-    <ul class="mn-list">
-      <li>한 번에 <b>20~30쪽 이하</b>, 해당 소단원의 개념·예제·문제 쪽만 주는 것이 가장 정확합니다.</li>
-      <li>교과서 숫자를 그대로 쓰지 않도록 프롬프트에 "숫자는 새로 정한다"가 들어가 있습니다(저작권).</li>
-      <li>사진·지도·작품 이미지가 꼭 필요하면 먼저 <b>🖼️ 그림 파일 올리기</b>로 올리고, 받은 <code>/img/…</code> 주소를 프롬프트에 적어 주세요.</li>
-    </ul>`,
-  },
+    ${keys("요령", ["한 번에 <b>20~30쪽 이하</b>, 해당 소단원의 개념·예제·문제 쪽만", "숫자는 교과서와 다르게 새로 정하게 합니다(저작권)", "사진·지도가 필요하면 먼저 <b>🖼️ 그림 파일 올리기</b> → 받은 <code>/img/…</code> 주소를 프롬프트에"])}
+    <div class="mn-row">
+      <button class="btn" type="button" data-click="#set-example">📄 수학 예시 받기 (벡터 3-1)</button>
+      <button class="btn" type="button" data-click="#set-example-other">📄 다른 교과 예시 받기 (과학)</button>
+    </div>` },
   {
-    title: "4. 예시 파일 받기",
-    html: `<p>AI는 형식을 말로 들을 때보다 <b>예시 파일 하나</b>를 볼 때 훨씬 정확하게 따라 합니다. 교과서와 함께 꼭 첨부하세요.</p>
-      <div class="mn-row">
-        <button class="btn" type="button" data-click="#set-example">📄 수학 예시 (벡터 3-1)</button>
-        <button class="btn" type="button" data-click="#set-example-other">📄 다른 교과 예시 (과학 · 운동과 에너지)</button>
-      </div>
-      <ul class="mn-list">
-        <li><b>수학 예시</b>: 벡터 표기([AB], {a}), 조작 그림, 합답형 ㄱㄴㄷ, 협업 문항</li>
-        <li><b>다른 교과 예시</b>: <code>수식: 끔</code>, 단답형(글자 답), 고르기(낱말), 그래프·넓이·접선, 모션, 인물 카드</li>
-      </ul>`,
-  },
-  {
-    title: "5. 프롬프트 만들기",
-    gen: true,
-    html: `<p>상황을 고르면 AI에게 줄 프롬프트를 만들어 줍니다. <b>1단계 → 2단계 → 3단계</b> 순서로 하나씩 요청하고, 단계마다 결과를 확인한 뒤 다음으로 넘어가세요.</p>
+    part: "make", title: "프롬프트 만들기", gen: true, html: `
+      <p class="mn-lead">상황을 고르면 AI에게 줄 프롬프트가 만들어집니다. <b>1단계 → 2단계 → 3단계</b> 순서로 요청하고, 단계마다 확인한 뒤 넘어가세요.</p>
       <div class="mn-form">
         <label>교과 <input id="mg-subject" value="수학" placeholder="예: 미적분, 과학, 사회"></label>
         <label>단원 <input id="mg-unit" placeholder="예: Ⅱ-1. 미분계수와 도함수"></label>
@@ -183,7 +207,6 @@ const SLIDES = [
           <label><input type="checkbox" name="mg-fig" value="image"> 그림 파일 (사진·지도·작품)</label>
           <label><input type="checkbox" name="mg-fig" value="none"> 그림 없음</label>
         </fieldset>
-        <label class="mn-wide" id="mg-images-wrap" hidden>올린 그림 주소와 설명 <input id="mg-images" placeholder="예: /img/a1b2c3d4e5f6.png 세포 사진, /img/…png 조선 지도"></label>
         <fieldset><legend>답 형식</legend>
           <label><input type="checkbox" name="mg-kind" value="num" checked> 숫자</label>
           <label><input type="checkbox" name="mg-kind" value="choice" checked> 오지선다·합답형</label>
@@ -191,89 +214,50 @@ const SLIDES = [
           <label><input type="checkbox" name="mg-kind" value="text"> 단답형(글자)</label>
           <label><input type="checkbox" name="mg-kind" value="vec"> 벡터식</label>
         </fieldset>
-        <label><input type="checkbox" id="mg-people" checked> 인물 카드 넣기 (수정을 깨면 나오는 인물 이야기)</label>
+        <label class="mn-wide" id="mg-images-wrap" hidden>올린 그림 주소와 설명 <input id="mg-images" placeholder="예: /img/a1b2c3d4e5f6.png 세포 사진"></label>
+        <label class="mn-check"><input type="checkbox" id="mg-people" checked> 인물 카드 넣기</label>
       </div>
-      <textarea id="mg-out" class="mn-out" readonly rows="12"></textarea>
-      <div class="mn-row">${copyBtn("mg-out", "📋 프롬프트 복사")}<span class="muted">→ AI 채팅에 교과서 PDF와 예시 md를 첨부하고 붙여 넣으세요.</span></div>`,
+      <textarea id="mg-out" class="mn-out" readonly rows="10"></textarea>
+      <div class="mn-row">${copyBtn("mg-out", "📋 프롬프트 복사")}<span class="muted">→ AI 채팅에 교과서 PDF + 예시 md를 첨부하고 붙여 넣기</span></div>`,
   },
-  {
-    title: "6. 1단계: 설계표 받기",
-    html: `<p>문제부터 만들지 않고, 먼저 <b>상자 9개의 개념과 조작 아이디어</b>를 표로 받습니다. 이 게임의 핵심은 개념 학습과 직접 조작이기 때문입니다.</p>
-      <table class="mn-table"><thead><tr><th>확인할 것</th><th>좋은 예</th></tr></thead><tbody>
-        <tr><td>개념 순서</td><td>교과서 순서대로, 방 1 → 방 4로 갈수록 깊어짐</td></tr>
-        <tr><td>조작 아이디어</td><td>"a를 움직이면 접선 기울기가 바뀌고, 그 값이 미분계수다" (움직여서 발견)</td></tr>
-        <tr><td>협업 조건</td><td>조건 ㉠만으로도 ㉡만으로도 풀 수 없고, 둘을 합쳐야 풀림</td></tr>
-      </tbody></table>
-      <p class="mn-tip">💡 고칠 점은 이 단계에서 말하세요. 문항을 다 만든 뒤 고치는 것보다 훨씬 쉽습니다. 예: "상자 4의 조작 아이디어를 넓이 대신 접선으로 바꿔 주세요."</p>`,
-  },
-  {
-    title: "7. 2단계: 핵심 카드와 인물 카드",
-    html: `<pre class="mn-code"># 핵심 카드 · 미분계수
-- 비석: 4
-그림: 평면 범위=-1,4,-1,9 곡선=x^2 슬라이더=a,0,3,0.5 접선=1,a 보기=기울기:d1(a)
-요약: 곡선 위 한 점에서 그은 접선의 기울기를 그 점의 미분계수라고 해요.
-- 그림의 a를 움직이며 접선 기울기가 어떻게 바뀌는지 보세요.
-
-# 인물 카드 · 아이작 뉴턴 (Isaac Newton)
-- 시대: 1643 ~ 1727 (영국)
-- 업적: 미적분과 운동 법칙
-- 분야: 📈 미적분
-이야기: 순간의 변화를 계산하는 방법(유율법)을 만들어 …</pre>
-      <ul class="mn-list">
-        <li>카드 제목은 상자 머리의 <code>- 개념:</code>과 똑같아야 연결됩니다.</li>
-        <li>카드의 <code>그림:</code>은 선택이지만, 넣으면 비석에서 바로 조작해 볼 수 있습니다.</li>
-        <li>인물 카드가 없으면 기본 수학자 카드(데카르트·오일러 등)가 나옵니다.</li>
-      </ul>`,
-  },
-  {
-    title: "8. 3단계: 문항과 그림 고르기",
-    html: `<table class="mn-table"><thead><tr><th>이런 수업이면</th><th>그림 줄 예</th></tr></thead><tbody>
+  { part: "make", title: "단계별로 확인할 것", html: `
+    ${flow("1단계 설계표: 상자 9개의 개념·조작 아이디어", "2단계 핵심 카드·인물 카드", "3단계 문항 27개 + 한 파일로 합치기")}
+    <table class="mn-table"><thead><tr><th>단계</th><th>확인할 것</th><th>좋은 예</th></tr></thead><tbody>
+      <tr><td>설계표</td><td>조작 아이디어가 '움직여서 발견'인가</td><td>"a를 움직이면 접선 기울기가 바뀌고, 그 값이 미분계수다"</td></tr>
+      <tr><td>카드</td><td>카드 제목 = 상자의 <code>- 개념:</code></td><td>카드에도 그림: 을 넣으면 비석에서 바로 조작</td></tr>
+      <tr><td>협업</td><td>조건 ㉠·㉡ 하나만으로는 안 풀리는가</td><td>㉠ 질량 4 kg / ㉡ 속도 2→8 m/s (2초)</td></tr>
+      <tr><td>문항</td><td>그림 수치 = 문제 수치, 보기= 에 답 대신 중간값</td><td>합답형은 ㄱ·ㄴ·ㄷ 양쪽 값</td></tr>
+    </tbody></table>
+    ${tip("💡 고칠 점은 설계표 단계에서 말하세요. 예: \"상자 4의 조작 아이디어를 넓이 대신 접선으로 바꿔 주세요.\"")}` },
+  { part: "make", title: "그림 고르기 (시뮬레이션)", html: `
+    <table class="mn-table"><thead><tr><th>이런 수업이면</th><th>그림 줄 예</th></tr></thead><tbody>
       <tr><td>벡터·도형 (끌어 보기)</td><td><code>평면 A=1,3 B=5,1 끌기=A,B 화살표=AB 보기=|AB|</code></td></tr>
       <tr><td>함수 그래프 (계수 바꾸기)</td><td><code>평면 범위=-3,3,-2,6 곡선=a*x^2 슬라이더=a,-2,2,0.5</code></td></tr>
       <tr><td>미분 (접선)</td><td><code>곡선=x^3-3*x 슬라이더=a,-2,2,0.25 접선=1,a 보기=기울기:d1(a)</code></td></tr>
       <tr><td>적분 (넓이)</td><td><code>곡선=x^2 슬라이더=b,0,3,0.5 넓이=1,0,b 보기=넓이:int1(0,b)</code></td></tr>
-      <tr><td>시뮬레이션 (저절로 움직임)</td><td><code>P=(1-t)*A+t*B 슬라이더=t,0,1,0.1 자취=P 재생=t,4</code></td></tr>
+      <tr><td>시뮬레이션 (저절로)</td><td><code>P=(1-t)*A+t*B 슬라이더=t,0,1,0.1 자취=P 재생=t,4</code></td></tr>
       <tr><td>공간 도형 (돌려 보기)</td><td><code>공간 직육면체=3,4,2 화살표=AG 재생=회전,10</code></td></tr>
       <tr><td>사진·지도·작품</td><td><code>그림: /img/…</code> (그림 파일 올리기)</td></tr>
     </tbody></table>
-    <p class="mn-tip">🔒 md 파일에 자바스크립트 같은 프로그램 코드를 직접 넣는 방식은 받지 않습니다. 올린 코드는 모든 학생 기기에서 실행되기 때문입니다. 위 그림 문법으로 대부분의 시뮬레이션을 만들 수 있고, 업로드 검사에서 오류를 미리 찾아 줍니다.</p>`,
-  },
-  {
-    title: "9. 검사하고 고치기",
-    html: `<ol class="mn-list">
-        <li>AI가 준 md 파일을 <b>📤 문항 세트 올리기</b>에서 고르고 <b>🔎 검사만 하기</b>를 누릅니다.</li>
-        <li>서버가 형식(상자 9개, 하·중·상, 협업 조건, 보기 5개), <b>정답 채점</b>, <b>그림 줄</b>을 모두 점검합니다.</li>
-        <li>오류가 나오면 오류 문장을 복사해 아래 프롬프트와 함께 AI에게 주세요.</li>
-      </ol>
-      <textarea id="mn-fix" class="mn-out" readonly rows="4">업로드 검사에서 아래 오류가 나왔습니다. 첨부한 md 파일에서 해당 부분만 고쳐 전체 파일을 다시 주세요.
+    ${tip("🔒 md 파일에 프로그램 코드를 직접 넣는 방식은 받지 않습니다. 올린 코드는 모든 학생 기기에서 실행되기 때문입니다. 위 그림 문법으로 대부분의 시뮬레이션을 만들 수 있고, 업로드 검사가 오류를 미리 찾아 줍니다.")}` },
+  { part: "make", title: "검사하고 고치기", html: `
+    ${flow("📤 문항 세트 올리기에서 파일 고르기", "🔎 검사만 하기", "오류 문장 복사", "아래 프롬프트와 함께 AI에게", "다시 검사 → 📤 검사 후 저장")}
+    <textarea id="mn-fix" class="mn-out" readonly rows="3">업로드 검사에서 아래 오류가 나왔습니다. 첨부한 md 파일에서 해당 부분만 고쳐 전체 파일을 다시 주세요.
 (여기에 교사 화면의 오류 문장을 그대로 붙여 넣기)</textarea>
-      <div class="mn-row">${copyBtn("mn-fix")}</div>
-      <textarea id="mn-fig" class="mn-out" readonly rows="5">첨부한 md 파일에서 [상자 N의 중]의 그림: 줄만 다시 만들어 주세요.
+    <div class="mn-row">${copyBtn("mn-fix", "📋 오류 고치기 프롬프트 복사")}</div>
+    <textarea id="mn-fig" class="mn-out" readonly rows="4">첨부한 md 파일에서 [상자 N의 중]의 그림: 줄만 다시 만들어 주세요.
 - 목적: 학생이 [무엇]을 움직이며 [어떤 개념]을 발견하게 하기
 - 문제의 수치와 맞추고, 그림: 줄과 조작: 줄만 바꾼 결과를 주세요.
 ${GRAMMAR.base}</textarea>
-      <div class="mn-row">${copyBtn("mn-fig", "📋 그림만 바꾸기 프롬프트 복사")}</div>`,
-  },
-  {
-    title: "10. 저장·적용·기록·출력",
-    html: `<ul class="mn-list">
-        <li><b>📤 검사 후 저장</b> → 중간관리자가 올린 세트는 <b>그 채널에만</b> 보이고, 저장 직후 "지금 적용할까요?"를 묻습니다. 적용하면 새 수업으로 시작하니 먼저 CSV를 받아 두세요.</li>
-        <li>전체 관리자가 올린 세트는 모든 채널의 "이 채널 단원" 목록에 나옵니다.</li>
-        <li><b>📜 문항 변경 기록</b>: 올림·지움·단원 바꿈이 자동으로 남고 CSV로 받을 수 있습니다.</li>
-        <li><b>🖨️ 출력</b>: 형성평가 문제지·답지(2단, 그림 포함), 핵심 카드, 교사용 해설집. 학생은 탈출 후 풀이 기록·오답 정리를 출력합니다.</li>
-        <li>적용한 뒤에는 학생 화면에서 상자 2~3개와 비석 1~2개를 직접 열어, 그림이 문제와 맞는지 확인하세요.</li>
-      </ul>`,
-  },
-  {
-    title: "11. 다른 교과 선생님께",
-    html: `<table class="mn-table"><thead><tr><th>교과</th><th>추천 구성</th></tr></thead><tbody>
+    <div class="mn-row">${copyBtn("mn-fig", "📋 그림만 바꾸기 프롬프트 복사")}</div>` },
+  { part: "make", title: "다른 교과 선생님께", html: `
+    <table class="mn-table"><thead><tr><th>교과</th><th>추천 구성</th></tr></thead><tbody>
       <tr><td>과학</td><td>그래프(시간-속도, 넓이=이동 거리), 모션, 단답형(용어), 인물 카드(과학자). <code>수식: 끔</code>, 공식은 <code>$...$</code></td></tr>
-      <tr><td>사회·역사</td><td>그림 파일(지도·사료 사진), 고르기·오지선다, 단답형(인물·사건), 인물 카드</td></tr>
-      <tr><td>국어·영어</td><td>그림 없음 또는 그림 파일, 오지선다·합답형, 단답형, 인물 카드(작가). 영어 문장이 수식으로 바뀌지 않게 <code>수식: 끔</code></td></tr>
+      <tr><td>사회·역사</td><td>그림 파일(지도·사료), 고르기·오지선다, 단답형(인물·사건), 인물 카드</td></tr>
+      <tr><td>국어·영어</td><td>그림 없음 또는 그림 파일, 오지선다·합답형, 단답형, 인물 카드(작가). <code>수식: 끔</code></td></tr>
       <tr><td>정보</td><td>조작 그림(좌표·그래프), 단답형, 오지선다</td></tr>
     </tbody></table>
-    <p class="mn-tip">💡 "다른 교과 예시 (과학)" 파일을 AI에게 함께 주면, 수학 기호 없이 같은 형식을 따라 합니다.</p>`,
-  },
+    ${keys("다른 교과에서 바뀌는 것", ["수학이 아닌 교과는 글 속 수식 자동 변환이 꺼집니다(영어 문장이 수식 글꼴로 바뀌지 않음).", "<b>단답형</b>: 띄어쓰기·대소문자 무시, 여러 정답은 <code>|</code>로", "<b>인물 카드</b>를 넣으면 수정을 깰 때 기본 수학자 대신 그 인물이 나옵니다.", "'다른 교과 예시 (과학)' 파일을 AI에게 함께 주세요."])}` },
 ];
 
 let idx = 0;
@@ -287,20 +271,38 @@ export function openManual(start = 0) {
 
 function build(pop) {
   pop.dataset.built = "1";
+  const partOf = (k) => SLIDES.findIndex((x) => x.part === k);
   pop.innerHTML = `<div class="manual-card" role="document">
-      <div class="manual-head"><h2>📘 AI로 문항 세트 만들기</h2><button class="btn" type="button" data-close aria-label="닫기">✕</button></div>
-      <div class="manual-track">${SLIDES.map((s, i) => `<section class="manual-slide" data-i="${i}" hidden><h3>${esc(s.title)}</h3>${s.html}</section>`).join("")}</div>
+      <div class="manual-head">
+        <h2>📘 사용 설명서</h2>
+        <div class="manual-tabs" role="tablist">
+          <button type="button" class="manual-tab" data-part="class" data-go="${partOf("class")}">🎮 수업 운영 (6인 모의 진행)</button>
+          <button type="button" class="manual-tab" data-part="make" data-go="${partOf("make")}">🤖 AI로 문항 만들기</button>
+        </div>
+        <button class="btn" type="button" data-close aria-label="닫기">✕</button>
+      </div>
+      <div class="manual-track">${SLIDES.map((s, i) => `<section class="manual-slide" data-i="${i}" hidden><h3><span class="mn-num">${i + 1} / ${SLIDES.length}</span>${esc(s.title)}</h3>${s.html}</section>`).join("")}</div>
       <div class="manual-nav">
         <button class="btn" type="button" data-prev>← 이전</button>
-        <div class="manual-dots">${SLIDES.map((s, i) => `<button type="button" class="manual-dot" data-go="${i}" aria-label="${esc(s.title)}"></button>`).join("")}</div>
+        <div class="manual-dots">${SLIDES.map((s, i) => `<button type="button" class="manual-dot ${s.part}" data-go="${i}" aria-label="${esc(s.title)}" title="${esc(s.title)}"></button>`).join("")}</div>
         <button class="btn primary" type="button" data-next>다음 →</button>
       </div>
+      <div class="manual-zoom" hidden><img alt=""><p></p></div>
     </div>`;
+  const zoom = pop.querySelector(".manual-zoom");
   pop.addEventListener("click", (e) => {
+    if (e.target === pop) { pop.hidden = true; return; }
+    if (e.target.closest(".manual-zoom")) { zoom.hidden = true; return; }
+    if (e.target.matches("img[data-zoom]")) {
+      zoom.querySelector("img").src = e.target.src;
+      zoom.querySelector("p").textContent = e.target.alt + " (누르면 닫혀요)";
+      zoom.hidden = false;
+      return;
+    }
     const t = e.target.closest("button");
-    if (e.target === pop || t?.dataset.close !== undefined && t?.hasAttribute("data-close")) { pop.hidden = true; return; }
     if (!t) return;
-    if (t.hasAttribute("data-prev")) show(idx - 1);
+    if (t.hasAttribute("data-close")) pop.hidden = true;
+    else if (t.hasAttribute("data-prev")) show(idx - 1);
     else if (t.hasAttribute("data-next")) show(idx + 1);
     else if (t.dataset.go) show(Number(t.dataset.go));
     else if (t.dataset.click) document.querySelector(t.dataset.click)?.click();
@@ -313,7 +315,7 @@ function build(pop) {
     if (pop.hidden || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (e.key === "ArrowRight") show(idx + 1);
     else if (e.key === "ArrowLeft") show(idx - 1);
-    else if (e.key === "Escape") pop.hidden = true;
+    else if (e.key === "Escape") { if (!zoom.hidden) zoom.hidden = true; else pop.hidden = true; }
   });
   // 프롬프트 생성기
   const gen = () => {
@@ -335,6 +337,13 @@ function show(i) {
   idx = Math.max(0, Math.min(SLIDES.length - 1, i));
   pop.querySelectorAll(".manual-slide").forEach((s) => { s.hidden = Number(s.dataset.i) !== idx; });
   pop.querySelectorAll(".manual-dot").forEach((d, k) => d.classList.toggle("on", k === idx));
+  pop.querySelectorAll(".manual-tab").forEach((t) => t.classList.toggle("on", t.dataset.part === SLIDES[idx].part));
   pop.querySelector("[data-prev]").disabled = idx === 0;
   pop.querySelector("[data-next]").disabled = idx === SLIDES.length - 1;
+  pop.querySelector(".manual-track").scrollTop = 0;
+}
+
+// 다른 화면에서 특정 부분을 바로 열 때: openManualPart("make")
+export function openManualPart(part) {
+  openManual(Math.max(0, SLIDES.findIndex((x) => x.part === part)));
 }

@@ -1,5 +1,5 @@
 import { connect } from "./net.js";
-import { openManual } from "./manual.js";
+import { openManual, openManualPart } from "./manual.js";
 import { fmt, watchMath, boxedText } from "./mathtext.js";
 import { openPrintDoc } from "./printdoc.js";
 import { PROBLEMS, loadSet, figureHtml, cardFigureHtml, SET } from "./problems.js";
@@ -88,7 +88,7 @@ $("#invite-copy").onclick = async () => {
 const LV = { low: "하", mid: "중", high: "상" };
 $("#print-sheet-btn").onclick = () => openPrintMenu();
 // 📘 사용 설명서: AI로 문항 세트 만들기 (로그인 전에도 볼 수 있다)
-for (const b of document.querySelectorAll(".open-manual")) b.onclick = () => openManual();
+for (const b of document.querySelectorAll(".open-manual")) b.onclick = () => (b.dataset.part ? openManualPart(b.dataset.part) : openManual());
 $("#print-answer-btn").onclick = () => { openPrintMenu(); runPrint("answer"); };
 $("#print-menu-close").onclick = () => { $("#print-menu").hidden = true; };
 $("#print-menu").addEventListener("pointerdown", (e) => { if (e.target.id === "print-menu") $("#print-menu").hidden = true; });

@@ -150,3 +150,10 @@ test("사용 설명서의 프롬프트 생성기는 단계·그림 종류에 맞
   assert.match(r, /수식: 끔/);
   assert.match(r, /단답형/);
 });
+
+test("사용 설명서가 쓰는 모의 진행 그림이 모두 있다", () => {
+  const src = fs.readFileSync("public/js/manual.js", "utf8");
+  const names = [...src.matchAll(/\["([a-z]-[a-z-]+)", "/g)].map((m) => m[1]);
+  assert.ok(names.length >= 15, `그림 ${names.length}개`);
+  for (const n of names) assert.ok(fs.existsSync(`public/img/manual/${n}.webp`), `${n}.webp`);
+});
