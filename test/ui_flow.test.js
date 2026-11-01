@@ -70,3 +70,11 @@ test("모든 방을 탈출한 학생은 탐험 중에도 자기 난이도 정답
   assert.match(stu, /id="mine-btn"/);
   assert.match(stu, /S\.cls\?\.stage === "done" \|\| iEscaped\(\)/);
 });
+
+test("중간관리자가 올린 문항 세트는 그 채널에만 보이고, 그 채널 교사만 지운다", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /filter\(\(x\) => all \|\| !x\.owner \|\| x\.owner === ch\)/);
+  assert.match(room, /const owner = master \? existing\?\.owner \?\? null : ch;/);
+  assert.match(room, /이 채널에서 올린 세트만 지울 수 있어요/);
+  assert.match(room, /SET_MSGS = \["uploadSet", "deleteSet", "setExample", "setListGet"\]/);
+});

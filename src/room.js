@@ -186,12 +186,17 @@ export class Room extends DurableObject {
     } catch {}
   }
 
-  // 고를 수 있는 세트 목록: 기본 세트 + 올린 세트 [{ id, title, uploaded }]
-  async setList() {
+  // 고를 수 있는 세트 목록: 기본 세트 + 올린 세트 [{ id, title, uploaded, owner }]
+  //   owner가 없으면 전체 관리자가 올린 세트(모든 채널), 있으면 그 채널 중간관리자가 올린 세트(그 채널만).
+  //   all=true는 전체 관리자의 관리 목록용(모든 채널의 세트).
+  async uploadedIndex() {
+    try { return await (await this.adminStub().fetch("https://admin/admin/sets")).json(); } catch { return []; }
+  }
+  async setList(all = false) {
     const base = SET_LIST.map((id) => ({ id, title: builtinSet(id)?.meta?.제목 ?? id, uploaded: false }));
-    let up = [];
-    try { up = await (await this.adminStub().fetch("https://admin/admin/sets")).json(); } catch {}
-    return [...base, ...up.map((x) => ({ id: x.id, title: x.title, uploaded: true, at: x.at }))];
+    const ch = String(this.channel ?? "1");
+    const up = (await this.uploadedIndex()).filter((x) => all || !x.owner || x.owner === ch);
+    return [...base, ...up.map((x) => ({ id: x.id, title: x.title, uploaded: true, at: x.at, owner: x.owner ?? null }))];
   }
   level(pid, diff) { return this.set().boxes[Number(pid.slice(1)) - 1]?.levels[diff] ?? null; }
 
@@ -508,23 +513,39 @@ export class Room extends DurableObject {
 
   // 전체 관리자 전용: 중간관리자(채널) 비밀번호·사용 기간 보기와 바꾸기
   async onAdmin(ws, msg) {
-    if (!ws.deserializeAttachment()?.master) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
+    const master = !!ws.deserializeAttachment()?.master;
+    // 문항 세트 올리기·지우기는 중간관리자도 한다(자기 채널 전용). 나머지(채널 비밀번호·기간)는 전체 관리자만.
+    const SET_MSGS = ["uploadSet", "deleteSet", "setExample", "setListGet"];
+    if (!master && !SET_MSGS.includes(msg.type)) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
+    const ch = String(this.channel ?? "1");
+    const who = master ? "전체 관리자" : `${ch}채널 교사`;
+    const lists = async () => ({ sets: await this.setList(), ...(master ? { allSets: await this.setList(true) } : {}) });
     // ---------- 문항 세트 올리기·지우기·예시 ----------
     if (msg.type === "setExample") return this.send(ws, { type: "setExample", md: builtinRaw(DEFAULT_SET) });
     if (msg.type === "uploadSet") {
       const r = validateSet(msg.md, gradeLevel);
       if (r.ok && SET_LIST.includes(r.id)) r.errors.push(`'${r.id}'은(는) 기본 세트 이름이에요. 다른 이름을 써 주세요.`);
+      // 같은 이름의 세트가 다른 채널(또는 전체 관리자) 것이면 중간관리자는 덮어쓸 수 없다
+      const existing = r.ok ? (await this.uploadedIndex()).find((x) => x.id === r.id) : null;
+      if (existing && !master && (existing.owner ?? null) !== ch) r.errors.push(`'${r.id}'은(는) 다른 채널이나 전체 관리자가 이미 쓰는 세트 이름이에요. 파일 맨 위 '세트:' 이름을 바꿔 주세요.`);
       if (!r.ok || r.errors.length) return this.send(ws, { type: "uploadResult", ok: false, errors: r.errors, summary: r.summary ?? null });
       if (msg.check) return this.send(ws, { type: "uploadResult", ok: true, checked: true, summary: r.summary, id: r.id });
-      await this.adminStub().fetch("https://admin/admin/setput", { method: "POST", body: JSON.stringify({ id: r.id, md: msg.md, info: { title: r.summary.title, at: Date.now() } }) });
-      this.log({ type: "관리자", name: "전체 관리자", detail: `문항 세트 올림: ${r.id}` });
-      return this.send(ws, { type: "uploadResult", ok: true, saved: true, summary: r.summary, id: r.id, sets: await this.setList() });
+      // 중간관리자가 올리면 그 채널 전용, 전체 관리자가 올리면 모든 채널(전체 관리자가 채널 세트를 고쳐 올리면 그 채널 전용 그대로)
+      const owner = master ? existing?.owner ?? null : ch;
+      await this.adminStub().fetch("https://admin/admin/setput", { method: "POST", body: JSON.stringify({ id: r.id, md: msg.md, info: { title: r.summary.title, at: Date.now(), owner } }) });
+      if (this.uploaded?.id === r.id) this.uploaded = { id: r.id, ...r.set }; // 이 채널이 쓰던 세트를 고쳐 올렸으면 바로 바꾼다
+      this.log({ type: "관리자", name: who, detail: `문항 세트 올림: ${r.id}${owner ? ` (${owner}채널 전용)` : " (모든 채널)"}` });
+      return this.send(ws, { type: "uploadResult", ok: true, saved: true, summary: r.summary, id: r.id, owner, ...(await lists()) });
     }
     if (msg.type === "deleteSet" && typeof msg.id === "string" && !SET_LIST.includes(msg.id)) {
+      const existing = (await this.uploadedIndex()).find((x) => x.id === msg.id);
+      if (!existing) return this.send(ws, { type: "uploadResult", ok: true, ...(await lists()) });
+      if (!master && (existing.owner ?? null) !== ch) return this.send(ws, { type: "uploadResult", ok: false, errors: ["이 채널에서 올린 세트만 지울 수 있어요."] });
       await this.adminStub().fetch("https://admin/admin/setdel", { method: "POST", body: JSON.stringify({ id: msg.id }) });
-      return this.send(ws, { type: "uploadResult", ok: true, deleted: msg.id, sets: await this.setList() });
+      this.log({ type: "관리자", name: who, detail: `문항 세트 지움: ${msg.id}` });
+      return this.send(ws, { type: "uploadResult", ok: true, deleted: msg.id, ...(await lists()) });
     }
-    if (msg.type === "setListGet") return this.send(ws, { type: "uploadResult", ok: true, sets: await this.setList() });
+    if (msg.type === "setListGet") return this.send(ws, { type: "uploadResult", ok: true, ...(await lists()) });
     if (msg.type === "adminSet") {
       const ch = String(msg.ch);
       if (!CHANNEL_IDS.includes(ch)) return;
