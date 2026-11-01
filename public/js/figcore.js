@@ -16,9 +16,10 @@
 //   끌기=a,A   슬라이더=t,-3,3,0.5;k,0,2,0.1   보기=라벨:식;식   화살표=a,b,AB   선분=AB,BC
 //   다각형=ABCD   직선=A,u   원=C,r   (공간) 평면=n,d (n·x + d = 0)   구=C,r   직육면체=가로,세로,높이   자취=P
 //   곡선=x^2-2*x;2^x  (평면, y = f(x) 그래프. x를 변수로, 조절기 값도 쓸 수 있다)
+//   재생=t,4;회전,10   모션그래픽: 조절기 t를 4초 동안 최소→최대→최소로 부드럽게, 공간 그림을 10초에 한 바퀴. 재생=없음이면 멈춤
 // 수 함수: x^2(거듭제곱) π √ |x| sqrt() abs() exp() ln() log()(밑 10) tan() — cos·sin·tan은 도 단위, 라디안은 cosr·sinr·tanr
 
-const RESERVED = new Set(["범위", "끌기", "슬라이더", "보기", "화살표", "선분", "다각형", "직선", "원", "평면", "구", "직육면체", "자취", "숨김", "곡선"]);
+const RESERVED = new Set(["범위", "끌기", "슬라이더", "보기", "화살표", "선분", "다각형", "직선", "원", "평면", "구", "직육면체", "자취", "숨김", "곡선", "재생"]);
 
 // ---------- 식 계산 ----------
 function tokenize(src) {
@@ -159,7 +160,7 @@ export function parseFigure(spec) {
   const parts = String(spec ?? "").trim().split(/\s+/).filter(Boolean);
   const kind = parts[0] === "평면" ? "2d" : parts[0] === "공간" ? "3d" : null;
   if (!kind) return null;
-  const fig = { kind, defs: [], starts: {}, sliders: [], drag: [], show: [], arrows: null, segs: [], polys: [], lines: [], circles: [], planes: [], spheres: [], box: null, trail: [], hide: [], range: null, curves: [] };
+  const fig = { kind, defs: [], starts: {}, sliders: [], drag: [], show: [], arrows: null, segs: [], polys: [], lines: [], circles: [], planes: [], spheres: [], box: null, trail: [], hide: [], range: null, curves: [], play: [], playOff: false };
   for (const part of parts.slice(1)) {
     const eq = part.indexOf("=");
     if (eq < 1) throw new Error(`'${part}'는 '이름=값'으로 써 주세요`);
@@ -179,6 +180,10 @@ export function parseFigure(spec) {
     else if (key === "직육면체") fig.box = list().map(Number);
     else if (key === "자취") fig.trail = list();
     else if (key === "곡선") fig.curves = list(";");
+    else if (key === "재생") {
+      if (val === "없음") fig.playOff = true;
+      else fig.play = list(";").map((s) => { const [name, sec] = s.split(","); return { name, sec: Math.max(1, Math.min(60, Number(sec) || 4)) }; });
+    }
     else if (key === "숨김") fig.hide = list();
     else if (/^[A-Za-z][A-Za-z0-9]*$/.test(key) && !RESERVED.has(key)) {
       const [expr, start] = val.split("@");
@@ -222,6 +227,10 @@ export function checkFigure(spec) {
     for (const [c, r] of [...fig.spheres, ...fig.circles]) { evalExpr(c, env); evalExpr(r, env); }
     for (const name of fig.drag) if (!(name in env)) throw new Error(`끌기 '${name}'가 정의되지 않았어요`);
     if (fig.curves.length && fig.kind !== "2d") throw new Error("곡선은 평면 그림에서만 써요");
+    for (const p of fig.play) {
+      if (p.name === "회전") { if (fig.kind !== "3d") throw new Error("재생=회전은 공간 그림에서만 써요"); continue; }
+      if (!fig.sliders.some((s) => s.name === p.name)) throw new Error(`재생 '${p.name}'은(는) 슬라이더 이름이나 '회전'으로 써요`);
+    }
     for (const c of fig.curves) {
       // x 여러 값에서 계산해 보아 식이 읽히는지, 수가 나오는지 확인한다 (어떤 x에서는 정의되지 않아도 된다)
       const vals = [-2, -0.5, 0.5, 1, 2, 3].map((x) => evalExpr(c, { ...env, x }));

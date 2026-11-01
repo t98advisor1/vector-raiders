@@ -201,7 +201,7 @@ function printSheet() {
     <section class="tp-labs">
       <h2>🗺️ 벡터 실험실 지도 가이드</h2>
       <ul>${labTips}</ul>
-      <p class="tp-tip">※ 문은 그 방의 열쇠(상자)를 모두 모으거나, 같은 팀의 2/3 이상이 열면 팀 전체에게 열립니다. 3·4번 방의 상 난이도는 2인 협업 문제입니다.</p>
+      <p class="tp-tip">※ 문은 그 방의 열쇠(상자)를 모두 모으거나, 같은 팀의 절반 이상이 열면 그 팀 전체에게 열립니다. 3·4번 방의 상 난이도는 2인 협업 문제입니다.</p>
     </section>
     <div class="tp-columns">
       ${rows}
