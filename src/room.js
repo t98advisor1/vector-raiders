@@ -204,6 +204,14 @@ export class Room extends DurableObject {
       });
     }
 
+    if (url.pathname === "/api/practice-sets") {
+      // 연습 모드 세트 고르기: 이 채널이 지금 수업에 쓰는 세트와, 이 채널에서 볼 수 있는 세트 목록(정답 없이 제목만)
+      this.channel = request.headers.get("X-Channel") ?? "1";
+      const sets = (await this.setList()).map(({ id, title, uploaded }) => ({ id, title, uploaded }));
+      const cur = this.data?.setId ?? DEFAULT_SET;
+      return Response.json({ ch: this.channel, current: sets.find((x) => x.id === cur) ?? sets[0], sets });
+    }
+
     // 연습 유적인지는 진입점(worker.js)이 알려 준다. 처음 열릴 때만 정해진다.
     this.mode ??= request.headers.get("X-Room-Mode") === "practice" ? "practice" : "class";
     this.channel = request.headers.get("X-Channel") ?? "1";
@@ -243,6 +251,14 @@ export class Room extends DurableObject {
     const ch = String(this.channel ?? "1");
     const up = (await this.uploadedIndex()).filter((x) => all || !x.owner || x.owner === ch);
     return [...base, ...up.map((x) => ({ id: x.id, title: x.title, uploaded: true, at: x.at, owner: x.owner ?? null }))];
+  }
+  // 연습에서 고른 세트가 그 채널에서 쓸 수 있는 세트인지 확인한다(다른 채널 전용 세트는 못 고른다)
+  async practiceSetId(msg) {
+    if (typeof msg.setId !== "string" || !msg.setId) return null;
+    if (builtinSet(msg.setId)) return msg.setId;
+    const ch = typeof msg.ch === "string" && CHANNEL_IDS.includes(msg.ch) ? msg.ch : "1";
+    const up = (await this.uploadedIndex()).find((x) => x.id === msg.setId);
+    return up && (!up.owner || up.owner === ch) ? up.id : null;
   }
   level(pid, diff) { return this.set().boxes[Number(pid.slice(1)) - 1]?.levels[diff] ?? null; }
 
@@ -547,7 +563,7 @@ export class Room extends DurableObject {
         const teamMembers = Object.entries(this.data.students).filter(([c, s]) => c !== cid && s.team === chosenTeam);
         if (teamMembers.length >= MAX_TEAM_SIZE) {
           this.send(ws, { type: "error", message: `${TEAM_NAMES[chosenTeam]}은 최대 정원(8명)이 마감되었어요. 다른 팀을 골라 주세요.` });
-          return ws.close(4005, "team full");
+          return ws.close(4009, "team full");
         }
       }
       // 연습 유적은 처음 들어온 학생 한 명의 것이다.
@@ -583,12 +599,14 @@ export class Room extends DurableObject {
       this.log({ type: "입장", name });
       // 세트: 연습은 학생이 고른 단원, 수업 채널은 기본 세트 (나중에 교사가 채널별로 고른다)
       // 연습에서 다른 단원을 고르면 그 단원 세트로 바꾸고, 상자 기록만 새로 시작한다(벡터 점프 기록은 그대로)
-      const wantSet = this.practice ? UNIT_SET[msg.unit] ?? DEFAULT_SET : this.data.setId ?? DEFAULT_SET;
+      // 연습: 학생이 고른 세트(채널의 수업 세트나 그 채널에 올린 다른 교과 세트) → 없으면 고른 단원의 기본 세트
+      const wantSet = this.practice ? (await this.practiceSetId(msg)) ?? UNIT_SET[msg.unit] ?? DEFAULT_SET : this.data.setId ?? DEFAULT_SET;
       if (this.data.setId !== wantSet) {
         if (this.data.setId && this.practice) Object.assign(st, { probs: {}, concepts: [], escapedAt: undefined });
         this.data.setId = wantSet;
         this.data.unlocked = [];
         await this.save();
+        await this.ensureSet(); // 올린 세트면 md를 받아 읽는다
       }
       this.send(ws, { type: "set", set: this.publicSet() });
       this.send(ws, { type: "joined", role: "student", name, n: st.n, pos: this.lastPos.get(cid) ?? null });
@@ -803,7 +821,8 @@ export class Room extends DurableObject {
       // (다른 난이도 정답이 아직 풀고 있는 친구에게 새지 않도록).
       if (this.practice) return;
       const done = this.data.stage === "done";
-      if (!done && !st.escapedAt) return;
+      // 게임 도중 나가는 학생(partial)도 지금까지 '자기가 푼 문제'의 정답만 받아 학습 자료를 출력할 수 있다.
+      if (!done && !st.escapedAt && !msg.partial) return;
       const table = this.answerTable();
       let conditions = Object.fromEntries(this.set().boxes.map((b) => [`p${b.no}`, Object.fromEntries(LEVELS.map((k) => [k, b.levels[k].conditions]))]));
       let byDiff = table;
@@ -824,6 +843,18 @@ export class Room extends DurableObject {
       const text = typeof msg.text === "string" ? msg.text.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 100) : "";
       if (!text) return;
       return this.broadcast({ type: "chat", from: st.n, name: st.name, team: st.team ?? null, text });
+    }
+
+    if (msg.type === "reflection") {
+      // 탐험 소감: 결과 화면에서 쓴 글을 교사 결과표(CSV)에 남긴다. 연습 모드는 저장하지 않는다.
+      if (this.practice) return;
+      const text = typeof msg.text === "string" ? msg.text.replace(/\s+/g, " ").trim().slice(0, 400) : "";
+      if (text.length < 5) return this.send(ws, { type: "error", message: "소감을 다섯 글자 이상 써 주세요." });
+      st.reflection = text;
+      await this.save();
+      this.log({ type: "소감", name: st.name, detail: text.slice(0, 60) });
+      this.scheduleBroadcast();
+      return this.send(ws, { type: "reflectionSaved" });
     }
 
     if (msg.type === "concept") {
@@ -1061,7 +1092,7 @@ export class Room extends DurableObject {
       return {
         cid: r.cid, name: st.name, online: online.has(r.cid), lab: st.lab.length, probs: st.probs, team: st.team ?? null,
         joinedAt: st.joinedAt, escapedAt: st.escapedAt ?? null, rank: r.rank, score: r.score, mileage: r.mileage, concepts: r.concepts,
-        room: this.pos.get(r.cid)?.room ?? null,
+        room: this.pos.get(r.cid)?.room ?? null, reflection: st.reflection ?? "",
       };
     });
     const stats = {};

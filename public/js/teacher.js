@@ -128,11 +128,11 @@ function printAssessmentTeacher(kind, level) {
       : v.answer.kind === "multi" ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${(/^[A-Z]{1,3}$/.test(o) ? fmt(`[${o}]`) : fmt(o))}`).join("&emsp;")}</p>` : "";
     const conds = (v.conditions ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("");
     const head = `<h3>${i + 1}${level === "all" ? `-${LV[d]}` : ""}. ${p.icon} ${p.relic} <small>${v.level} · ${v.points}점</small></h3>`;
-    if (!isAnswer) {
-      const fig = figureHtml(p, d);
-      return `<section class="fa-item">${head}<div class="fa-body"><div class="fa-q"><div class="pr-text">${boxedText(v.text)}</div>${conds}${optHtml}</div>${fig ? `<div class="fa-fig">${fig}</div>` : ""}</div><p class="fa-blank"><b>답</b> <span></span></p></section>`;
-    }
-    return `<section class="fa-item">${head}<p class="pr-answer"><b>정답</b> ${fmt(answers[p.id]?.[d] ?? "")}</p><p class="pr-hint"><b>풀이</b> ${fmt(v.hint ?? "")}</p></section>`;
+    const fig = figureHtml(p, d);
+    const q = `<div class="fa-body"><div class="fa-q"><div class="pr-text">${boxedText(v.text)}</div>${conds}${optHtml}</div>${fig ? `<div class="fa-fig">${fig}</div>` : ""}</div>`;
+    if (!isAnswer) return `<section class="fa-item">${head}${q}<p class="fa-blank"><b>답</b> <span></span></p></section>`;
+    // 교사용 답지: 수업 전에 미리 볼 수 있도록 문제·그림(그래프)까지 함께 싣는다
+    return `<section class="fa-item">${head}${q}<p class="pr-answer"><b>정답</b> ${fmt(answers[p.id]?.[d] ?? "")}</p><p class="pr-hint"><b>풀이</b> ${fmt(v.hint ?? "")}</p></section>`;
   })).join("");
   showPrint(`
     <header class="pr-head fa-head">
@@ -620,7 +620,7 @@ function clock(ms) {
 
 function downloadCsv(d) {
   const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
-  const head = ["순위", "이름", "팀", "점수", "들어온 시각", "탈출 시각", "벡터 점프", "활동 마일리지", "개념 학습", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.풀이시간(초)`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`)];
+  const head = ["순위", "이름", "팀", "점수", "들어온 시각", "탈출 시각", "벡터 점프", "활동 마일리지", "개념 학습", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.풀이시간(초)`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`), "탐험 소감"];
   const rows = d.students.map((st) => {
     const marks = PROBLEMS.map((p) => {
       const r = st.probs[p.id];
@@ -633,7 +633,7 @@ function downloadCsv(d) {
     });
     const times = PROBLEMS.map((p) => (st.probs[p.id]?.timeMs ? Math.round(st.probs[p.id].timeMs / 1000) : ""));
     const wrongs = PROBLEMS.map((p) => (st.probs[p.id]?.wrongs ?? []).join(" / "));
-    return [st.rank, st.name, st.team ?? "", st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, st.mileage ?? 0, st.concepts ?? 0, ...marks, ...times, ...wrongs];
+    return [st.rank, st.name, st.team ?? "", st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, st.mileage ?? 0, st.concepts ?? 0, ...marks, ...times, ...wrongs, st.reflection ?? ""];
   });
   const csv = "﻿" + [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n");
   const a = document.createElement("a");
@@ -749,13 +749,28 @@ $("#img-upload").onclick = async () => {
   const f = $("#img-file").files?.[0];
   const box = $("#img-result");
   if (!f) { box.className = "upload-result bad"; box.textContent = "먼저 그림 파일을 골라 주세요."; return; }
-  if (f.size > 700_000) { box.className = "upload-result bad"; box.textContent = `그림이 너무 커요 (${Math.round(f.size / 1000)}KB). 700KB 이하로 줄여 주세요.`; return; }
-  const buf = new Uint8Array(await f.arrayBuffer());
+  box.className = "upload-result"; box.textContent = "그림을 webp로 줄이는 중…";
+  const blob = await toWebp(f); // 학생 기기가 빨리 받도록 가장 가벼운 webp로 줄인다
+  if (blob.size > 700_000) { box.className = "upload-result bad"; box.textContent = `그림이 너무 커요 (${Math.round(blob.size / 1000)}KB). 700KB 이하로 줄여 주세요.`; return; }
+  const buf = new Uint8Array(await blob.arrayBuffer());
   let bin = "";
   for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-  box.className = "upload-result"; box.textContent = "올리는 중…";
-  net?.send({ type: "uploadImage", name: f.name, data: btoa(bin) });
+  box.className = "upload-result"; box.textContent = blob !== f ? `webp로 줄였어요 (${Math.round(f.size / 1000)}KB → ${Math.round(blob.size / 1000)}KB). 올리는 중…` : "올리는 중…";
+  net?.send({ type: "uploadImage", name: f.name.replace(/\.\w+$/, blob !== f ? ".webp" : "$&"), data: btoa(bin) });
 };
+// png·jpg를 가로 1200px 이하 webp(품질 0.8)로 바꾼다. 움직이는 gif나, 바꿔도 더 커지면 원본 그대로.
+async function toWebp(f) {
+  if (!/^image\/(png|jpeg|webp)$/.test(f.type)) return f;
+  try {
+    const bmp = await createImageBitmap(f);
+    const k = Math.min(1, 1200 / bmp.width);
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const out = await new Promise((r) => c.toBlob(r, "image/webp", 0.8));
+    return out && out.type === "image/webp" && out.size < f.size ? out : f;
+  } catch { return f; }
+}
 function onImageResult(msg) {
   const box = $("#img-result");
   if (!msg.ok) { box.className = "upload-result bad"; box.textContent = `⚠️ ${msg.message}`; }

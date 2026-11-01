@@ -279,32 +279,33 @@ mjx-container { font-size: 125% !important; }
 .warn-cell { background: var(--bad-soft); font-weight: 700; }
 
 /* 교사 화면: 다크 네이비 · 인디고 실시간 대시보드 테마 */
-body.teacher { background: linear-gradient(160deg, #0b1020, #121a36 55%, #18204a); color: #e5e9f5; }
-body.teacher .topbar { background: rgba(13, 18, 40, 0.95); border-bottom: 1px solid rgba(129, 140, 248, 0.35); }
-body.teacher .chip.soft { background: rgba(129, 140, 248, 0.22); color: #dbe1ff; }
-body.teacher .panel { background: rgba(19, 26, 54, 0.92); border: 1px solid rgba(129, 140, 248, 0.28);
-  box-shadow: 0 10px 34px rgba(3, 7, 18, 0.5); color: #e5e9f5; }
-body.teacher small, body.teacher .muted { color: #93a0c4; }
-body.teacher .legend-line { color: #93a0c4; }
-body.teacher .btn { background: #1b2347; border-color: rgba(129, 140, 248, 0.45); color: #e5e9f5; }
-body.teacher .btn:hover { background: #232c58; }
-body.teacher .btn.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
-body.teacher .btn.primary:hover { background: #4f52e0; }
-body.teacher .btn.danger { border-color: #f87171; color: #fca5a5; }
-body.teacher .table th { background: #1b2347; color: #c7d2fe; }
-body.teacher .table th, body.teacher .table td { border-bottom-color: rgba(129, 140, 248, 0.18); }
-body.teacher .table tr.detail td { background: rgba(99, 102, 241, 0.08); }
-body.teacher .name-btn { color: #e5e9f5; }
-body.teacher .join-url.big { color: #a5b4fc; }
-body.teacher .mark.none { color: #4d5878; }
-body.teacher .answer-sheet-table .as-answer { color: #6ee7b7; }
-body.teacher .pcard { background: #161d3c; border-color: rgba(129, 140, 248, 0.28); color: #e5e9f5; }
-body.teacher .pcard .ptext { color: #dbe1ff; }
-body.teacher .kick-btn { background: #2a1220; }
-body.teacher .toggle { background: #1b2347; color: #93a0c4; }
-body.teacher .team-card { background: #161d3c; color: #e5e9f5; }
-body.teacher .ch-card { background: #161d3c; color: #e5e9f5; }
-body.teacher .ch-card.on { background: rgba(99, 102, 241, 0.28); border-color: #6366f1; }
+/* 교사 화면: 밝은 테마 (오래 보아도 눈이 편하고, 교실 화면에 띄워도 잘 보이게) */
+body.teacher { background: linear-gradient(160deg, #f7f8fc, #eef1fb 55%, #e8ecf8); color: #1f2937; }
+body.teacher .topbar { background: rgba(255, 255, 255, 0.97); border-bottom: 1px solid #dfe3f3; }
+body.teacher .chip.soft { background: #eef0ff; color: #3730a3; }
+body.teacher .panel { background: #ffffff; border: 1px solid #e1e5f2;
+  box-shadow: 0 6px 22px rgba(30, 41, 89, 0.08); color: #1f2937; }
+body.teacher small, body.teacher .muted { color: #64748b; }
+body.teacher .legend-line { color: #64748b; }
+body.teacher .btn { background: #ffffff; border-color: #c7cdea; color: #1f2937; }
+body.teacher .btn:hover { background: #f1f3fd; }
+body.teacher .btn.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+body.teacher .btn.primary:hover { background: #4338ca; }
+body.teacher .btn.danger { border-color: #fca5a5; color: #b91c1c; }
+body.teacher .table th { background: #eef1fb; color: #3730a3; }
+body.teacher .table th, body.teacher .table td { border-bottom-color: #e5e8f4; }
+body.teacher .table tr.detail td { background: #f6f7ff; }
+body.teacher .name-btn { color: #1f2937; }
+body.teacher .join-url.big { color: #4338ca; }
+body.teacher .mark.none { color: #a3acc4; }
+body.teacher .answer-sheet-table .as-answer { color: #047857; }
+body.teacher .pcard { background: #fbfcff; border-color: #e1e5f2; color: #1f2937; }
+body.teacher .pcard .ptext { color: #334155; }
+body.teacher .kick-btn { background: #fff1f2; }
+body.teacher .toggle { background: #eef1fb; color: #475569; }
+body.teacher .team-card { background: #fbfcff; color: #1f2937; }
+body.teacher .ch-card { background: #fbfcff; color: #1f2937; }
+body.teacher .ch-card.on { background: #eef0ff; border-color: #4f46e5; }
 
 /* 상단 KPI 카드 */
 .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -1309,3 +1310,48 @@ body.touch-device .chat-panel { right: 96px; bottom: calc(14px + env(safe-area-i
 
 /* 채팅은 문제 창(모달) 위에 둔다: 협업 문제를 풀며 채팅해도 문제 창이 닫히지 않게 */
 .chat-toggle, .chat-panel { z-index: 60; }
+
+/* 완주 선물(쿠키): 소감 + 자료 4가지를 받으면 관상 연구소가 열린다 */
+.reward-box { margin: 10px 0 6px; padding: 12px 14px; border: 1.5px solid #d4af37; border-radius: 14px; background: #fffbea; display: grid; gap: 6px; text-align: left; }
+.reward-box small { color: var(--muted); }
+.reward-box textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; border-radius: 10px; border: 1px solid #d6c39a; resize: vertical; }
+.reward-box #feel-send { justify-self: start; }
+.reward-check { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.reward-check li { padding: 3px 10px; border-radius: 999px; border: 1px dashed #c9b287; color: var(--muted); font-size: 0.9em; }
+.reward-check li.ok { border-style: solid; border-color: #16a34a; color: #166534; background: #dcfce7; }
+.reward-check li.ok::before { content: "✔ "; }
+.cookie-box { margin-top: 6px; padding: 12px; border-radius: 12px; color: #f3e6c4; background: #15130f url(/img/reward/gwansang.webp) center 25% / cover; position: relative; overflow: hidden; }
+.cookie-box::before { content: ""; position: absolute; inset: 0; background: rgba(21, 19, 15, 0.7); }
+.cookie-box > * { position: relative; }
+.cookie-box b { color: #e9c766; }
+.muted.small { font-size: 0.85em; }
+
+/* 교사 화면 밝은 테마: 위에서 어두운 색으로 정한 교사용 부품을 밝게 덮어쓴다 */
+body.teacher .kpi-card { background: linear-gradient(150deg, #eef0ff, #ffffff); border-color: #dfe3f3; box-shadow: 0 6px 18px rgba(30, 41, 89, 0.08); }
+body.teacher .kpi-card b { color: #1e1b4b; }
+body.teacher .kpi-card b small, body.teacher .kpi-card small, body.teacher .pgauge .pgauge-label, body.teacher .wrong-title { color: #64748b; }
+body.teacher .kpi-team-row em { color: #4338ca; }
+body.teacher .kpi-team-row .kpi-bar, body.teacher .pgauge { background: #e8ebf7; }
+body.teacher .wrong-chip { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+body.teacher .wrong-chip b { color: #7f1d1d; }
+body.teacher .ch-tab { background: #eef0ff; color: #3730a3; }
+body.teacher .ch-tab.on { background: var(--amber); color: #3b2500; }
+body.teacher .admin-panel { border-color: #f3d27a !important; }
+body.teacher .admin-table input, body.teacher .print-menu-row select, body.teacher .set-pick select { background: #fff; color: #1f2937; border-color: #c7cdea; color-scheme: light; }
+body.teacher .admin-cur { color: #b45309; }
+body.teacher .upload-box { border-top-color: #dfe3f3; }
+body.teacher .upload-row input[type=file] { color: #1f2937; }
+body.teacher .print-pop { background: rgba(30, 41, 89, 0.35); }
+body.teacher .print-pop-card { background: #ffffff; color: #1f2937; border-color: #dfe3f3; box-shadow: 0 20px 60px rgba(30, 41, 89, 0.25); }
+
+/* 연습 모드: 채널 세트로 연습하기 */
+.practice-sets { margin-top: 12px; padding: 10px 12px; border: 1.5px dashed var(--line); border-radius: 14px; display: grid; gap: 8px; }
+.practice-sets .ps-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.practice-sets select { font: inherit; padding: 3px 8px; border-radius: 8px; }
+.ps-list { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
+.ps-item { display: grid; gap: 2px; }
+body.teacher .admin-banner { background: #eef0ff; color: #312e81; border: 1px solid #dfe3f3; }
+body.teacher .admin-banner b { color: #3730a3; }
+body.teacher .admin-banner code { background: #fff; color: #0f766e; border-color: #99f6e4; }
+body.teacher .admin-banner[data-period]::after { color: #b45309; }
+body.teacher .brand { color: #1e1b4b; }

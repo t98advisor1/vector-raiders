@@ -16,6 +16,14 @@ export default {
       return env.ROOM.get(env.ROOM.idFromName("stats:global")).fetch(request);
     }
 
+    // 연습 모드에서 고를 수 있는 세트: 그 채널의 수업 세트 + 그 채널에서 볼 수 있는 세트 목록
+    if (url.pathname === "/api/practice-sets") {
+      const ch = CH_RE.test(url.searchParams.get("ch") ?? "") ? url.searchParams.get("ch") : "1";
+      const forwarded = new Request(request);
+      forwarded.headers.set("X-Channel", ch);
+      return env.ROOM.get(env.ROOM.idFromName(`class:${ch}`)).fetch(forwarded);
+    }
+
     // 교사가 올린 그림 파일 (문항·카드의 '그림: /img/…')
     const img = /^\/img\/([a-z0-9]{6,40}\.(png|jpe?g|gif|webp))$/i.exec(url.pathname);
     if (img && request.method === "GET") {

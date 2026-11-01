@@ -60,7 +60,7 @@ test("문장 속 수식에 역슬래시가 두 번 들어가 벡터 표시가 �
 
 test("연습 모드에서는 정답표(출력용)를 보내지 않는다", () => {
   const room = fs.readFileSync("src/room.js", "utf8");
-  assert.match(room, /if \(this\.practice\) return;\n\s*const done = this\.data\.stage === "done";\n\s*if \(!done && !st\.escapedAt\) return;/);
+  assert.match(room, /if \(this\.practice\) return;\n\s*const done = this\.data\.stage === "done";[\s\S]{0,200}if \(!done && !st\.escapedAt && !msg\.partial\) return;/);
 });
 
 test("모든 방을 탈출한 학생은 탐험 중에도 자기 난이도 정답만 받아 풀이 기록을 출력한다", () => {
@@ -169,4 +169,59 @@ test("협업 짝 정보는 저장소에 남고, 다시 열면 같은 조건을 �
   assert.doesNotMatch(stu, /문제는 같고 배점만 달라요/);
   const game = fs.readFileSync("public/js/game.js", "utf8");
   assert.match(game, /BIAS = \{ bridge: -1\.0, tablet: 0\.4 \}/);
+});
+
+test("중간에 나가기: 수업 중 내가 푼 문제의 정답만 받아 학습 자료를 출력한다", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /d && st\.probs\[pid\]\?\.solved \? \{ \[d\]: v\[d\] \} : \{\}/); // 안 푼 문제 정답은 빠진다
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.match(stu, /type: "review", partial: true/);
+  assert.match(stu, /function printMyCards/);
+  const html = fs.readFileSync("public/index.html", "utf8");
+  assert.match(html, /id="exit-btn"/);
+});
+
+test("완주 선물: 소감과 형성평가 자료 4가지를 모두 받아야 관상 연구소가 열린다", () => {
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  for (const k of ["feel", "sheet", "answer", "mine", "review"]) assert.match(stu, new RegExp(`\\["${k}", `));
+  assert.match(stu, /REWARD_STEPS\.every\(\(\[k\]\) => r\[k\]\)/);
+  assert.match(stu, /localStorage\.setItem\("vr-cookie"/);
+  const gw = fs.readFileSync("public/gwansang.html", "utf8");
+  assert.match(gw, /localStorage\.getItem\("vr-cookie"\)/);
+  assert.match(gw, /opacity: 0\.30;/);
+  assert.match(gw, /og:image" content="https:\/\/go\.geomath\.workers\.dev\/img\/reward\/gwansang-og\.jpg"/);
+  assert.doesNotMatch(gw, /data:image\/[a-z]+;base64/); // 큰 내장 그림 대신 파일
+  assert.ok(fs.existsSync("public/img/reward/gwansang.webp") && fs.existsSync("public/img/reward/gwansang-og.jpg"));
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /msg\.type === "reflection"/);
+});
+
+test("연습 모드는 채널의 수업 세트와 그 채널에서 쓸 수 있는 세트를 고를 수 있다", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /async practiceSetId\(msg\)/);
+  assert.match(room, /up && \(!up\.owner \|\| up\.owner === ch\)/); // 다른 채널 전용 세트는 못 고른다
+  const worker = fs.readFileSync("src/worker.js", "utf8");
+  assert.match(worker, /\/api\/practice-sets/);
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.match(stu, /setId: mode === "practice"/);
+});
+
+test("교사용 형성평가 답지에도 문제와 그림이 들어간다", () => {
+  const t = fs.readFileSync("public/js/teacher.js", "utf8");
+  assert.match(t, /return `<section class="fa-item">\$\{head\}\$\{q\}<p class="pr-answer">/);
+});
+
+test("배경음악은 기·승·전·결·맺음 장으로 바뀌고 장마다 쉼과 고조 구간이 있다", () => {
+  const snd = fs.readFileSync("public/js/sound.js", "utf8");
+  for (const n of ["기", "승", "전", "결", "맺음"]) assert.match(snd, new RegExp(`name: "${n}"`));
+  assert.match(snd, /part === "rest"/);
+  assert.match(snd, /ending\(\)/);
+});
+
+test("코드 그림 안내와 webp 압축", () => {
+  const man = fs.readFileSync("public/js/manual.js", "utf8");
+  assert.match(man, /코드 그림 올리는 법/);
+  assert.match(man, /webp 형식, 가로 1000px 이하, 200KB 이하/);
+  const t = fs.readFileSync("public/js/teacher.js", "utf8");
+  assert.match(t, /c\.toBlob\(r, "image\/webp", 0\.8\)/);
 });

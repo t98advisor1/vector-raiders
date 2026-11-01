@@ -1,0 +1,3102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+  <title>관상 연구소 (觀相 硏究所) — 조선 수묵화 관상 리딩 [FOR FUN ONLY]</title>
+  <meta name="description" content="조선 수묵화 콘셉트의 재미 전용(FOR FUN ONLY) 얼굴 관상 리딩 웹앱. 기기 내 전면 카메라 시각 효과와 4가지 성정 문답으로 16가지 관상 캐릭터 풀이를 체험하세요." />
+
+  <!-- Vercel 정적 배포 및 SNS 공유 미리보기 (Open Graph / Twitter Card 1200x630) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://go.geomath.workers.dev/gwansang" />
+  <meta name="robots" content="noindex" />
+  <meta property="og:title" content="관상 연구소 (觀相 硏究所) — 조선 수묵화 관상 리딩" />
+  <meta property="og:description" content="재미로 보는 조선 수묵화 풍 관상 풀이. 사진·영상은 기기 밖으로 절대 전송되지 않으며, 4가지 문답으로 16가지 관상 캐릭터와 희망 메시지를 전해 드립니다." />
+  <meta property="og:image" content="https://go.geomath.workers.dev/img/reward/gwansang-og.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="관상 연구소 — 수묵화 인물 그림(30% 불투명도)과 금빛 제목" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="관상 연구소 (觀相 硏究所) — 재미 전용 관상 리딩" />
+  <meta name="twitter:description" content="조선 수묵화 콘셉트 관상 리딩 웹앱. 카메라 영상 무전송 보장 · 16가지 관상 캐릭터 풀이." />
+  <meta name="twitter:image" content="https://go.geomath.workers.dev/img/reward/gwansang-og.jpg" />
+
+  <!-- Google Fonts: 세리프 계열 한글 타이포그래피 (Noto Serif KR, Gowun Batang) -->
+  <link rel="icon" href="/img/reward/gwansang.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-ink-deep: #0b0a08;
+      --bg-ink-card: #15130f;
+      --bg-ink-elevated: #1e1b15;
+      --gold-primary: #d4af37;
+      --gold-bright: #f1d576;
+      --gold-muted: #9a7d28;
+      --gold-border: rgba(212, 175, 55, 0.34);
+      --gold-glow: rgba(212, 175, 55, 0.16);
+      --text-hanji: #f2ece1;
+      --text-secondary: #c7bda8;
+      --text-muted: #8e8472;
+      --seal-red: #b93829;
+      --font-serif: 'Noto Serif KR', 'Gowun Batang', 'Nanum Myeongjo', 'Batang', Georgia, serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      min-height: 100dvh;
+      background-color: var(--bg-ink-deep);
+      color: var(--text-hanji);
+      font-family: var(--font-serif);
+      line-height: 1.65;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 은은한 한지 먹물 질감 배경 */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        radial-gradient(circle at 20% 15%, rgba(212, 175, 55, 0.05) 0%, transparent 45%),
+        radial-gradient(circle at 80% 85%, rgba(185, 56, 41, 0.04) 0%, transparent 45%);
+    }
+
+    /* 상단 헤더 */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(11, 10, 8, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--gold-border);
+      padding: 0.7rem 1rem;
+    }
+
+    .header-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      cursor: pointer;
+    }
+
+    .seal-stamp {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      background: rgba(185, 56, 41, 0.18);
+      border: 1.5px solid var(--seal-red);
+      color: #ff7666;
+      font-weight: 900;
+      font-size: 0.85rem;
+      border-radius: 4px;
+      letter-spacing: -0.03em;
+      box-shadow: inset 0 0 6px rgba(185, 56, 41, 0.35);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 1.2rem;
+      font-weight: 900;
+      color: var(--gold-bright);
+      letter-spacing: 0.04em;
+    }
+
+    .fun-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--bg-ink-deep);
+      background: linear-gradient(135deg, var(--gold-bright), var(--gold-primary));
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      vertical-align: middle;
+      letter-spacing: 0.03em;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-header {
+      background: rgba(30, 27, 21, 0.9);
+      color: var(--text-hanji);
+      border: 1px solid var(--gold-border);
+      padding: 0.42rem 0.8rem;
+      border-radius: 6px;
+      font-family: var(--font-serif);
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-header:hover, .btn-header:focus-visible {
+      border-color: var(--gold-bright);
+      background: rgba(212, 175, 55, 0.15);
+      color: var(--gold-bright);
+      outline: none;
+    }
+
+    .btn-header.active-sound {
+      border-color: var(--gold-primary);
+      color: var(--gold-bright);
+      box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+    }
+
+    /* 단계 네비게이션 바 */
+    .step-bar {
+      max-width: 960px;
+      margin: 0.65rem auto 0;
+      padding: 0 1rem;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.4rem;
+      position: relative;
+      z-index: 10;
+    }
+
+    .step-pill {
+      text-align: center;
+      font-size: 0.76rem;
+      padding: 0.38rem 0.25rem;
+      border-radius: 4px;
+      background: rgba(21, 19, 15, 0.75);
+      border: 1px solid rgba(212, 175, 55, 0.18);
+      color: var(--text-muted);
+      transition: all 0.25s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .step-pill.active {
+      background: rgba(212, 175, 55, 0.16);
+      border-color: var(--gold-primary);
+      color: var(--gold-bright);
+      font-weight: 700;
+    }
+
+    .step-pill.done {
+      border-color: rgba(212, 175, 55, 0.4);
+      color: var(--text-secondary);
+    }
+
+    /* 메인 컨테이너 */
+    .main-container {
+      position: relative;
+      z-index: 5;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 3.5rem;
+    }
+
+    .screen-section {
+      display: none;
+      animation: fadeInScreen 0.38s ease forwards;
+    }
+
+    .screen-section.active {
+      display: block;
+    }
+
+    @keyframes fadeInScreen {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 1. 시작 화면 (조선 수묵화 몽타주 20% 워터마크 + radial 그라데이션 스크림) */
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid var(--gold-border);
+      background-color: var(--bg-ink-card);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), inset 0 0 40px rgba(212, 175, 55, 0.05);
+      padding: 2.6rem 1.75rem;
+      min-height: 540px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* 조선 몽타주 스타일 수묵화 인물 얼굴 이미지 약 20% 불투명도 워터마크 */
+    .hero-watermark {
+      position: absolute;
+      inset: 0;
+      background-image: url("/img/reward/gwansang.webp");
+      background-size: cover;
+      background-position: center 25%;
+      background-repeat: no-repeat;
+      opacity: 0.30;
+      filter: contrast(1.15) sepia(0.18);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* 텍스트 가독성을 위한 radial 그라데이션 스크림 */
+    .hero-scrim {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle at 50% 42%,
+        rgba(11, 10, 8, 0.42) 0%,
+        rgba(11, 10, 8, 0.78) 55%,
+        rgba(11, 10, 8, 0.96) 100%
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 3;
+      max-width: 660px;
+      width: 100%;
+    }
+
+    .joseon-subtitle {
+      display: inline-block;
+      color: var(--gold-primary);
+      font-size: 0.88rem;
+      letter-spacing: 0.22em;
+      border-top: 1px solid var(--gold-border);
+      border-bottom: 1px solid var(--gold-border);
+      padding: 0.25rem 1rem;
+      margin-bottom: 1.1rem;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 5vw, 3.1rem);
+      font-weight: 900;
+      color: var(--gold-bright);
+      letter-spacing: 0.06em;
+      margin-bottom: 0.75rem;
+      text-shadow: 0 4px 18px rgba(0, 0, 0, 0.9);
+    }
+
+    .hero-desc {
+      font-size: 1.05rem;
+      color: var(--text-hanji);
+      margin-bottom: 1.5rem;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+    }
+
+    .consent-box {
+      background: rgba(15, 13, 10, 0.86);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      padding: 1.2rem 1.25rem;
+      text-align: left;
+      margin-bottom: 1.5rem;
+      backdrop-filter: blur(4px);
+    }
+
+    .consent-box h3 {
+      font-size: 0.96rem;
+      color: var(--gold-bright);
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .consent-list {
+      list-style: none;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .consent-list li {
+      position: relative;
+      padding-left: 1.1rem;
+    }
+
+    .consent-list li::before {
+      content: "◆";
+      position: absolute;
+      left: 0;
+      color: var(--gold-primary);
+      font-size: 0.7rem;
+      top: 0.15rem;
+    }
+
+    .consent-check-label {
+      margin-top: 0.95rem;
+      padding-top: 0.85rem;
+      border-top: 1px dashed rgba(212, 175, 55, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.92rem;
+      color: var(--gold-bright);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .consent-check-label input[type="checkbox"] {
+      width: 19px;
+      height: 19px;
+      accent-color: var(--gold-primary);
+      cursor: pointer;
+    }
+
+    .cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.8rem;
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #e2c15a 0%, #b88e1e 100%);
+      color: #0b0a08;
+      font-family: var(--font-serif);
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 0.88rem 1.6rem;
+      border-radius: 8px;
+      border: 1px solid #f5df8b;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 6px 20px rgba(212, 175, 55, 0.25);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .btn-gold:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(212, 175, 55, 0.4);
+      filter: brightness(1.06);
+    }
+
+    .btn-gold:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-ink {
+      background: rgba(25, 22, 17, 0.92);
+      color: var(--gold-bright);
+      font-family: var(--font-serif);
+      font-weight: 700;
+      font-size: 0.96rem;
+      padding: 0.88rem 1.4rem;
+      border-radius: 8px;
+      border: 1px solid var(--gold-primary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+    }
+
+    .btn-ink:hover:not(:disabled) {
+      background: rgba(212, 175, 55, 0.16);
+      border-color: var(--gold-bright);
+    }
+
+    /* 2. 카메라 / 데모 촬영 화면 */
+    .panel-card {
+      background: var(--bg-ink-card);
+      border: 1px solid var(--gold-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 1.15rem;
+    }
+
+    .section-header h2 {
+      font-size: 1.5rem;
+      color: var(--gold-bright);
+      margin-bottom: 0.3rem;
+    }
+
+    .section-header p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .camera-stage-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto 1.1rem;
+      aspect-ratio: 4 / 3;
+      background: #070605;
+      border: 2px solid var(--gold-primary);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.15);
+    }
+
+    @media (max-width: 600px) {
+      .camera-stage-wrapper {
+        aspect-ratio: 3 / 4;
+      }
+    }
+
+    #camera-video {
+      display: none;
+    }
+
+    #camera-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .camera-hud-top {
+      position: absolute;
+      top: 0.7rem;
+      left: 0.75rem;
+      right: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 4;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .hud-tag {
+      background: rgba(11, 10, 8, 0.82);
+      border: 1px solid var(--gold-border);
+      color: var(--gold-bright);
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      backdrop-filter: blur(4px);
+    }
+
+    .privacy-guard-banner {
+      background: rgba(212, 175, 55, 0.1);
+      border: 1px solid var(--gold-border);
+      border-radius: 8px;
+      padding: 0.55rem 0.9rem;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .effects-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .effect-chip {
+      background: rgba(28, 24, 18, 0.95);
+      border: 1px solid var(--gold-border);
+      color: var(--text-secondary);
+      padding: 0.48rem 0.85rem;
+      border-radius: 999px;
+      font-family: var(--font-serif);
+      font-size: 0.84rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .effect-chip.active {
+      background: rgba(212, 175, 55, 0.22);
+      border-color: var(--gold-bright);
+      color: var(--gold-bright);
+      font-weight: 700;
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.25);
+    }
+
+    .zoom-control-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 1.2rem;
+      background: rgba(20, 18, 14, 0.85);
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      flex-wrap: wrap;
+    }
+
+    .zoom-control-bar label {
+      font-size: 0.85rem;
+      color: var(--gold-bright);
+      font-weight: 700;
+    }
+
+    .zoom-control-bar input[type="range"] {
+      width: 150px;
+      accent-color: var(--gold-primary);
+      cursor: pointer;
+    }
+
+    .zoom-preset-btn {
+      background: transparent;
+      border: 1px solid var(--gold-border);
+      color: var(--text-secondary);
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-family: var(--font-serif);
+      cursor: pointer;
+    }
+
+    .zoom-preset-btn.active {
+      background: var(--gold-primary);
+      color: var(--bg-ink-deep);
+      font-weight: 700;
+    }
+
+    /* 3. 4개 질문 화면 */
+    .questions-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .question-card {
+      background: rgba(28, 25, 19, 0.9);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      padding: 1.2rem;
+    }
+
+    .question-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--gold-bright);
+      margin-bottom: 0.8rem;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0.65rem;
+    }
+
+    .option-btn {
+      text-align: left;
+      background: rgba(15, 13, 10, 0.88);
+      border: 1px solid rgba(212, 175, 55, 0.28);
+      color: var(--text-hanji);
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-serif);
+      font-size: 0.93rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+    }
+
+    .option-btn:hover {
+      border-color: var(--gold-primary);
+      background: rgba(212, 175, 55, 0.1);
+    }
+
+    .option-btn.selected {
+      background: rgba(212, 175, 55, 0.2);
+      border: 1.5px solid var(--gold-bright);
+      color: var(--gold-bright);
+      font-weight: 700;
+      box-shadow: 0 0 14px rgba(212, 175, 55, 0.2);
+    }
+
+    /* 4. 결과 리딩 화면 */
+    .fiction-disclaimer-bar {
+      background: rgba(185, 56, 41, 0.14);
+      border: 1px solid rgba(185, 56, 41, 0.55);
+      color: #ffbfb8;
+      padding: 0.7rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      text-align: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .result-scroll-paper {
+      background: linear-gradient(180deg, #191611 0%, #12100c 100%);
+      border: 2px solid var(--gold-primary);
+      border-radius: 12px;
+      padding: 1.8rem 1.5rem;
+      box-shadow: inset 0 0 35px rgba(212, 175, 55, 0.06), 0 12px 36px rgba(0, 0, 0, 0.7);
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .character-header {
+      text-align: center;
+      border-bottom: 1px solid var(--gold-border);
+      padding-bottom: 1.25rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .character-code-badge {
+      display: inline-block;
+      background: rgba(212, 175, 55, 0.16);
+      border: 1px solid var(--gold-primary);
+      color: var(--gold-bright);
+      font-size: 0.82rem;
+      padding: 0.2rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 0.5rem;
+    }
+
+    .character-name {
+      font-size: clamp(1.6rem, 4vw, 2.25rem);
+      font-weight: 900;
+      color: var(--gold-bright);
+      margin-bottom: 0.35rem;
+      letter-spacing: 0.04em;
+    }
+
+    .character-subtitle {
+      font-size: 1rem;
+      color: var(--text-secondary);
+    }
+
+    .reading-section {
+      margin-bottom: 1.35rem;
+      padding: 1.1rem 1.2rem;
+      background: rgba(11, 10, 8, 0.55);
+      border-left: 3px solid var(--gold-primary);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .reading-label {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--gold-primary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* 요구사항 엄수: 총평 20px, 항목/조언/희망 16px */
+    .reading-overview-text {
+      font-size: 20px !important;
+      line-height: 1.75;
+      color: var(--text-hanji);
+      font-weight: 600;
+      white-space: pre-line;
+    }
+
+    .reading-body-text {
+      font-size: 16px !important;
+      line-height: 1.75;
+      color: var(--text-hanji);
+      white-space: pre-line;
+    }
+
+    .typing-cursor::after {
+      content: "▏";
+      color: var(--gold-bright);
+      animation: blinkCursor 0.8s infinite;
+      margin-left: 2px;
+    }
+
+    @keyframes blinkCursor {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* 캐릭터 전환 및 타자 컨트롤 바 */
+    .result-controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      margin-bottom: 1.2rem;
+      background: rgba(20, 18, 14, 0.9);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--gold-border);
+    }
+
+    .char-select {
+      background: #0e0c09;
+      color: var(--gold-bright);
+      border: 1px solid var(--gold-primary);
+      padding: 0.45rem 0.75rem;
+      border-radius: 6px;
+      font-family: var(--font-serif);
+      font-size: 0.88rem;
+      max-width: 100%;
+    }
+
+    /* Gemini API 연동 카드 */
+    .gemini-card {
+      background: rgba(24, 21, 16, 0.95);
+      border: 1px solid var(--gold-primary);
+      border-radius: 12px;
+      padding: 1.35rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .gemini-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .gemini-header h3 {
+      font-size: 1.15rem;
+      color: var(--gold-bright);
+    }
+
+    .gemini-notice-list {
+      font-size: 0.83rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.95rem;
+      line-height: 1.6;
+      background: rgba(11, 10, 8, 0.65);
+      padding: 0.75rem 0.95rem;
+      border-radius: 8px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+    }
+
+    .api-input-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .api-input {
+      flex: 1 1 240px;
+      background: #0b0a08;
+      border: 1px solid var(--gold-border);
+      color: var(--text-hanji);
+      padding: 0.7rem 0.9rem;
+      border-radius: 6px;
+      font-family: var(--font-serif);
+      font-size: 0.92rem;
+    }
+
+    .api-input:focus {
+      outline: none;
+      border-color: var(--gold-bright);
+    }
+
+    .gemini-status-box {
+      font-size: 0.88rem;
+      padding: 0.65rem 0.9rem;
+      border-radius: 6px;
+      background: rgba(212, 175, 55, 0.1);
+      border: 1px solid var(--gold-border);
+      color: var(--gold-bright);
+      display: none;
+      margin-top: 0.65rem;
+    }
+
+    .gemini-app-box {
+      background: rgba(15, 13, 10, 0.82);
+      border: 1px solid rgba(212, 175, 55, 0.35);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .gemini-sub-label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--gold-bright);
+      margin-bottom: 0.45rem;
+    }
+
+    .gemini-prompt-textarea {
+      width: 100%;
+      background: #090806;
+      border: 1px solid var(--gold-border);
+      color: var(--text-hanji);
+      border-radius: 8px;
+      padding: 0.75rem 0.85rem;
+      font-family: var(--font-serif);
+      font-size: 0.86rem;
+      line-height: 1.55;
+      resize: vertical;
+      margin-bottom: 0.7rem;
+    }
+
+    .gemini-prompt-textarea:focus {
+      outline: none;
+      border-color: var(--gold-bright);
+    }
+
+    .gemini-advanced-details {
+      margin-top: 0.85rem;
+      border-top: 1px dashed rgba(212, 175, 55, 0.25);
+      padding-top: 0.75rem;
+    }
+
+    .gemini-advanced-details summary {
+      cursor: pointer;
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .gemini-advanced-details summary:hover {
+      color: var(--gold-bright);
+    }
+
+    /* 내보내기 버튼 그리드 */
+    .export-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.65rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* 모달 공통 (4단계 큰 글씨 도움말 모달 & OG 이미지 모달) */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #17140f;
+      border: 2px solid var(--gold-primary);
+      border-radius: 14px;
+      max-width: 680px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 1.75rem 1.5rem;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9);
+    }
+
+    .modal-title {
+      font-size: 1.55rem;
+      color: var(--gold-bright);
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--gold-border);
+      padding-bottom: 0.65rem;
+    }
+
+    /* 4단계 큰 글씨 도움말 스타일 */
+    .help-step-card {
+      background: rgba(11, 10, 8, 0.75);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      padding: 1.1rem 1.2rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .help-step-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--gold-bright);
+      margin-bottom: 0.35rem;
+    }
+
+    .help-step-desc {
+      font-size: 18px;
+      line-height: 1.65;
+      color: var(--text-hanji);
+    }
+
+    /* 토스트 알림 */
+    .toast-container {
+      position: fixed;
+      bottom: 1.4rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 120;
+      background: rgba(20, 18, 14, 0.96);
+      border: 1.5px solid var(--gold-bright);
+      color: var(--gold-bright);
+      padding: 0.7rem 1.3rem;
+      border-radius: 999px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .toast-container.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    /* 푸터 */
+    .app-footer {
+      text-align: center;
+      padding: 1.5rem 1rem 2.5rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid rgba(212, 175, 55, 0.15);
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* 인쇄 / PDF 전용 CSS (사진·카메라·버튼 일절 제외, 순수 텍스트 관상 교지 출력) */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #111111 !important;
+      }
+      body::before,
+      .app-header,
+      .step-bar,
+      #screen-start,
+      #screen-camera,
+      #screen-questions,
+      .result-controls-row,
+      .gemini-card,
+      .export-grid,
+      .no-print,
+      .app-footer,
+      .modal-backdrop,
+      .toast-container,
+      canvas,
+      video,
+      img {
+        display: none !important;
+      }
+      .main-container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      #screen-result {
+        display: block !important;
+      }
+      .fiction-disclaimer-bar {
+        background: none !important;
+        border: 1px solid #444 !important;
+        color: #222 !important;
+        margin-bottom: 16pt !important;
+      }
+      .result-scroll-paper {
+        background: #ffffff !important;
+        border: 2px solid #222222 !important;
+        box-shadow: none !important;
+        color: #111111 !important;
+        padding: 18pt !important;
+      }
+      .character-name,
+      .reading-label,
+      .character-code-badge {
+        color: #000000 !important;
+        border-color: #333333 !important;
+      }
+      .character-subtitle,
+      .reading-overview-text,
+      .reading-body-text {
+        color: #111111 !important;
+      }
+      .reading-section {
+        background: #fafafa !important;
+        border-left: 3px solid #222222 !important;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 벡터 유적 탈출 쿠키 보상: 완주·소감·형성평가 받기를 마친 학생에게만 열린다 -->
+  <style>
+    .vr-lock{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;background:#0b0a08 url(/img/reward/gwansang.webp) center 25%/cover no-repeat}
+    .vr-lock[hidden]{display:none}
+    .vr-lock::before{content:"";position:absolute;inset:0;background:rgba(11,10,8,.7)}
+    .vr-lock-box{position:relative;max-width:520px;text-align:center;color:#f3e6c4;border:1px solid #d4af37;border-radius:14px;padding:28px 22px;background:rgba(21,19,15,.85);font-family:'Gowun Batang',serif;line-height:1.7}
+    .vr-lock-box h2{color:#e9c766;margin:0 0 10px}.vr-lock-box ol{text-align:left;margin:10px auto;display:inline-block}
+    .vr-lock-box a{display:inline-block;margin-top:12px;color:#0b0a08;background:#d4af37;padding:8px 18px;border-radius:30px;text-decoration:none;font-weight:700}
+    .vr-badge{max-width:960px;margin:10px auto 0;padding:10px 16px;border:1px solid rgba(212,175,55,.5);border-radius:10px;color:#e9c766;text-align:center;font-family:'Gowun Batang',serif;background:rgba(212,175,55,.08)}
+  </style>
+  <div class="vr-lock" id="vr-lock" hidden>
+    <div class="vr-lock-box">
+      <h2>🔒 아직 잠긴 쿠키 선물이에요</h2>
+      <p>관상 연구소는 <b>벡터 유적 탈출</b>을 끝까지 해낸 탐험가에게 열려요.</p>
+      <ol><li>모든 방 탈출(또는 탐험 끝)</li><li>결과 화면에서 소감 쓰기</li><li>형성평가 문제지·답지, 풀이 기록, 오답 정리 모두 받기</li></ol>
+      <div><a href="/">벡터 유적 탈출로 돌아가기</a></div>
+    </div>
+  </div>
+  <script>
+    // 같은 사이트의 게임이 보상 조건을 채웠을 때 남긴 표시를 확인한다(이 기기 브라우저에만 저장).
+    var VR_COOKIE = null;
+    try { VR_COOKIE = JSON.parse(localStorage.getItem("vr-cookie") || "null"); } catch (e) {}
+    if (!VR_COOKIE) document.getElementById("vr-lock").hidden = false;
+  </script>
+
+
+  <!-- 상단 헤더 -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-group" id="btn-home-logo" role="button" tabindex="0" aria-label="관상 연구소 처음으로 이동">
+        <span class="seal-stamp">觀相</span>
+        <div>
+          <span class="brand-title">관상 연구소</span>
+          <span class="fun-badge">FOR FUN ONLY</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <button type="button" class="btn-header active-sound" id="btn-sound-toggle" aria-pressed="true">
+          <span id="sound-icon">🔊</span>
+          <span id="sound-label">타자음 켜짐 (테스트)</span>
+        </button>
+        <button type="button" class="btn-header" id="btn-open-help-top">
+          <span>🔑</span>
+          <span>제미나이 이용 도움말</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 진행 단계 표시 -->
+    <nav class="step-bar" aria-label="진행 단계">
+      <div class="step-pill active" id="step-pill-1">1. 시작·동의</div>
+      <div class="step-pill" id="step-pill-2">2. 관상 촬영</div>
+      <div class="step-pill" id="step-pill-3">3. 성정 4문답</div>
+      <div class="step-pill" id="step-pill-4">4. 관상 리딩</div>
+    </nav>
+  </header>
+
+  <main class="main-container">
+
+    <div class="vr-badge no-print" id="vr-badge" hidden></div>
+    <!-- [화면 1] 시작 및 동의 화면 -->
+    <section id="screen-start" class="screen-section active" aria-labelledby="hero-heading">
+      <div class="hero-card">
+        <!-- 수묵화 인물 그림 30% 불투명도 워터마크 -->
+        <div class="hero-watermark" aria-hidden="true"></div>
+        <!-- 텍스트 가독성을 위한 Radial 그라데이션 스크림 -->
+        <div class="hero-scrim" aria-hidden="true"></div>
+
+        <div class="hero-content">
+          <div class="joseon-subtitle">朝鮮 水墨 觀相 硏究所 · 재미 전용</div>
+          <h1 class="hero-title" id="hero-heading">관상 연구소</h1>
+          <p class="hero-desc">
+            먹빛과 금빛으로 풀어내는 열여섯 가지 수묵 관상 이야기.<br />
+            거울 속 기운을 살피고 네 가지 물음에 답하여 오늘의 관상 교지를 받아 보시오.
+          </p>
+
+          <div class="consent-box">
+            <h3>📜 이용 전 필수 안내 및 개인정보 보호 서약</h3>
+            <ul class="consent-list">
+              <li><strong>재미 전용(FOR FUN ONLY):</strong> 본 앱의 16가지 관상 캐릭터와 풀이는 모두 고전 해학 모티프의 <strong>창작 픽션</strong>이며, 과학적·의학적 근거가 전혀 없습니다.</li>
+              <li><strong>사진·영상 무전송 원칙:</strong> 전면 카메라 영상은 오직 사용자의 기기 브라우저 안에서만 처리됩니다. 외부 서버나 AI API로 <strong>사진·영상·랜드마크 데이터를 절대 전송하거나 저장하지 않습니다.</strong></li>
+              <li><strong>카메라 없이도 이용 가능:</strong> 카메라가 없거나 권한을 허용하지 않아도 <strong>데모 모드</strong>로 모든 시각 효과와 관상 풀이를 동일하게 체험하실 수 있습니다.</li>
+            </ul>
+            <label class="consent-check-label" for="chk-consent">
+              <input type="checkbox" id="chk-consent" checked />
+              <span>위 안내(재미 전용 픽션 및 영상 무전송 원칙)를 확인하였으며 이에 동의합니다.</span>
+            </label>
+          </div>
+
+          <div class="cta-group">
+            <button type="button" class="btn-gold" id="btn-start-camera">
+              <span>📷</span>
+              <span>카메라로 관상 촬영 시작</span>
+            </button>
+            <button type="button" class="btn-ink" id="btn-start-demo">
+              <span>🎨</span>
+              <span>카메라 없이 데모 체험</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- [화면 2] 카메라 촬영 / 데모 시각 효과 화면 -->
+    <section id="screen-camera" class="screen-section" aria-labelledby="camera-heading">
+      <div class="panel-card">
+        <div class="section-header">
+          <h2 id="camera-heading">수묵 기운 스캔 및 관상 갈무리</h2>
+          <p>열화상·랜드마크·인물·3D·줌 효과를 조합해 기운을 살핀 뒤 다음 단계로 이동하시오.</p>
+        </div>
+
+        <div class="privacy-guard-banner">
+          🔒 <strong>안심 기기 내 처리 중:</strong> 현재 화면의 영상과 랜드마크는 기기 메모리 밖으로 절대 나가지 않으며, 사진은 어디에도 저장·전송되지 않습니다.
+        </div>
+
+        <div class="camera-stage-wrapper">
+          <video id="camera-video" playsinline webkit-playsinline muted></video>
+          <canvas id="camera-canvas" width="800" height="600"></canvas>
+          <div class="camera-hud-top">
+            <span class="hud-tag" id="hud-mode-badge">데모 수묵화 모드</span>
+            <span class="hud-tag" id="hud-crop-badge">Cover-Crop 비율 무왜곡 매핑</span>
+          </div>
+        </div>
+
+        <!-- 시각 효과 토글 버튼 (열화상 / 랜드마크 / 인물 / 3D) -->
+        <div class="effects-toolbar" role="group" aria-label="캔버스 시각 효과 선택">
+          <button type="button" class="effect-chip active" data-effect="portrait" id="eff-portrait">
+            🖌️ 인물 (수묵 윤곽)
+          </button>
+          <button type="button" class="effect-chip" data-effect="thermal" id="eff-thermal">
+            🔥 열화상 (기운 온도)
+          </button>
+          <button type="button" class="effect-chip active" data-effect="landmarks" id="eff-landmarks">
+            ✨ 랜드마크 (삼정·혈점)
+          </button>
+          <button type="button" class="effect-chip" data-effect="mesh3d" id="eff-mesh3d">
+            🌐 3D (입체 골격망)
+          </button>
+        </div>
+
+        <!-- 줌 컨트롤 (Cover-Crop 통합 매핑) -->
+        <div class="zoom-control-bar">
+          <label for="zoom-slider">🔍 줌 배율 (<span id="zoom-val-label">1.0x</span>)</label>
+          <input type="range" id="zoom-slider" min="1.0" max="2.2" step="0.1" value="1.0" />
+          <button type="button" class="zoom-preset-btn active" data-zoom="1.0">1.0x</button>
+          <button type="button" class="zoom-preset-btn" data-zoom="1.4">1.4x</button>
+          <button type="button" class="zoom-preset-btn" data-zoom="1.8">1.8x</button>
+        </div>
+
+        <div class="cta-group">
+          <button type="button" class="btn-gold" id="btn-capture-next">
+            <span>📜</span>
+            <span>기운 갈무리 완료 → 4문답 이동</span>
+          </button>
+          <button type="button" class="btn-ink" id="btn-toggle-cam-demo">
+            <span>🔄</span>
+            <span id="toggle-cam-demo-label">데모 모드로 전환</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- [화면 3] 4개 객관식 질문 화면 -->
+    <section id="screen-questions" class="screen-section" aria-labelledby="questions-heading">
+      <div class="panel-card">
+        <div class="section-header">
+          <h2 id="questions-heading">성정(性情) 네 가지 문답</h2>
+          <p>네 가지 질문에 답하면 답변 조합으로 16가지 관상 캐릭터 중 그대의 상(相)을 찾아냅니다.</p>
+        </div>
+
+        <div class="questions-grid" id="questions-container">
+          <!-- JS로 4개 질문 렌더링 -->
+        </div>
+
+        <div class="cta-group">
+          <button type="button" class="btn-gold" id="btn-submit-answers">
+            <span>✨</span>
+            <span>답변 조합으로 관상 결과 보기</span>
+          </button>
+          <button type="button" class="btn-ink" id="btn-random-pick">
+            <span>🎲</span>
+            <span>운명에 맡기기 (16관상 중 랜덤 뽑기)</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- [화면 4] 관상 결과 리딩 화면 -->
+    <section id="screen-result" class="screen-section" aria-labelledby="result-char-name">
+      <div class="fiction-disclaimer-bar">
+        ※ <strong>재미 전용(FOR FUN ONLY) 알림:</strong> 아래 관상 풀이는 창작 픽션이며 과학적 근거가 전혀 없습니다. 촬영 영상이나 사진은 어디에도 저장·전송되지 않았습니다.
+      </div>
+
+      <!-- 상단 캐릭터/타자 제어 바 -->
+      <div class="result-controls-row no-print">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <label for="select-character" style="font-size:0.86rem; color:var(--gold-bright);">16관상 도감:</label>
+          <select id="select-character" class="char-select" aria-label="16가지 관상 캐릭터 선택"></select>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap;">
+          <button type="button" class="btn-header" id="btn-skip-typing">⏩ 타자 즉시 완성</button>
+          <button type="button" class="btn-header" id="btn-replay-typing">🔄 타자 다시 재생</button>
+          <button type="button" class="btn-header" id="btn-reroll-random">🎲 랜덤 다시 뽑기</button>
+        </div>
+      </div>
+
+      <!-- 관상 교지 두루마리 본문 -->
+      <article class="result-scroll-paper" id="printable-reading-area">
+        <div class="character-header">
+          <span class="character-code-badge" id="result-char-code">제1상 · 乾乾 (건건)</span>
+          <h2 class="character-name" id="result-char-name">청산백학상 (靑山白鶴相)</h2>
+          <p class="character-subtitle" id="result-char-title">구름 위를 노니는 고고한 학의 기품을 지닌 선비상</p>
+        </div>
+
+        <!-- 1. 총평 (20px) -->
+        <div class="reading-section">
+          <div class="reading-label">◈ 총평 (總評 · 20px)</div>
+          <p class="reading-overview-text" id="reading-overview"></p>
+        </div>
+
+        <!-- 2. 항목별 리딩 (16px) -->
+        <div class="reading-section">
+          <div class="reading-label">◈ 항목별 리딩 (三停 · 재물 · 관록 · 인연 · 16px)</div>
+          <p class="reading-body-text" id="reading-items"></p>
+        </div>
+
+        <!-- 3. 조언 (16px) -->
+        <div class="reading-section">
+          <div class="reading-label">◈ 처세 조언 (處世 助言 · 16px)</div>
+          <p class="reading-body-text" id="reading-advice"></p>
+        </div>
+
+        <!-- 4. 희망 메시지 (16px) -->
+        <div class="reading-section" style="margin-bottom:0;">
+          <div class="reading-label">◈ 희망 메시지 (祝願 德談 · 16px)</div>
+          <p class="reading-body-text" id="reading-hope"></p>
+        </div>
+      </article>
+
+      <!-- 내보내기 4종 버튼 (무사진 원칙) -->
+      <div class="export-grid no-print" role="group" aria-label="결과 내보내기 메뉴">
+        <button type="button" class="btn-ink" id="btn-export-copy">
+          <span>📋</span>
+          <span>결과 텍스트 복사</span>
+        </button>
+        <button type="button" class="btn-ink" id="btn-export-print">
+          <span>🖨️</span>
+          <span>출력 · PDF 저장</span>
+        </button>
+        <button type="button" class="btn-ink" id="btn-export-share">
+          <span>📤</span>
+          <span>공유하기 (텍스트)</span>
+        </button>
+        <button type="button" class="btn-ink" id="btn-export-mailto">
+          <span>✉️</span>
+          <span>내 메일로 보내기</span>
+        </button>
+      </div>
+
+      <!-- 제미나이(Gemini) 앱 연동 패널 -->
+      <div class="gemini-card no-print">
+        <div class="gemini-header">
+          <h3>✨ 제미나이(Gemini) 앱으로 AI 심층 관상 리딩 이용하기</h3>
+          <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+            <button type="button" class="btn-header" id="btn-open-gemini-app-guide">
+              <span>📱</span>
+              <span>제미나이 앱 이용 4단계 안내</span>
+            </button>
+            <button type="button" class="btn-header" id="btn-open-help-modal">
+              <span>❓</span>
+              <span>키 발급 방법 (4단계 큰 글씨 도움말)</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="gemini-notice-list">
+          • <strong>API 키 없이 제미나이(Gemini) 앱 바로 이용:</strong> 별도의 키 발급 없이 내 관상 캐릭터와 4문답 결과가 담긴 <strong>맞춤형 프롬프트를 자동 복사하여 제미나이 앱(<code>gemini.google.com/app</code>)</strong>에서 바로 AI 심층 리딩을 받을 수 있습니다.<br />
+          • <strong>철저한 무사진(텍스트 전용) 원칙:</strong> 제미나이 앱으로 전달되는 프롬프트에는 <strong>얼굴 사진·영상·랜드마크가 절대 포함되지 않으며</strong> 오직 관상 캐릭터명과 문답 텍스트만 담깁니다.<br />
+          • <strong>답변 교지 적용 지원:</strong> 제미나이 앱에서 받은 답변을 아래 입력칸에 붙여넣으면 이 화면의 한지 두루마리(타자 효과음 · 인쇄/PDF 저장)에 그대로 반영됩니다.
+        </div>
+
+        <!-- 1) 제미나이 앱 프롬프트 자동 생성 및 실행 -->
+        <div class="gemini-app-box">
+          <label class="gemini-sub-label" for="input-user-topic">1. 제미나이 앱에 함께 물어볼 고민·관심사 키워드 (선택)</label>
+          <div class="api-input-group" style="margin-bottom:0.65rem;">
+            <input
+              type="text"
+              id="input-user-topic"
+              class="api-input"
+              placeholder="(선택) 요즘 궁금한 고민이나 키워드 입력 (예: 이직, 재물, 연애, 학업, 건강)"
+              maxlength="80"
+              aria-label="추가 고민 키워드 입력"
+            />
+          </div>
+
+          <label class="gemini-sub-label" for="gemini-app-prompt-preview">2. 제미나이 앱 전달용 자동 완성 프롬프트 (텍스트 전용 · 사진 미포함)</label>
+          <textarea
+            id="gemini-app-prompt-preview"
+            class="gemini-prompt-textarea"
+            rows="5"
+            aria-label="제미나이 앱에 붙여넣을 관상 리딩 프롬프트"
+          ></textarea>
+
+          <div class="cta-group" style="justify-content:flex-start;">
+            <button type="button" class="btn-gold" id="btn-open-gemini-app">
+              <span>🚀</span>
+              <span>프롬프트 복사 후 제미나이(Gemini) 앱 열기</span>
+            </button>
+            <button type="button" class="btn-ink" id="btn-copy-gemini-prompt">
+              <span>📋</span>
+              <span>프롬프트만 복사하기</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2) 제미나이 앱 답변을 붙여넣어 관상 교지(타이핑 효과 & PDF 인쇄)로 반영 -->
+        <div class="gemini-app-box" style="margin-bottom:0.4rem;">
+          <label class="gemini-sub-label" for="input-gemini-response">3. (선택) 제미나이 앱에서 받은 답변을 붙여넣어 관상 교지로 출력하기</label>
+          <textarea
+            id="input-gemini-response"
+            class="gemini-prompt-textarea"
+            rows="4"
+            placeholder="제미나이 앱이 작성해 준 관상 풀이 텍스트를 여기에 붙여넣고 아래 버튼을 누르면, 위쪽 한지 교지에 타자 효과음과 함께 적용되어 PDF 인쇄·공유를 하실 수 있습니다."
+            aria-label="제미나이 앱 답변 붙여넣기 입력창"
+          ></textarea>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button type="button" class="btn-ink" id="btn-apply-gemini-response">
+              <span>📜</span>
+              <span>제미나이 답변을 관상 교지에 적용 (타자 효과 재생)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3) 고급 옵션: 기존 API 키 페이지 내 직접 호출 기능도 접이식으로 보존 -->
+        <details class="gemini-advanced-details" hidden style="display:none">
+          <summary>⚙️ 고급 설정: Google AI Studio API 키로 페이지 안에서 직접 생성하기 (선택)</summary>
+          <div style="margin-top:0.65rem;">
+            <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem;">
+              API 키는 페이지 메모리에만 보관되며 <code>x-goog-api-key</code> 헤더와 <code>ListModels</code> 확인(<code>gemini-3.8-flash</code> → <code>3.6</code> → <code>3.5-flash-lite</code> 순차 대체 및 1회 재시도)으로 동작합니다.
+            </p>
+            <div class="api-input-group" style="margin-bottom:0;">
+              <input
+                type="password"
+                id="input-gemini-key"
+                class="api-input"
+                placeholder="Google AI Studio API 키 입력 (AIza...)"
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Google AI Studio API 키 입력"
+              />
+              <button type="button" class="btn-gold" id="btn-run-gemini">
+                <span>🔮</span>
+                <span>AI 리딩 생성</span>
+              </button>
+            </div>
+          </div>
+        </details>
+
+        <div class="gemini-status-box" id="gemini-status-box" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="cta-group no-print">
+        <button type="button" class="btn-ink" id="btn-back-questions">
+          <span>⬅️</span>
+          <span>문답 다시 선택하기</span>
+        </button>
+        <button type="button" class="btn-ink" id="btn-restart-all">
+          <span>🏠</span>
+          <span>처음 화면으로 돌아가기</span>
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer no-print">
+    <p>관상 연구소 (觀相 硏究所) · FOR FUN ONLY · 모든 결과는 과학적 근거가 없는 창작 픽션이며 사진·영상은 기기 외부로 전송되지 않습니다.</p>
+    <div style="margin-top:0.6rem;">
+      <button type="button" class="btn-header" id="btn-open-og-modal" style="font-size:0.75rem;">
+        🖼️ SNS 공유용 OG 미리보기 이미지 (1200×630) 확인·저장
+      </button>
+    </div>
+  </footer>
+
+  <!-- [모달 1] 제미나이(Gemini) 앱 이용 방법 & API 키 4단계 큰 글씨 도움말 모달 -->
+  <div class="modal-backdrop" id="modal-api-help" role="dialog" aria-modal="true" aria-labelledby="modal-help-title">
+    <div class="modal-content">
+      <h2 class="modal-title" id="modal-help-title">✨ 제미나이(Gemini) 앱으로 AI 관상 리딩 이용 방법 (4단계 안내)</h2>
+      <p style="font-size:17px; color:var(--text-secondary); margin-bottom:1rem;">
+        별도의 API 키 발급 없이 평소 쓰시는 <strong>제미나이(Gemini) 앱 또는 웹(gemini.google.com/app)</strong>으로 바로 심층 관상 리딩을 받아 보실 수 있습니다.
+      </p>
+
+      <div class="help-step-card">
+        <div class="help-step-title">1단계: 프롬프트 복사 후 제미나이 앱 열기</div>
+        <div class="help-step-desc">
+          결과 화면에서 고민 키워드를 적은 뒤 <strong>[🚀 프롬프트 복사 후 제미나이(Gemini) 앱 열기]</strong> 버튼을 누르면 내 관상 캐릭터와 4문답 내용이 자동 복사되며 제미나이 앱이 열립니다.
+        </div>
+      </div>
+
+      <div class="help-step-card">
+        <div class="help-step-title">2단계: 제미나이 앱 로그인</div>
+        <div class="help-step-desc">
+          열리는 <strong>제미나이 앱(또는 gemini.google.com 웹페이지)</strong>에서 평소 사용하시는 Google 계정으로 로그인합니다.
+        </div>
+      </div>
+
+      <div class="help-step-card">
+        <div class="help-step-title">3단계: 채팅창에 붙여넣기 후 전송</div>
+        <div class="help-step-desc">
+          제미나이 대화 입력창을 길게 누르거나 <strong>붙여넣기(Ctrl+V / ⌘+V)</strong>를 하여 복사된 관상 질문을 입력하고 전송합니다.
+        </div>
+      </div>
+
+      <div class="help-step-card">
+        <div class="help-step-title">4단계: 답변 감상 및 한지 교지 적용</div>
+        <div class="help-step-desc">
+          제미나이 앱에서 바로 읽으시거나, 답변을 복사해 관상 연구소의 <strong>[3. 제미나이 답변 붙여넣기]</strong> 칸에 넣고 적용하면 타자 효과음과 함께 PDF 인쇄·저장을 하실 수 있습니다.
+        </div>
+      </div>
+
+      <details class="gemini-advanced-details" hidden style="display:none">
+        <summary>🔑 (참고) 고급 설정용 Google AI Studio API 키 발급 4단계 보기</summary>
+        <div style="margin-top:0.75rem; font-size:16px; color:var(--text-secondary); line-height:1.65;">
+          1단계: <strong>aistudio.google.com</strong> 접속 → 2단계: <strong>Google 계정 로그인</strong> → 3단계: <strong>Get API key / Create API key</strong>로 키 만들기 → 4단계: 고급 설정 입력창에 <strong>붙여넣기</strong> 후 생성.
+        </div>
+      </details>
+
+      <div style="text-align:right; margin-top:1.2rem;">
+        <button type="button" class="btn-gold" id="btn-close-help-modal">확인 및 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [모달 2] 1200x630 실제 첫 진입 화면 OG 캡처 미리보기 & 다운로드 모달 -->
+  <div class="modal-backdrop" id="modal-og-preview" role="dialog" aria-modal="true" aria-labelledby="modal-og-title">
+    <div class="modal-content">
+      <h2 class="modal-title" id="modal-og-title">🖼️ SNS 공유 미리보기 (OG 1200×630) 캡처</h2>
+      <p style="font-size:0.92rem; color:var(--text-secondary); margin-bottom:0.9rem;">
+        실제 첫 진입 화면(조선 수묵화 20% 워터마크 + radial 스크림 + 금빛 서체)을 1200×630 정식 규격으로 렌더링한 OG 이미지입니다. 정적 배포 시 <code>og-preview-1200x630.png</code>로 바로 사용할 수 있습니다.
+      </p>
+      <div style="border:1px solid var(--gold-border); border-radius:8px; overflow:hidden; margin-bottom:1rem;">
+        <canvas id="og-canvas" width="1200" height="630" style="width:100%; height:auto; display:block;"></canvas>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.6rem; flex-wrap:wrap;">
+        <button type="button" class="btn-gold" id="btn-download-og">1200×630 PNG 다운로드</button>
+        <button type="button" class="btn-ink" id="btn-close-og-modal">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 -->
+  <div class="toast-container" id="toast-msg" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      /* =========================================================================
+       * 1. 상태 관리 (API 키는 오직 페이지 메모리에만 보관, 스토리지 미사용)
+       * ========================================================================= */
+      let inMemoryApiKey = "";
+      let currentScreen = "start";
+      let soundEnabled = true;
+      let audioCtx = null;
+
+      // 카메라 및 캔버스 상태
+      let mediaStream = null;
+      let isCameraActive = false;
+      let animFrameId = null;
+      let zoomLevel = 1.0;
+      const activeEffects = {
+        portrait: true,
+        thermal: false,
+        landmarks: true,
+        mesh3d: false
+      };
+
+      // 워터마크/데모용 수묵화 이미지 로드
+      const demoPortraitImg = new Image();
+      demoPortraitImg.src = "/img/reward/gwansang.webp";
+
+      // 4개 질문 응답 상태 (각 0 또는 1, 조합으로 0~15 인덱스 생성)
+      const userAnswers = [0, 0, 0, 0];
+      let currentCharacterIndex = 0;
+      let typingTimer = null;
+      let currentReadingData = null;
+
+      /* =========================================================================
+       * 2. WebAudio 타자 효과음 엔진 (짧은 틱 + 문장 끝 낮은 툭 소리 + 즉시 테스트음)
+       * ========================================================================= */
+      function ensureAudioContext() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return null;
+        if (!audioCtx) {
+          audioCtx = new AudioContextClass();
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume().catch(function () {});
+        }
+        return audioCtx;
+      }
+
+      // 짧은 틱(Tick) 소리: 글자 타이핑 시 재생
+      function playTickSound() {
+        if (!soundEnabled) return;
+        const ctx = ensureAudioContext();
+        if (!ctx || ctx.state !== "running") return;
+
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(820 + Math.random() * 140, now);
+        osc.frequency.exponentialRampToValueAtTime(240, now + 0.022);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.022);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.024);
+      }
+
+      // 문장 끝 낮은 툭(Thud) 소리: 마침표/줄바꿈 시 재생
+      function playThudSound() {
+        if (!soundEnabled) return;
+        const ctx = ensureAudioContext();
+        if (!ctx || ctx.state !== "running") return;
+
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(145, now);
+        osc.frequency.exponentialRampToValueAtTime(52, now + 0.095);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.1);
+      }
+
+      // 사운드 토글 클릭 시 바로 재생되는 테스트 소리 (틱-틱-툭)
+      function playToggleTestSound() {
+        const ctx = ensureAudioContext();
+        if (!ctx) return;
+        playTickSound();
+        setTimeout(function () { playTickSound(); }, 90);
+        setTimeout(function () { playThudSound(); }, 190);
+      }
+
+      /* =========================================================================
+       * 3. 4개의 객관식 질문 데이터 & 16가지 관상 캐릭터 데이터
+       * ========================================================================= */
+      const QUESTIONS = [
+        {
+          id: 0,
+          title: "제1문 [천정·초년운] — 낯선 산길의 갈림길에 섰을 때 그대의 첫걸음은 어떠합니까?",
+          options: [
+            { bit: 0, label: "높은 봉우리에 먼저 올라 전체 지세와 흐름을 굽어살핀다 (통찰·원대함)" },
+            { bit: 1, label: "발아래 또렷한 물길과 나뭇가지를 살피며 착실히 길을 연다 (실리·추진력)" }
+          ]
+        },
+        {
+          id: 1,
+          title: "제2문 [인당·중년운] — 중요한 결단을 앞두고 마음이 흔들릴 때 무엇을 따릅니까?",
+          options: [
+            { bit: 0, label: "오랜 원칙과 대의명분, 스스로 세운 신념의 기둥을 지킨다 (절개·강직함)" },
+            { bit: 1, label: "함께하는 사람들의 화합과 시대의 유연한 변화를 품는다 (포용·유연함)" }
+          ]
+        },
+        {
+          id: 2,
+          title: "제3문 [준두·재백궁] — 곳간에 귀한 재물과 성취가 쌓였을 때 그대의 뜻은 어디에 있습니까?",
+          options: [
+            { bit: 0, label: "깊은 뿌리처럼 내실을 다져 가문과 터전을 든든히 지킨다 (수성·축적)" },
+            { bit: 1, label: "넓은 강물처럼 세상에 흘려보내 새로운 기회와 인연을 만든다 (개척·베풂)" }
+          ]
+        },
+        {
+          id: 3,
+          title: "제4문 [지각·말년운] — 세월이 흘러 황혼에 이르렀을 때 어떤 풍경 속에 머물고 싶습니까?",
+          options: [
+            { bit: 0, label: "고즈넉한 서재와 솔바람 속에서 학문과 예술의 향기를 남긴다 (청류·여유)" },
+            { bit: 1, label: "북적이는 사랑채에서 후학·벗들과 웃음꽃을 피우며 덕을 나눈다 (번영·다복)" }
+          ]
+        }
+      ];
+
+      const CHARACTERS = [
+        {
+          code: "제1상 · 0000",
+          name: "청산백학상 (靑山白鶴相)",
+          subtitle: "푸른 산 너머 구름을 벗 삼는 고고한 백학의 선비상",
+          overview: "이마(천정)가 맑고 눈매에 깊은 총기가 서려 있으니, 세속의 소란에 휩쓸리지 않고 자신만의 높은 이상을 지켜내는 백학의 형상입니다. 서두르지 않아도 때가 되면 저절로 귀인의 추대를 받는 기품이 흐릅니다.",
+          items: "• 삼정(초·중·말년): 초년에는 학문과 기예를 갈고닦으며, 중년 이후 명성이 사방에 퍼져 말년까지 평안함이 이어집니다.\n• 재물운(재백궁): 일확천금보다 명예와 함께 따라오는 정직하고 단단한 녹봉이 곳간을 채웁니다.\n• 관록·성취운: 깊이 파고드는 전문성과 청렴함으로 조직이나 학계의 어른으로 자리매김합니다.\n• 대인·인연운: 가벼운 인연보다 평생을 함께할 지음(知音) 서넛이 큰 힘이 됩니다.",
+          advice: "때로는 지나친 완벽주의가 스스로를 피로하게 할 수 있으니, 작은 허물은 웃어넘기는 여백의 미를 두면 복록이 배가됩니다.",
+          hope: "그대가 걸어온 반듯한 발자국이 곧 누군가의 이정표가 됩니다. 구름 위를 나는 학처럼 늘 자유롭고 평안하기를 축원합니다."
+        },
+        {
+          code: "제2상 · 0001",
+          name: "송림군자상 (松林君子相)",
+          subtitle: "사철 푸른 소나무 숲처럼 사람들에게 그늘을 내어주는 군자상",
+          overview: "눈썹 사이 인당이 환하고 입꼬리(지각)가 넉넉하여, 강직한 원칙 속에서도 주변 사람을 따뜻하게 품어 안는 거목의 관상입니다. 위기일수록 흔들리지 않는 중심축이 되어 많은 이들이 그대 곁으로 모여듭니다.",
+          items: "• 삼정(초·중·말년): 초년의 성실함이 중년의 두터운 신망으로 꽃피고, 말년에는 많은 후배와 이웃의 존경을 받습니다.\n• 재물운(재백궁): 신용이 곧 큰 자산이 되어, 위기에도 마르지 않는 샘물처럼 안정된 재물 흐름을 유지합니다.\n• 관록·성취운: 책임을 회피하지 않는 태도로 중책을 맡으며 오래도록 자리를 지킵니다.\n• 대인·인연운: 약속을 천금같이 여겨 한 번 맺은 인연이 평생의 귀인으로 남습니다.",
+          advice: "남의 짐을 대신 짊어지느라 정작 자신의 휴식을 미루기 쉬우니, 먼저 자신의 심신을 돌보는 시간을 꼭 챙기십시오.",
+          hope: "눈보라 속에서도 푸르름을 잃지 않는 소나무처럼, 그대의 묵묵한 진심은 반드시 가장 따뜻한 봄날을 불러올 것입니다."
+        },
+        {
+          code: "제3상 · 0010",
+          name: "운해비룡상 (雲海飛相)",
+          subtitle: "구름 바다를 박차고 치솟아 큰 뜻을 펼치는 비룡의 상",
+          overview: "코끝(준두)에 힘이 있고 광대(관골)가 조화롭게 받쳐주니, 큰 그림을 그리고 세상의 흐름을 주도하는 비상(飛翔)의 기운이 가득합니다. 작은 연못에 머물지 않고 더 넓은 무대로 나아갈수록 빛을 발합니다.",
+          items: "• 삼정(초·중·말년): 젊은 시절부터 남다른 포부로 두각을 나타내며, 중년에 인생의 가장 큰 도약을 이룹니다.\n• 재물운(재백궁): 재물을 모으는 데 그치지 않고 적재적소에 투자하고 순환시켜 큰 결실을 맺습니다.\n• 관록·성취운: 새로운 프로젝트나 개척지에서 선구자 역할을 맡아 이름을 떨칩니다.\n• 대인·인연운: 뜻이 크고 기개가 통하는 동지들과 함께할 때 시너지가 폭발합니다.",
+          advice: "높이 날아오를수록 발아래의 작은 목소리에 귀를 기울이면, 순풍이 멈추지 않고 그대를 떠받쳐 줄 것입니다.",
+          hope: "오랫동안 품어 온 원대한 뜻이 마침내 구름을 뚫고 청천에 닿을 날이 머지않았습니다. 당당히 날개를 펼치십시오."
+        },
+        {
+          code: "제4상 · 0011",
+          name: "만경창파상 (萬頃蒼波相)",
+          subtitle: "만 갈래 물길을 모두 받아들이는 드넓은 바다의 상",
+          overview: "이마와 턱이 시원하게 열려 있고 눈빛에 막힘이 없으니, 크고 작은 사람과 재물을 가리지 않고 품어내는 대해(大海)의 기상입니다. 베푼 만큼 열 배의 복이 되어 돌아오는 선순환의 주인공입니다.",
+          items: "• 삼정(초·중·말년): 초년의 다채로운 경험이 중년의 거대한 포용력이 되어, 말년에는 풍요로운 결실로 이어집니다.\n• 재물운(재백궁): 물길이 모이듯 다양한 통로로 재물이 유입되며, 나눌수록 오히려 창고가 차오릅니다.\n• 관록·성취운: 여러 집단의 이해관계를 조율하는 리더십으로 큰 조직을 이끕니다.\n• 대인·인연운: 동서남북 어디를 가도 반기는 벗이 있어 고립될 일이 없습니다.",
+          advice: "모든 물을 다 받아들이되 간혹 탁한 기운은 걸러내는 분별력을 더한다면 평생 파도 없는 순항을 누릴 것입니다.",
+          hope: "그대의 넓은 마음은 언제나 사람들의 안식처입니다. 바다처럼 깊고 푸른 축복이 그대의 앞날에 가득하기를 바랍니다."
+        },
+        {
+          code: "제5상 · 0100",
+          name: "명월청풍상 (明月淸風相)",
+          subtitle: "밤하늘 밝은 달과 맑은 바람처럼 막힘없는 지혜의 상",
+          overview: "눈동자가 맑은 거울 같고 귓바퀴(윤곽)가 단정하니, 복잡한 세상사 속에서도 핵심을 꿰뚫어 보는 지혜와 유연한 감수성을 겸비한 관상입니다. 억지로 다투지 않고도 자연스럽게 원하는 바를 이뤄냅니다.",
+          items: "• 삼정(초·중·말년): 초년부터 총명함이 빛나며, 중년에는 지혜로운 조언자로, 말년에는 유유자적한 현자로 살아갑니다.\n• 재물운(재백궁): 무리한 욕심을 부리지 않아도 필요한 때에 꼭 맞는 재물이 따르는 복록이 있습니다.\n• 관록·성취운: 기획, 예술, 학술, 상담 등 섬세한 통찰이 필요한 분야에서 독보적인 성취를 거둡니다.\n• 대인·인연운: 부드러운 화법으로 적을 만들지 않으며 귀인이 먼저 손을 내밉니다.",
+          advice: "생각이 깊어 때로 결정을 미룰 수 있으니, 마음이 정해졌다면 바람처럼 가볍게 첫발을 내딛어 보십시오.",
+          hope: "어두운 밤길일수록 그대의 맑은 달빛 지혜가 더욱 환하게 빛납니다. 언제나 평온한 바람이 그대 곁을 감싸길 빕니다."
+        },
+        {
+          code: "제6상 · 0101",
+          name: "춘풍화기상 (春風和氣相)",
+          subtitle: "얼어붙은 땅도 녹이는 따뜻한 봄바람의 화목한 상",
+          overview: "볼과 입매에 온화한 미소가 머물고 눈꼬리(부부궁·교우궁)가 부드러우니, 그대가 머무는 자리마다 갈등이 녹아내리고 웃음꽃이 피어나는 봄바람의 형상입니다. 사람이 곧 가장 큰 재산이자 복록입니다.",
+          items: "• 삼정(초·중·말년): 초년부터 주변의 사랑을 받으며, 중년과 말년으로 갈수록 가정과 일터에 화목함이 깊어집니다.\n• 재물운(재백궁): 사람을 통해 좋은 정보와 기회가 들어오며, 안정적이고 꾸준한 가산(家産)을 일굽니다.\n• 관록·성취운: 화합과 신뢰가 중요한 자리에서 누구도 대체할 수 없는 중심인물이 됩니다.\n• 대인·인연운: 배우자, 벗, 동료 모두와 깊은 정을 나누며 평생 외로움을 모릅니다.",
+          advice: "거절을 어려워해 손해를 볼 때가 있으니, 온화한 미소 속에서도 나만의 경계선을 또렷이 세우면 더욱 좋습니다.",
+          hope: "그대가 건넨 따뜻한 말 한마디가 세상을 봄날로 만듭니다. 그대가 뿌린 다정한 씨앗들이 만발한 꽃으로 돌아오길 축원합니다."
+        },
+        {
+          code: "제7상 · 0110",
+          name: "금란지교상 (金蘭之交相)",
+          subtitle: "쇠처럼 단단하고 난초처럼 향기로운 인연을 이끄는 상",
+          overview: "눈빛에 진실함이 담겨 있고 코와 광대의 균형이 아름다우니, 사람과 사람 사이의 재능을 알아보고 연결하여 새로운 가치를 창조하는 귀인의 관상입니다. 유연한 사고와 넓은 시야가 으뜸입니다.",
+          items: "• 삼정(초·중·말년): 초년에 쌓은 다양한 인맥이 중년에 큰 사업적·사회적 성취로 연결되며 말년까지 풍요롭습니다.\n• 재물운(재백궁): 협업과 파트너십을 통해 재물이 크게 불어나는 상생의 재물운을 지녔습니다.\n• 관록·성취운: 외교, 소통, 문화, 창의적인 조직 운영에서 탁월한 수완을 발휘합니다.\n• 대인·인연운: 난초 향기처럼 은은하고 품격 있는 인연들이 사방에서 모여듭니다.",
+          advice: "주변을 챙기는 만큼 스스로의 독자적인 기술과 내공도 함께 연마하면 어떤 풍파에도 흔들리지 않습니다.",
+          hope: "진심으로 맺은 인연은 세월이 갈수록 황금보다 빛납니다. 그대의 걸음마다 좋은 사람과 기쁜 소식이 가득하기를 빕니다."
+        },
+        {
+          code: "제8상 · 0111",
+          name: "서기운집상 (瑞氣雲集相)",
+          subtitle: "상서로운 구름과 복록이 사방에서 모여드는 다복의 상",
+          overview: "얼굴 전체의 삼정(三停)이 고르고 턱(지각)이 후덕하니, 하늘의 때와 땅의 이치, 사람의 화합을 고루 얻는 천생 다복(多福)의 관상입니다. 어려운 고비를 만나도 신기하게도 귀인의 도움으로 전화위복을 이룹니다.",
+          items: "• 삼정(초·중·말년): 초년의 밝은 기운이 중년의 풍성한 활동으로 이어지고, 말년에는 자손과 주변의 축복 속에 태평합니다.\n• 재물운(재백궁): 나가는 재물보다 들어오는 복록이 더 크며, 의식주에 부족함이 없는 길상입니다.\n• 관록·성취운: 특유의 긍정적인 에너지로 침체된 조직이나 일도 다시 살려내는 힘이 있습니다.\n• 대인·인연운: 남녀노소 누구에게나 호감을 얻어 가는 곳마다 환영받습니다.",
+          advice: "순탄할 때일수록 작은 절약과 겸손을 실천하면 그 상서로운 기운이 대대손손 이어질 것입니다.",
+          hope: "상서로운 구름이 이미 그대의 머리 위에 머물고 있습니다. 오늘 품은 밝은 미소가 내일의 큰 행운을 열어줄 것입니다."
+        },
+        {
+          code: "제9상 · 1000",
+          name: "수석장인상 (水石匠人相)",
+          subtitle: "물방울이 바위를 뚫듯 한 길을 완성하는 명장의 상",
+          overview: "미간과 눈매가 치밀하고 코의 산근(山根)이 곧게 뻗어 있으니, 한 번 마음먹은 일은 끝내 최고 경지까지 끌어올리는 장인(匠人)의 관상입니다. 빈틈없는 실행력과 성실함이 그대의 가장 강력한 무기입니다.",
+          items: "• 삼정(초·중·말년): 초년에 다진 탄탄한 기본기가 중년에 독보적인 실력으로 인정받아 말년까지 흔들림이 없습니다.\n• 재물운(재백궁): 땀 흘려 일군 정직한 재물이 차곡차곡 쌓여 절대 무너지지 않는 금고를 이룹니다.\n• 관록·성취운: 기술, 연구, 실무, 전문직 등 실력으로 승부하는 분야에서 일인자의 반열에 오릅니다.\n• 대인·인연운: 말보다 행동으로 신뢰를 증명하여 진국이 같은 동료들이 곁을 지킵니다.",
+          advice: "가끔은 눈앞의 돌만 보지 말고 고개를 들어 먼 산의 풍경을 감상하며 마음의 여유를 허락해 주십시오.",
+          hope: "그대가 정성껏 다듬어 온 시간들은 결코 헛되지 않습니다. 묵묵히 걸어온 길 끝에 가장 빛나는 명작이 완성될 것입니다."
+        },
+        {
+          code: "제10상 · 1001",
+          name: "반석만고상 (盤石萬古相)",
+          subtitle: "천 년 세월에도 흔들리지 않는 너럭바위 같은 신뢰의 상",
+          overview: "하관(지각)과 법령(팔자주름 부위)이 단단히 자리 잡고 눈빛이 침착하니, 실리와 원칙을 겸비하여 가문과 공동체를 반석 위에 올려놓는 든든한 기둥의 상입니다.",
+          items: "• 삼정(초·중·말년): 초년부터 어른스러운 책임감을 보이며, 중년과 말년으로 갈수록 그 안정감이 큰 복이 됩니다.\n• 재물운(재백궁): 부동산, 기반 자산, 장기적인 저축 등 단단한 형태의 재물운이 매우 강합니다.\n• 관록·성취운: 관리, 재무, 운영, 행정 등 중심을 잡아야 하는 자리에서 최고의 역량을 발휘합니다.\n• 대인·인연운: 한결같은 태도로 주변 사람들에게 깊은 안도감과 믿음을 줍니다.",
+          advice: "익숙한 방식만 고집하기보다 때로는 새로운 시도를 작은 부분부터 받아들이면 더 큰 도약이 열립니다.",
+          hope: "비바람이 몰아쳐도 바위는 자리를 지킵니다. 그대의 든든한 하루하루가 가장 평화롭고 풍요로운 성을 쌓아 올릴 것입니다."
+        },
+        {
+          code: "제11상 · 1010",
+          name: "맹호출림상 (猛虎出林相)",
+          subtitle: "숲을 박차고 나와 거침없이 목표를 쟁취하는 호랑이의 상",
+          overview: "눈빛에 형형한 기백이 서려 있고 관골과 코가 힘차게 솟아 있으니, 기회가 보이면 주저 없이 달려들어 결과를 만들어내는 맹호의 관상입니다. 탁월한 현실 감각과 결단력이 돋보입니다.",
+          items: "• 삼정(초·중·말년): 젊은 시절부터 남다른 추진력으로 자수성가의 기틀을 잡으며 중년에 전성기를 맞이합니다.\n• 재물운(재백궁): 승부처에서 과감하게 움직여 큰 재물을 거머쥐는 역동적인 재물운을 타고났습니다.\n• 관록·성취운: 창업, 영업, 지휘, 개척 등 결단과 돌파력이 필요한 곳에서 우두머리가 됩니다.\n• 대인·인연운: 의리가 깊어 자신의 사람이라고 여긴 이는 끝까지 책임지고 이끕니다.",
+          advice: "앞만 보고 달릴 때일수록 주변의 속도를 함께 살펴 주면, 호랑이에 날개를 단 듯 천하무적이 될 것입니다.",
+          hope: "그대의 뜨거운 기개 앞에 막힌 길은 없습니다. 오늘 내딛는 힘찬 발걸음이 새로운 시대를 여는 포효가 되기를 응원합니다."
+        },
+        {
+          code: "제12상 · 1011",
+          name: "풍년만창상 (豐年滿倉相)",
+          subtitle: "가을 들녘의 황금 물결처럼 곳간과 인심이 모두 가득 차는 상",
+          overview: "코끝(준두)이 둥글고 풍성하며 입매가 반듯하니, 현실적인 수완과 넉넉한 인심을 함께 갖추어 재물과 사람을 동시에 모으는 풍년의 관상입니다. 실속 있으면서도 주변을 배부르게 하는 복이 있습니다.",
+          items: "• 삼정(초·중·말년): 초년의 부지런한 씨앗 뿌리기가 중년의 대풍(大豐)으로 이어지고 말년에는 나눔의 기쁨을 누립니다.\n• 재물운(재백궁): 상업, 금융, 유통, 가치 창출에 천부적인 감각이 있어 곳간이 마를 날이 없습니다.\n• 관록·성취운: 실질적인 성과를 만들어내고 구성원들에게 합당한 보상을 나누어 존경받습니다.\n• 대인·인연운: 잔칫집처럼 늘 사람이 모이고 유익한 정보와 기회가 오갑니다.",
+          advice: "바쁜 일상 속에서도 예술이나 자연을 벗 삼아 마음을 비우는 시간을 가지면 행복지수가 더욱 높아집니다.",
+          hope: "황금빛 들판에 불어오는 가을바람처럼, 그대의 땀방울이 가장 풍성하고 달콤한 결실로 가득 채워지기를 축원합니다."
+        },
+        {
+          code: "제13상 · 1100",
+          name: "유수청음상 (流水淸音相)",
+          subtitle: "바위를 돌아 흐르며 맑은 소리를 내는 지혜로운 시냇물의 상",
+          overview: "눈매가 총명하고 얼굴 선이 매끄러우니, 현실적인 감각과 유연한 적응력을 겸비해 어떤 환경에서도 막힘없이 길을 찾아내는 유수(流水)의 관상입니다. 실속과 평온함을 동시에 챙기는 현명함이 있습니다.",
+          items: "• 삼정(초·중·말년): 초년의 빠른 습득력이 중년의 안정된 전문성으로 자리 잡아 말년에는 여유로운 삶을 누립니다.\n• 재물운(재백궁): 세밀한 안목으로 새는 돈을 막고 알짜배기 실리를 챙기는 실속파 재물운입니다.\n• 관록·성취운: 변화가 빠른 현대 사회나 새로운 기술·트렌드 분야에서 남들보다 한발 앞서 나갑니다.\n• 대인·인연운: 상대의 마음을 편안하게 읽고 맞추어 주어 어디서나 환영받습니다.",
+          advice: "너무 물 흐르듯 양보만 하기보다 꼭 필요한 순간에는 자신의 몫과 주장을 또렷이 밝혀도 좋습니다.",
+          hope: "바위를 만나면 돌아 흐르고 마침내 큰 강에 닿는 시냇물처럼, 그대의 지혜로운 걸음은 언제나 푸른 바다에 닿을 것입니다."
+        },
+        {
+          code: "제14상 · 1101",
+          name: "화림서조상 (花林瑞鳥相)",
+          subtitle: "꽃이 만발한 숲속에서 기쁜 소식을 전하는 길조(吉鳥)의 상",
+          overview: "눈가에 생기가 넘치고 입꼬리가 자연스레 올라가 있으니, 실생활의 부지런함과 다정한 소통 능력으로 주변에 기쁨과 활력을 불어넣는 길조의 관상입니다. 일상의 작은 행복을 크게 키우는 재주가 있습니다.",
+          items: "• 삼정(초·중·말년): 초년부터 재치와 성실함으로 인정받으며, 중년과 말년 내내 웃음이 끊이지 않는 가정을 이룹니다.\n• 재물운(재백궁): 작은 종잣돈도 알뜰하고 지혜롭게 키워내어 든든한 자산을 일궈냅니다.\n• 관록·성취운: 교육, 서비스, 미디어, 디자인, 커뮤니티 등 사람의 마음을 움직이는 일에 빛이 납니다.\n• 대인·인연운: 특유의 밝은 기운 덕분에 귀인이 먼저 찾아와 손을 잡아줍니다.",
+          advice: "타인의 반응에 일희일비하지 않고 내 안의 기쁨에 집중할 때 그대의 매력은 더욱 찬란해집니다.",
+          hope: "꽃숲에 날아든 반가운 새처럼, 오늘 그대에게도 가슴 설레는 기쁜 소식과 따뜻한 행운이 찾아오기를 진심으로 빕니다."
+        },
+        {
+          code: "제15상 · 1110",
+          name: "팔방개척상 (八方開拓相)",
+          subtitle: "사통팔달 막힌 길을 뚫고 새로운 시장을 여는 개척자의 상",
+          overview: "이마의 역마(驛馬) 기운과 코의 추진력이 유연한 미소와 어우러지니, 변화무쌍한 세상의 흐름을 가장 먼저 읽고 새로운 기회를 창출하는 팔방미인 개척자의 관상입니다.",
+          items: "• 삼정(초·중·말년): 젊어서부터 넓은 세상을 무대로 활약하며, 중년에 독창적인 사업이나 업적을 이루어냅니다.\n• 재물운(재백궁): 새로운 아이디어와 네트워크를 결합해 남들이 보지 못한 블루오션에서 재물을 얻습니다.\n• 관록·성취운: 글로벌 무대, 신사업, 크리에이티브 디렉팅 등 역동적인 현장에서 진가를 발휘합니다.\n• 대인·인연운: 국경과 분야를 넘나드는 폭넓은 인맥이 그대의 가장 든든한 날개가 됩니다.",
+          advice: "새로운 일을 벌이는 재능에 끝까지 매듭을 짓는 지구력을 한 스푼 더하면 세상이 놀랄 성취를 이룹니다.",
+          hope: "길이 없는 곳에 그대가 걸어가면 그것이 곧 새로운 길이 됩니다. 두려움 없이 설레는 모험을 이어가시길 응원합니다."
+        },
+        {
+          code: "제16상 · 1111",
+          name: "천지태평상 (天地太平相)",
+          subtitle: "하늘과 땅의 조화 속에 만인의 평안과 번영을 누리는 태평성대상",
+          overview: "상정·중정·하정이 막힘없이 원만하고 눈·코·입에 여유로운 화기(和氣)가 흐르니, 실리와 포용, 나눔과 번영을 두루 갖춘 천지태평의 관상입니다. 스스로도 복을 누리고 주변까지 살찌우는 대길상입니다.",
+          items: "• 삼정(초·중·말년): 초년의 활달함이 중년의 풍요로운 성취로 이어지고, 말년에는 만인의 축복 속에 태평성대를 누립니다.\n• 재물운(재백궁): 재물이 흐르는 길목에 서 있어 베풀고 나누어도 끊임없이 복록이 채워집니다.\n• 관록·성취운: 덕망과 실력을 겸비한 리더로서 많은 사람의 신망을 한 몸에 받습니다.\n• 대인·인연운: 시절 인연마다 귀인이 되어 서로를 돕고 이끌어 주는 아름다운 동행이 이어집니다.",
+          advice: "이미 충분한 복과 역량을 지녔으니, 조급해하지 않고 지금의 여유와 감사를 지키는 것만으로도 만사가 형통합니다.",
+          hope: "그대의 얼굴에 서린 따뜻한 미소가 곧 태평성대의 시작입니다. 오늘부터 펼쳐질 모든 날들에 만복이 깃들기를 축원합니다."
+        }
+      ];
+
+      /* =========================================================================
+       * 4. UI 헬퍼 및 화면 전환
+       * ========================================================================= */
+      let toastTimeout = null;
+      function showToast(msg) {
+        const el = document.getElementById("toast-msg");
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add("show");
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(function () {
+          el.classList.remove("show");
+        }, 2800);
+      }
+
+      function switchScreen(screenName) {
+        currentScreen = screenName;
+        const map = {
+          start: { id: "screen-start", step: 1 },
+          camera: { id: "screen-camera", step: 2 },
+          questions: { id: "screen-questions", step: 3 },
+          result: { id: "screen-result", step: 4 }
+        };
+
+        Object.keys(map).forEach(function (k) {
+          const sec = document.getElementById(map[k].id);
+          if (sec) {
+            sec.classList.toggle("active", k === screenName);
+          }
+          const pill = document.getElementById("step-pill-" + map[k].step);
+          if (pill) {
+            pill.classList.remove("active", "done");
+            if (map[k].step === map[screenName].step) {
+              pill.classList.add("active");
+            } else if (map[k].step < map[screenName].step) {
+              pill.classList.add("done");
+            }
+          }
+        });
+
+        if (screenName !== "camera") {
+          stopCameraStream();
+          if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+          }
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      /* =========================================================================
+       * 5. 카메라 및 Cover-Crop 통합 매핑 캔버스 렌더링 엔진
+       * ========================================================================= */
+      const videoEl = document.getElementById("camera-video");
+      const canvasEl = document.getElementById("camera-canvas");
+      const ctx2d = canvasEl ? canvasEl.getContext("2d", { willReadFrequently: true }) : null;
+
+      // 비율 왜곡 없는 Cover-Crop 통합 매핑 계산기
+      // 비디오/데모 이미지와 랜드마크·3D 메쉬가 동일한 cover-crop + zoom 변환 행렬을 공유함
+      function computeCoverCrop(srcW, srcH, dstW, dstH, zoom) {
+        const safeSrcW = srcW || 800;
+        const safeSrcH = srcH || 600;
+        const baseScale = Math.max(dstW / safeSrcW, dstH / safeSrcH);
+        const totalScale = baseScale * (zoom || 1.0);
+
+        const cropW = dstW / totalScale;
+        const cropH = dstH / totalScale;
+        const sx = (safeSrcW - cropW) / 2;
+        const sy = (safeSrcH - cropH) / 2;
+
+        return {
+          sx: sx,
+          sy: sy,
+          sw: cropW,
+          sh: cropH,
+          scale: totalScale,
+          // 정규화된 얼굴 좌표(0~1)를 비율 왜곡 없이 캔버스 픽셀(dx, dy)로 매핑
+          normToCanvas: function (nx, ny) {
+            const srcX = nx * safeSrcW;
+            const srcY = ny * safeSrcH;
+            return {
+              x: (srcX - sx) * totalScale,
+              y: (srcY - sy) * totalScale
+            };
+          }
+        };
+      }
+
+      async function startCameraOrDemo(preferCamera) {
+        stopCameraStream();
+        isCameraActive = false;
+
+        if (preferCamera && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: "user",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            });
+            videoEl.srcObject = mediaStream;
+            await videoEl.play();
+            isCameraActive = true;
+            updateCameraHudBadges();
+            showToast("전면 카메라가 연결되었습니다. (기기 내 처리 전용)");
+          } catch (err) {
+            isCameraActive = false;
+            updateCameraHudBadges();
+            showToast("카메라 권한이 없거나 장치를 찾을 수 없어 데모 모드로 진행합니다.");
+          }
+        } else {
+          isCameraActive = false;
+          updateCameraHudBadges();
+          showToast("데모 수묵화 모드로 관상 스캔을 체험합니다.");
+        }
+
+        startCanvasLoop();
+      }
+
+      function stopCameraStream() {
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(function (track) {
+            track.stop();
+          });
+          mediaStream = null;
+        }
+        if (videoEl) {
+          videoEl.srcObject = null;
+        }
+        isCameraActive = false;
+      }
+
+      function updateCameraHudBadges() {
+        const badge = document.getElementById("hud-mode-badge");
+        const toggleLabel = document.getElementById("toggle-cam-demo-label");
+        if (badge) {
+          badge.textContent = isCameraActive ? "실시간 전면 카메라 (무전송)" : "데모 수묵화 체험 모드";
+        }
+        if (toggleLabel) {
+          toggleLabel.textContent = isCameraActive ? "데모 모드로 전환" : "실제 카메라 연결 시도";
+        }
+      }
+
+      function startCanvasLoop() {
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+
+        function renderFrame(timestamp) {
+          if (currentScreen !== "camera" || !ctx2d) return;
+
+          const rect = canvasEl.getBoundingClientRect();
+          const dstW = Math.max(320, Math.round(rect.width));
+          const dstH = Math.max(240, Math.round(rect.height));
+          if (canvasEl.width !== dstW || canvasEl.height !== dstH) {
+            canvasEl.width = dstW;
+            canvasEl.height = dstH;
+          }
+
+          const t = (timestamp || 0) * 0.001;
+          let srcW = 800;
+          let srcH = 450;
+
+          if (isCameraActive && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+            srcW = videoEl.videoWidth;
+            srcH = videoEl.videoHeight;
+          } else if (demoPortraitImg.complete && demoPortraitImg.naturalWidth > 0) {
+            srcW = demoPortraitImg.naturalWidth;
+            srcH = demoPortraitImg.naturalHeight;
+          }
+
+          const mapper = computeCoverCrop(srcW, srcH, dstW, dstH, zoomLevel);
+
+          ctx2d.save();
+          ctx2d.fillStyle = "#0b0a08";
+          ctx2d.fillRect(0, 0, dstW, dstH);
+
+          // 1) 원본 영상 또는 데모 수묵화 초상화를 Cover-Crop으로 왜곡 없이 그리기
+          if (isCameraActive && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+            // 전면 카메라 거울 반전
+            ctx2d.save();
+            ctx2d.translate(dstW, 0);
+            ctx2d.scale(-1, 1);
+            ctx2d.drawImage(videoEl, mapper.sx, mapper.sy, mapper.sw, mapper.sh, 0, 0, dstW, dstH);
+            ctx2d.restore();
+          } else if (demoPortraitImg.complete && demoPortraitImg.naturalWidth > 0) {
+            ctx2d.drawImage(demoPortraitImg, mapper.sx, mapper.sy, mapper.sw, mapper.sh, 0, 0, dstW, dstH);
+          }
+
+          // 2) 열화상(Thermal) 또는 인물(수묵 농담) 픽셀/필터 합성
+          if (activeEffects.thermal) {
+            applyThermalEffect(ctx2d, dstW, dstH);
+          } else if (activeEffects.portrait) {
+            applyInkPortraitOverlay(ctx2d, dstW, dstH, mapper, t);
+          }
+
+          // 3) 3D 입체 골격망 (3D Wireframe Mesh) — Cover-Crop 통합 좌표계 사용
+          if (activeEffects.mesh3d) {
+            draw3DFaceMesh(ctx2d, mapper, t);
+          }
+
+          // 4) 관상 랜드마크 (삼정·오관 혈점) — Cover-Crop 통합 좌표계 사용
+          if (activeEffects.landmarks) {
+            drawPhysiognomyLandmarks(ctx2d, mapper, t);
+          }
+
+          ctx2d.restore();
+          animFrameId = requestAnimationFrame(renderFrame);
+        }
+
+        animFrameId = requestAnimationFrame(renderFrame);
+      }
+
+      // 열화상 효과 (밝기 루미넌스를 조선 오행 열화상 컬러로 변환)
+      function applyThermalEffect(ctx, w, h) {
+        try {
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const d = imgData.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const lum = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+            if (lum < 0.25) {
+              const k = lum / 0.25;
+              d[i] = Math.round(15 + k * 70);
+              d[i + 1] = Math.round(10 + k * 15);
+              d[i + 2] = Math.round(55 + k * 110);
+            } else if (lum < 0.55) {
+              const k = (lum - 0.25) / 0.30;
+              d[i] = Math.round(85 + k * 145);
+              d[i + 1] = Math.round(25 + k * 35);
+              d[i + 2] = Math.round(165 - k * 120);
+            } else if (lum < 0.82) {
+              const k = (lum - 0.55) / 0.27;
+              d[i] = Math.round(230 + k * 25);
+              d[i + 1] = Math.round(60 + k * 145);
+              d[i + 2] = Math.round(45 - k * 25);
+            } else {
+              const k = (lum - 0.82) / 0.18;
+              d[i] = 255;
+              d[i + 1] = Math.round(205 + k * 50);
+              d[i + 2] = Math.round(20 + k * 210);
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+        } catch (e) {
+          // 캔버스 픽셀 접근 예외 시 무시
+        }
+      }
+
+      // 인물 수묵화 윤곽 및 삼정(三停) 비네팅 효과
+      function applyInkPortraitOverlay(ctx, w, h, mapper, t) {
+        const grad = ctx.createRadialGradient(w * 0.5, h * 0.48, Math.min(w, h) * 0.2, w * 0.5, h * 0.5, Math.max(w, h) * 0.68);
+        grad.addColorStop(0, "rgba(11, 10, 8, 0.0)");
+        grad.addColorStop(0.7, "rgba(11, 10, 8, 0.38)");
+        grad.addColorStop(1, "rgba(11, 10, 8, 0.85)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+
+        // 인물 윤곽 가이드 타원 (Cover-Crop 좌표 연동)
+        const center = mapper.normToCanvas(0.5, 0.48);
+        const rx = mapper.scale * 135;
+        const ry = mapper.scale * 175;
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(212, 175, 55, 0.42)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.ellipse(center.x, center.y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 스캔 파동선
+        const scanY = center.y + Math.sin(t * 1.6) * (ry * 0.85);
+        ctx.setLineDash([]);
+        ctx.strokeStyle = "rgba(241, 213, 118, 0.35)";
+        ctx.beginPath();
+        ctx.moveTo(center.x - rx * 1.1, scanY);
+        ctx.lineTo(center.x + rx * 1.1, scanY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 3D 입체 골격망 (3D Wireframe Mesh) — Cover-Crop 통합 매핑
+      function draw3DFaceMesh(ctx, mapper, t) {
+        ctx.save();
+        const yaw = Math.sin(t * 1.1) * 0.14;
+        const pitch = Math.cos(t * 0.8) * 0.06;
+
+        const lats = [-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75];
+        const lons = [-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75];
+
+        function project3DNode(u, v) {
+          const z = Math.sqrt(Math.max(0, 1 - u * u * 0.7 - v * v * 0.7));
+          const xRot = u * Math.cos(yaw) + z * Math.sin(yaw);
+          const yRot = v * Math.cos(pitch) - z * Math.sin(pitch);
+          const nx = 0.5 + xRot * 0.155;
+          const ny = 0.48 + yRot * 0.29;
+          return mapper.normToCanvas(nx, ny);
+        }
+
+        ctx.strokeStyle = "rgba(212, 175, 55, 0.46)";
+        ctx.lineWidth = 1;
+
+        // 가로 위도선
+        lats.forEach(function (lat) {
+          ctx.beginPath();
+          lons.forEach(function (lon, idx) {
+            const p = project3DNode(lon, lat);
+            if (idx === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          });
+          ctx.stroke();
+        });
+
+        // 세로 경도선
+        lons.forEach(function (lon) {
+          ctx.beginPath();
+          lats.forEach(function (lat, idx) {
+            const p = project3DNode(lon, lat);
+            if (idx === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          });
+          ctx.stroke();
+        });
+
+        ctx.restore();
+      }
+
+      // 관상 핵심 혈점 랜드마크 — Cover-Crop 통합 매핑
+      function drawPhysiognomyLandmarks(ctx, mapper, t) {
+        const pulse = Math.sin(t * 3.0) * 0.002;
+        const points = [
+          { name: "천정(초년)", nx: 0.50, ny: 0.27 + pulse },
+          { name: "인당(명궁)", nx: 0.50, ny: 0.37 - pulse },
+          { name: "좌태양혈", nx: 0.39, ny: 0.39 },
+          { name: "우태양혈", nx: 0.61, ny: 0.39 },
+          { name: "좌안(감찰관)", nx: 0.435, ny: 0.405 },
+          { name: "우안(감찰관)", nx: 0.565, ny: 0.405 },
+          { name: "산근", nx: 0.50, ny: 0.42 },
+          { name: "준두(재백궁)", nx: 0.50, ny: 0.51 + pulse },
+          { name: "좌관골(권세)", nx: 0.40, ny: 0.49 },
+          { name: "우관골(권세)", nx: 0.60, ny: 0.49 },
+          { name: "인중", nx: 0.50, ny: 0.57 },
+          { name: "출납관(입)", nx: 0.50, ny: 0.63 },
+          { name: "지각(말년)", nx: 0.50, ny: 0.72 - pulse }
+        ];
+
+        const mapped = points.map(function (pt) {
+          const c = mapper.normToCanvas(pt.nx, pt.ny);
+          return { name: pt.name, x: c.x, y: c.y };
+        });
+
+        ctx.save();
+        // 중심 자오선 및 대칭 연결선
+        ctx.strokeStyle = "rgba(241, 213, 118, 0.55)";
+        ctx.lineWidth = 1.2;
+        const links = [
+          [0, 1], [1, 6], [6, 7], [7, 10], [10, 11], [11, 12],
+          [2, 4], [4, 1], [1, 5], [5, 3],
+          [4, 8], [8, 7], [7, 9], [9, 5],
+          [8, 11], [9, 11], [8, 12], [9, 12]
+        ];
+        links.forEach(function (pair) {
+          const a = mapped[pair[0]];
+          const b = mapped[pair[1]];
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        });
+
+        // 각 혈점 포인트 및 명칭 렌더링
+        ctx.font = "600 11px 'Noto Serif KR', serif";
+        mapped.forEach(function (p, i) {
+          ctx.fillStyle = "#f1d576";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 3.6, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = "rgba(212, 175, 55, 0.8)";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 7 + Math.sin(t * 4 + i) * 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+
+          if (i === 0 || i === 1 || i === 7 || i === 12) {
+            ctx.fillStyle = "rgba(11, 10, 8, 0.78)";
+            ctx.fillRect(p.x + 9, p.y - 9, 68, 17);
+            ctx.fillStyle = "#f1d576";
+            ctx.fillText(p.name, p.x + 12, p.y + 3);
+          }
+        });
+        ctx.restore();
+      }
+
+      /* =========================================================================
+       * 6. 질문 렌더링 및 관상 결과 타이핑 애니메이션
+       * ========================================================================= */
+      function renderQuestions() {
+        const container = document.getElementById("questions-container");
+        if (!container) return;
+        container.innerHTML = "";
+
+        QUESTIONS.forEach(function (q, qIdx) {
+          const card = document.createElement("div");
+          card.className = "question-card";
+
+          const title = document.createElement("div");
+          title.className = "question-title";
+          title.textContent = q.title;
+          card.appendChild(title);
+
+          const grid = document.createElement("div");
+          grid.className = "options-grid";
+
+          q.options.forEach(function (opt) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "option-btn" + (userAnswers[qIdx] === opt.bit ? " selected" : "");
+            btn.innerHTML = "<span>" + (userAnswers[qIdx] === opt.bit ? "◉" : "○") + "</span><span>" + opt.label + "</span>";
+            btn.addEventListener("click", function () {
+              ensureAudioContext();
+              playTickSound();
+              userAnswers[qIdx] = opt.bit;
+              renderQuestions();
+            });
+            grid.appendChild(btn);
+          });
+
+          card.appendChild(grid);
+          container.appendChild(card);
+        });
+      }
+
+      function populateCharacterDropdown() {
+        const sel = document.getElementById("select-character");
+        if (!sel) return;
+        sel.innerHTML = "";
+        CHARACTERS.forEach(function (ch, idx) {
+          const opt = document.createElement("option");
+          opt.value = String(idx);
+          opt.textContent = ch.code.split("·")[0].trim() + " · " + ch.name;
+          sel.appendChild(opt);
+        });
+      }
+
+      function computeCharacterIndexFromAnswers() {
+        return (userAnswers[0] << 3) | (userAnswers[1] << 2) | (userAnswers[2] << 1) | userAnswers[3];
+      }
+
+      function displayCharacterResult(charIndex, customReading) {
+        currentCharacterIndex = ((charIndex % 16) + 16) % 16;
+        const baseChar = CHARACTERS[currentCharacterIndex];
+        const sel = document.getElementById("select-character");
+        if (sel) sel.value = String(currentCharacterIndex);
+
+        currentReadingData = customReading || {
+          code: baseChar.code,
+          name: baseChar.name,
+          subtitle: baseChar.subtitle,
+          overview: baseChar.overview,
+          items: baseChar.items,
+          advice: baseChar.advice,
+          hope: baseChar.hope
+        };
+
+        document.getElementById("result-char-code").textContent = currentReadingData.code;
+        document.getElementById("result-char-name").textContent = currentReadingData.name;
+        document.getElementById("result-char-title").textContent = currentReadingData.subtitle;
+
+        updateGeminiAppPromptPreview();
+        startTypewriterEffect(currentReadingData);
+      }
+
+      function startTypewriterEffect(reading) {
+        if (typingTimer) {
+          clearInterval(typingTimer);
+          typingTimer = null;
+        }
+
+        const elOverview = document.getElementById("reading-overview");
+        const elItems = document.getElementById("reading-items");
+        const elAdvice = document.getElementById("reading-advice");
+        const elHope = document.getElementById("reading-hope");
+
+        const targets = [
+          { el: elOverview, text: reading.overview },
+          { el: elItems, text: reading.items },
+          { el: elAdvice, text: reading.advice },
+          { el: elHope, text: reading.hope }
+        ];
+
+        targets.forEach(function (t) {
+          if (t.el) {
+            t.el.textContent = "";
+            t.el.classList.remove("typing-cursor");
+          }
+        });
+
+        let secIdx = 0;
+        let charIdx = 0;
+        if (targets[0].el) targets[0].el.classList.add("typing-cursor");
+
+        typingTimer = setInterval(function () {
+          if (secIdx >= targets.length) {
+            clearInterval(typingTimer);
+            typingTimer = null;
+            playThudSound();
+            return;
+          }
+
+          const curr = targets[secIdx];
+          if (charIdx < curr.text.length) {
+            const ch = curr.text.charAt(charIdx);
+            curr.el.textContent += ch;
+            charIdx++;
+
+            // 문장 끝 또는 줄바꿈에서는 낮은 툭(Thud) 소리, 일반 글자에서는 짧은 틱(Tick) 소리
+            if (ch === "." || ch === "!" || ch === "?" || ch === "。" || ch === "\n") {
+              playThudSound();
+            } else if (charIdx % 2 === 1 && ch !== " ") {
+              playTickSound();
+            }
+          } else {
+            curr.el.classList.remove("typing-cursor");
+            playThudSound();
+            secIdx++;
+            charIdx = 0;
+            if (secIdx < targets.length && targets[secIdx].el) {
+              targets[secIdx].el.classList.add("typing-cursor");
+            }
+          }
+        }, 22);
+      }
+
+      function finishTypingImmediately() {
+        if (typingTimer) {
+          clearInterval(typingTimer);
+          typingTimer = null;
+        }
+        if (!currentReadingData) return;
+
+        const map = [
+          { id: "reading-overview", text: currentReadingData.overview },
+          { id: "reading-items", text: currentReadingData.items },
+          { id: "reading-advice", text: currentReadingData.advice },
+          { id: "reading-hope", text: currentReadingData.hope }
+        ];
+        map.forEach(function (m) {
+          const el = document.getElementById(m.id);
+          if (el) {
+            el.textContent = m.text;
+            el.classList.remove("typing-cursor");
+          }
+        });
+        playThudSound();
+      }
+
+      /* =========================================================================
+       * 7. Gemini API 연동 (x-goog-api-key 헤더, ListModels 확인, 3.8 -> 3.6 -> 3.5-flash-lite, 1회 자동 재시도)
+       * ========================================================================= */
+      async function fetchWithAutoRetry(url, options, maxRetries) {
+        let attempt = 0;
+        const limit = typeof maxRetries === "number" ? maxRetries : 1;
+        while (true) {
+          try {
+            const res = await fetch(url, options);
+            if (!res.ok && res.status >= 500 && attempt < limit) {
+              attempt++;
+              continue;
+            }
+            return res;
+          } catch (networkErr) {
+            if (attempt < limit) {
+              attempt++;
+              await new Promise(function (r) { setTimeout(r, 450); });
+              continue;
+            }
+            throw networkErr;
+          }
+        }
+      }
+
+      async function resolveGeminiModels(apiKey) {
+        // 기본 우선순위: gemini-3.8-flash -> gemini-3.6 -> gemini-3.5-flash-lite
+        const preferredOrder = [
+          "gemini-3.8-flash",
+          "gemini-3.6-flash",
+          "gemini-3.6",
+          "gemini-3.5-flash-lite"
+        ];
+
+        const res = await fetchWithAutoRetry(
+          "https://generativelanguage.googleapis.com/v1beta/models",
+          {
+            method: "GET",
+            headers: {
+              "x-goog-api-key": apiKey
+            }
+          },
+          1
+        );
+
+        if (!res.ok) {
+          throw new Error("ListModels failed with status " + res.status);
+        }
+
+        const data = await res.json();
+        const availableNames = (data.models || [])
+          .filter(function (m) {
+            return Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.indexOf("generateContent") !== -1;
+          })
+          .map(function (m) {
+            return String(m.name || "").replace(/^models\//, "");
+          });
+
+        const candidates = [];
+        // 1) 요구사항에 지정된 우선순위 체인 추가
+        preferredOrder.forEach(function (pref) {
+          const exact = availableNames.find(function (n) { return n === pref || n.indexOf(pref) === 0; });
+          if (exact && candidates.indexOf(exact) === -1) {
+            candidates.push(exact);
+          } else if (candidates.indexOf(pref) === -1) {
+            candidates.push(pref);
+          }
+        });
+
+        // 2) ListModels에서 확인된 실제 사용 가능한 flash 계열 모델을 후순위로 보강
+        availableNames.forEach(function (name) {
+          if (name.indexOf("gemini") !== -1 && name.indexOf("flash") !== -1 && candidates.indexOf(name) === -1) {
+            candidates.push(name);
+          }
+        });
+
+        return candidates;
+      }
+
+      // 제미나이(Gemini) 앱 전달용 맞춤형 프롬프트 생성기 (텍스트 전용 · 사진 절대 미포함)
+      function buildGeminiAppPrompt() {
+        const baseChar = CHARACTERS[currentCharacterIndex] || CHARACTERS[0];
+        const topicInput = document.getElementById("input-user-topic");
+        const userTopic = topicInput && topicInput.value.trim() ? topicInput.value.trim() : "공부와 진로, 친구 관계";
+        const answerLines = QUESTIONS.map(function (q, i) {
+          return "  - " + (i + 1) + "문: " + q.options[userAnswers[i]].label;
+        }).join("\n");
+
+        return [
+          "당신은 조선 수묵화 풍의 해학적이고 지혜로운 '관상 연구소'의 대가입니다.",
+          "이 풀이는 재미 전용(FOR FUN ONLY) 창작 픽션이며, 사진 없이 아래 성정 4문답과 관상 캐릭터를 바탕으로 작성해 주세요.",
+          "읽는 사람은 수업 게임 '벡터 유적 탈출'(기하·벡터 방탈출)을 끝까지 해낸 고등학생 탐험가입니다.",
+          "외모를 평가하거나 운명을 단정하지 말고, 끈기·협력·탐구심처럼 게임에서 보여 준 태도를 칭찬하며 공부와 성장을 응원해 주세요.",
+          "풀이 곳곳에 벡터·방향·좌표 같은 수학 비유를 한두 번 재치 있게 섞어 주세요.",
+          (VR_COOKIE ? "■ 탐험 기록: " + [VR_COOKIE.name ? VR_COOKIE.name + " 탐험가" : "", VR_COOKIE.set || "", VR_COOKIE.solved != null ? "연 상자 " + VR_COOKIE.solved + "/" + VR_COOKIE.total : "", VR_COOKIE.feel ? "소감: \"" + VR_COOKIE.feel + "\"" : ""].filter(Boolean).join(" · ") : ""),
+          "",
+          "■ 나의 관상 캐릭터: " + baseChar.name + " (" + baseChar.code + ")",
+          "■ 캐릭터 별칭: " + baseChar.subtitle,
+          "■ 나의 성정 4문답 선택:",
+          answerLines,
+          "■ 요즘 나의 주된 관심사/고민 키워드: " + userTopic,
+          "",
+          "위 내용을 바탕으로 다음 4가지 항목으로 나누어 기품 있고 따뜻한 조선 시대 서첩 문체(존댓말)로 심층 관상 리딩을 작성해 주세요:",
+          "[총평]",
+          "(전체적인 기운과 성정에 대한 2~3문장의 총평)",
+          "",
+          "[항목별 리딩]",
+          "• 삼정(초·중·말년): ...",
+          "• 학업·탐구운(문창성): ...",
+          "• 성취운(벡터 유적에서 보여 준 끈기): ...",
+          "• 협력·인연운(함께 문제를 푼 친구들): ...",
+          "",
+          "[처세 조언]",
+          "(관심사 '" + userTopic + "'와 관련하여 실천할 수 있는 구체적이고 따뜻한 처세 조언)",
+          "",
+          "[희망 메시지]",
+          "(마음을 북돋아 주는 축원과 희망의 덕담)"
+        ].join("\n");
+      }
+
+      function updateGeminiAppPromptPreview() {
+        const previewEl = document.getElementById("gemini-app-prompt-preview");
+        if (!previewEl) return;
+        previewEl.value = buildGeminiAppPrompt();
+      }
+
+      function copyPromptAndOpenGeminiApp(openApp) {
+        ensureAudioContext();
+        playThudSound();
+        const previewEl = document.getElementById("gemini-app-prompt-preview");
+        const promptText = previewEl && previewEl.value.trim() ? previewEl.value.trim() : buildGeminiAppPrompt();
+        const statusBox = document.getElementById("gemini-status-box");
+
+        function afterCopy() {
+          if (openApp) {
+            if (statusBox) {
+              statusBox.style.display = "block";
+              statusBox.textContent = "맞춤형 관상 프롬프트가 클립보드에 복사되었습니다! 새 창으로 열린 제미나이(Gemini) 앱 대화창에 붙여넣기(Ctrl+V 또는 길게 눌러 붙여넣기) 하여 전송해 보세요.";
+            }
+            showToast("프롬프트 복사 완료! 제미나이 앱 대화창에 붙여넣어 주세요.");
+            window.open("https://gemini.google.com/app", "_blank", "noopener,noreferrer");
+          } else {
+            if (statusBox) {
+              statusBox.style.display = "block";
+              statusBox.textContent = "제미나이 앱용 관상 프롬프트가 클립보드에 복사되었습니다. 제미나이 앱을 열어 붙여넣기 해주세요.";
+            }
+            showToast("제미나이 프롬프트가 복사되었습니다.");
+          }
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(promptText).then(afterCopy).catch(function () {
+            fallbackCopyText(promptText);
+            afterCopy();
+          });
+        } else {
+          fallbackCopyText(promptText);
+          afterCopy();
+        }
+      }
+
+      function applyPastedGeminiResponse() {
+        ensureAudioContext();
+        const respInput = document.getElementById("input-gemini-response");
+        const statusBox = document.getElementById("gemini-status-box");
+        const raw = respInput ? respInput.value.trim() : "";
+
+        if (!raw) {
+          showToast("제미나이 앱에서 받은 답변 텍스트를 먼저 붙여넣어 주세요.");
+          if (respInput) respInput.focus();
+          return;
+        }
+
+        const baseChar = CHARACTERS[currentCharacterIndex] || CHARACTERS[0];
+        const topicInput = document.getElementById("input-user-topic");
+        const userTopic = topicInput && topicInput.value.trim() ? topicInput.value.trim() : "제미나이 앱 심층 리딩";
+
+        let overview = "";
+        let items = "";
+        let advice = "";
+        let hope = "";
+
+        // [총평], [항목별 리딩], [처세 조언], [희망 메시지] 구분자 파싱 시도
+        const secOverview = raw.match(/\[총평\]([\s\S]*?)(?=\[항목별|\[처세|\[조언|\[희망|$)/);
+        const secItems = raw.match(/\[항목별[^\]]*\]([\s\S]*?)(?=\[처세|\[조언|\[희망|$)/);
+        const secAdvice = raw.match(/\[(?:처세\s*)?조언\]([\s\S]*?)(?=\[희망|$)/);
+        const secHope = raw.match(/\[희망[^\]]*\]([\s\S]*?)$/);
+
+        if (secOverview && secOverview[1].trim()) {
+          overview = secOverview[1].trim();
+          items = secItems && secItems[1].trim() ? secItems[1].trim() : baseChar.items;
+          advice = secAdvice && secAdvice[1].trim() ? secAdvice[1].trim() : baseChar.advice;
+          hope = secHope && secHope[1].trim() ? secHope[1].trim() : baseChar.hope;
+        } else {
+          // 자유 형식 문단으로 붙여넣은 경우 문단 단위로 자연스럽게 분배
+          const paras = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+          overview = paras[0] || raw;
+          items = paras[1] || baseChar.items;
+          advice = paras[2] || baseChar.advice;
+          hope = paras.slice(3).join("\n\n") || baseChar.hope;
+        }
+
+        displayCharacterResult(currentCharacterIndex, {
+          code: baseChar.code + " · 제미나이 앱 풀이",
+          name: baseChar.name,
+          subtitle: baseChar.subtitle + " (" + userTopic + ")",
+          overview: overview,
+          items: items,
+          advice: advice,
+          hope: hope
+        });
+
+        if (statusBox) {
+          statusBox.style.display = "block";
+          statusBox.textContent = "제미나이 앱의 답변이 관상 교지에 적용되었습니다. 상단 두루마리에서 타자 효과와 인쇄·PDF 저장을 이용하실 수 있습니다.";
+        }
+        showToast("제미나이 앱 답변을 관상 교지에 반영했습니다!");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      async function runGeminiReading() {
+        return; // 학생용으로는 API 키 직접 호출을 쓰지 않는다(제미나이 앱에 프롬프트 붙여넣기만 사용)
+        ensureAudioContext();
+        const keyInput = document.getElementById("input-gemini-key");
+        const topicInput = document.getElementById("input-user-topic");
+        const statusBox = document.getElementById("gemini-status-box");
+        const runBtn = document.getElementById("btn-run-gemini");
+
+        inMemoryApiKey = keyInput ? keyInput.value.trim() : "";
+        if (!inMemoryApiKey) {
+          showToast("Google AI Studio API 키를 먼저 입력해 주세요.");
+          if (keyInput) keyInput.focus();
+          return;
+        }
+
+        const baseChar = CHARACTERS[currentCharacterIndex];
+        const userTopic = topicInput && topicInput.value.trim() ? topicInput.value.trim() : "전반적인 행운과 마음가짐";
+        const answerSummary = QUESTIONS.map(function (q, i) {
+          return (i + 1) + "문: " + q.options[userAnswers[i]].label;
+        }).join(" / ");
+
+        if (statusBox) {
+          statusBox.style.display = "block";
+          statusBox.textContent = "Google 인증(x-goog-api-key)으로 사용 가능한 모델을 확인하고 관상 풀이를 생성하고 있습니다...";
+        }
+        if (runBtn) runBtn.disabled = true;
+
+        try {
+          const modelChain = await resolveGeminiModels(inMemoryApiKey);
+          const promptText = [
+            "당신은 조선 수묵화 풍의 해학적이고 따뜻한 관상 연구소 선생입니다.",
+            "이 결과는 재미 전용(FOR FUN ONLY) 창작 픽션이며 사진 없이 텍스트 문답만으로 작성됩니다.",
+            "현재 선정된 관상 캐릭터: " + baseChar.name + " (" + baseChar.subtitle + ")",
+            "사용자의 4문답 선택: " + answerSummary,
+            "사용자의 관심 키워드: " + userTopic,
+            "반드시 아래 JSON 형식으로만 한국어로 응답하세요 (마크다운 코드블록 없이 순수 JSON):",
+            '{"overview":"2~3문장의 기품 있는 총평","items":"• 삼정(초·중·말년): ...\\n• 재물운(재백궁): ...\\n• 관록·성취운: ...\\n• 대인·인연운: ...","advice":"따뜻하고 실질적인 처세 조언 2문장","hope":"희망과 응원의 축원 메시지 2문장"}'
+          ].join("\n");
+
+          let parsedResult = null;
+          let usedModel = "";
+
+          for (let i = 0; i < modelChain.length; i++) {
+            const modelName = modelChain[i];
+            const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(modelName) + ":generateContent";
+
+            try {
+              const genRes = await fetchWithAutoRetry(
+                endpoint,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": inMemoryApiKey
+                  },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: promptText }] }],
+                    generationConfig: { temperature: 0.75 }
+                  })
+                },
+                1
+              );
+
+              if (!genRes.ok) continue;
+              const genJson = await genRes.json();
+              const rawText = (
+                genJson &&
+                genJson.candidates &&
+                genJson.candidates[0] &&
+                genJson.candidates[0].content &&
+                genJson.candidates[0].content.parts &&
+                genJson.candidates[0].content.parts[0] &&
+                genJson.candidates[0].content.parts[0].text
+              ) || "";
+
+              const cleaned = rawText.replace(/```json|```/gi, "").trim();
+              const obj = JSON.parse(cleaned);
+              if (obj && obj.overview && obj.items && obj.advice && obj.hope) {
+                parsedResult = obj;
+                usedModel = modelName;
+                break;
+              }
+            } catch (innerErr) {
+              // 다음 fallback 모델로 계속 진행
+            }
+          }
+
+          if (!parsedResult) {
+            throw new Error("All candidate models failed");
+          }
+
+          displayCharacterResult(currentCharacterIndex, {
+            code: baseChar.code + " · AI 심층 풀이",
+            name: baseChar.name,
+            subtitle: baseChar.subtitle + " (관심사: " + userTopic + ")",
+            overview: parsedResult.overview,
+            items: parsedResult.items,
+            advice: parsedResult.advice,
+            hope: parsedResult.hope
+          });
+
+          if (statusBox) {
+            statusBox.textContent = "AI 맞춤형 관상 리딩이 완성되었습니다. (사용 모델: " + usedModel + " · 텍스트 전용 무사진 전송 완료)";
+          }
+          showToast("AI 심층 관상 리딩이 생성되었습니다.");
+        } catch (err) {
+          if (statusBox) {
+            statusBox.textContent = "네트워크 상태나 API 키 설정을 확인한 후 잠시 뒤 다시 시도해 주세요. (기본 관상 리딩은 그대로 이용하실 수 있습니다.)";
+          }
+          showToast("네트워크 상태 확인 후 다시 시도해 주세요.");
+        } finally {
+          if (runBtn) runBtn.disabled = false;
+        }
+      }
+
+      /* =========================================================================
+       * 8. 내보내기 4종 (복사 / 출력·PDF / Web Share / mailto — 사진 절대 미포함)
+       * ========================================================================= */
+      function buildPlainTextReading() {
+        const d = currentReadingData || CHARACTERS[currentCharacterIndex];
+        return [
+          "========================================",
+          "[관상 연구소 (觀相 硏究所) — 재미 전용 관상 교지]",
+          "========================================",
+          "• 관상 명칭: " + d.name + " (" + d.code + ")",
+          "• 별칭: " + d.subtitle,
+          "",
+          "[1. 총평]",
+          d.overview,
+          "",
+          "[2. 항목별 리딩]",
+          d.items,
+          "",
+          "[3. 처세 조언]",
+          d.advice,
+          "",
+          "[4. 희망 메시지]",
+          d.hope,
+          "",
+          "----------------------------------------",
+          "※ 본 결과는 재미 전용(FOR FUN ONLY) 창작 픽션이며 과학적 근거가 없습니다.",
+          "※ 사진·영상은 어떤 내보내기에도 포함되지 않습니다."
+        ].join("\n");
+      }
+
+      function copyReadingText() {
+        const text = buildPlainTextReading();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            showToast("관상 결과 텍스트가 클립보드에 복사되었습니다.");
+          }).catch(function () {
+            fallbackCopyText(text);
+          });
+        } else {
+          fallbackCopyText(text);
+        }
+      }
+
+      function fallbackCopyText(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+          showToast("관상 결과 텍스트가 복사되었습니다.");
+        } catch (e) {
+          showToast("복사에 실패했습니다.");
+        }
+        document.body.removeChild(ta);
+      }
+
+      function printOrSavePdf() {
+        finishTypingImmediately();
+        window.print();
+      }
+
+      async function shareReadingText() {
+        const d = currentReadingData || CHARACTERS[currentCharacterIndex];
+        const text = buildPlainTextReading();
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: "관상 연구소 — " + d.name,
+              text: text
+            });
+            showToast("텍스트 공유 창을 열었습니다.");
+          } catch (err) {
+            if (err && err.name !== "AbortError") {
+              copyReadingText();
+            }
+          }
+        } else {
+          copyReadingText();
+          showToast("이 브라우저는 공유 API를 지원하지 않아 결과 텍스트를 복사했습니다.");
+        }
+      }
+
+      function sendReadingMailto() {
+        const d = currentReadingData || CHARACTERS[currentCharacterIndex];
+        const subject = encodeURIComponent("[관상 연구소] " + d.name + " 관상 리딩 결과 (재미 전용)");
+        const body = encodeURIComponent(buildPlainTextReading());
+        window.location.href = "mailto:?subject=" + subject + "&body=" + body;
+      }
+
+      /* =========================================================================
+       * 9. 1200x630 실제 첫 진입 화면 OG 미리보기 캔버스 합성기
+       * ========================================================================= */
+      function renderOgPreviewCanvas() {
+        const ogCanvas = document.getElementById("og-canvas");
+        if (!ogCanvas) return;
+        const c = ogCanvas.getContext("2d");
+        const W = 1200;
+        const H = 630;
+
+        // 1) 어두운 먹색 배경
+        c.fillStyle = "#0b0a08";
+        c.fillRect(0, 0, W, H);
+
+        // 2) 조선 몽타주 수묵화 얼굴 20% 불투명도 워터마크 (Cover-Crop)
+        if (demoPortraitImg.complete && demoPortraitImg.naturalWidth > 0) {
+          const m = computeCoverCrop(demoPortraitImg.naturalWidth, demoPortraitImg.naturalHeight, W, H, 1.0);
+          c.save();
+          c.globalAlpha = 0.20;
+          c.drawImage(demoPortraitImg, m.sx, m.sy, m.sw, m.sh, 0, 0, W, H);
+          c.restore();
+        }
+
+        // 3) 텍스트 가독성을 위한 Radial 그라데이션 스크림
+        const rad = c.createRadialGradient(W * 0.5, H * 0.45, 80, W * 0.5, H * 0.5, 680);
+        rad.addColorStop(0, "rgba(11, 10, 8, 0.40)");
+        rad.addColorStop(0.6, "rgba(11, 10, 8, 0.78)");
+        rad.addColorStop(1, "rgba(11, 10, 8, 0.96)");
+        c.fillStyle = rad;
+        c.fillRect(0, 0, W, H);
+
+        // 4) 금빛 외곽 테두리
+        c.strokeStyle = "rgba(212, 175, 55, 0.55)";
+        c.lineWidth = 3;
+        c.strokeRect(36, 36, W - 72, H - 72);
+
+        // 5) 시작 화면 타이포그래피 렌더링
+        c.textAlign = "center";
+        c.fillStyle = "#d4af37";
+        c.font = "600 22px 'Noto Serif KR', serif";
+        c.fillText("朝鮮 水墨 觀相 硏究所 · FOR FUN ONLY", W / 2, 185);
+
+        c.fillStyle = "#f1d576";
+        c.font = "900 74px 'Noto Serif KR', serif";
+        c.fillText("관상 연구소", W / 2, 290);
+
+        c.fillStyle = "#f2ece1";
+        c.font = "400 28px 'Noto Serif KR', serif";
+        c.fillText("먹빛과 금빛으로 풀어내는 열여섯 가지 수묵 관상 이야기", W / 2, 365);
+
+        c.fillStyle = "#c7bda8";
+        c.font = "400 22px 'Noto Serif KR', serif";
+        c.fillText("기기 내 전면 카메라 시각 효과 · 4문답 16관상 캐릭터 · 사진 무전송 보장", W / 2, 430);
+
+        // 하단 금빛 인장 배지
+        c.fillStyle = "rgba(212, 175, 55, 0.18)";
+        c.fillRect(W / 2 - 210, 480, 420, 56);
+        c.strokeStyle = "#d4af37";
+        c.lineWidth = 1.5;
+        c.strokeRect(W / 2 - 210, 480, 420, 56);
+        c.fillStyle = "#f1d576";
+        c.font = "700 22px 'Noto Serif KR', serif";
+        c.fillText("관상 촬영 및 데모 체험 시작하기", W / 2, 516);
+      }
+
+      /* =========================================================================
+       * 10. 이벤트 리스너 바인딩
+       * ========================================================================= */
+      function initEvents() {
+        renderQuestions();
+        populateCharacterDropdown();
+
+        // 홈 로고 클릭
+        document.getElementById("btn-home-logo").addEventListener("click", function () {
+          switchScreen("start");
+        });
+
+        // 사운드 토글 (사용자 제스처 안에서 AudioContext 생성/재개 + 즉시 테스트 사운드 재생)
+        document.getElementById("btn-sound-toggle").addEventListener("click", function () {
+          ensureAudioContext();
+          soundEnabled = !soundEnabled;
+          const btn = document.getElementById("btn-sound-toggle");
+          const icon = document.getElementById("sound-icon");
+          const label = document.getElementById("sound-label");
+
+          if (soundEnabled) {
+            btn.classList.add("active-sound");
+            btn.setAttribute("aria-pressed", "true");
+            icon.textContent = "🔊";
+            label.textContent = "타자음 켜짐 (테스트)";
+            playToggleTestSound();
+            showToast("타자 효과음이 켜졌습니다. (테스트 소리 재생)");
+          } else {
+            // 꺼질 때도 토글 동작 확인용 짧은 피드백 후 음소거
+            btn.classList.remove("active-sound");
+            btn.setAttribute("aria-pressed", "false");
+            icon.textContent = "🔇";
+            label.textContent = "타자음 꺼짐";
+            showToast("타자 효과음이 꺼졌습니다.");
+          }
+        });
+
+        // 동의 체크박스 연동
+        const chkConsent = document.getElementById("chk-consent");
+        const btnStartCam = document.getElementById("btn-start-camera");
+        const btnStartDemo = document.getElementById("btn-start-demo");
+        chkConsent.addEventListener("change", function () {
+          btnStartCam.disabled = !chkConsent.checked;
+          btnStartDemo.disabled = !chkConsent.checked;
+        });
+
+        // 시작 화면 -> 카메라 또는 데모 진입
+        btnStartCam.addEventListener("click", function () {
+          ensureAudioContext();
+          playTickSound();
+          switchScreen("camera");
+          startCameraOrDemo(true);
+        });
+
+        btnStartDemo.addEventListener("click", function () {
+          ensureAudioContext();
+          playTickSound();
+          switchScreen("camera");
+          startCameraOrDemo(false);
+        });
+
+        // 시각 효과 칩 토글
+        document.querySelectorAll(".effect-chip").forEach(function (chip) {
+          chip.addEventListener("click", function () {
+            ensureAudioContext();
+            playTickSound();
+            const key = chip.getAttribute("data-effect");
+            activeEffects[key] = !activeEffects[key];
+            chip.classList.toggle("active", activeEffects[key]);
+          });
+        });
+
+        // 줌 슬라이더 및 프리셋 버튼
+        const zoomSlider = document.getElementById("zoom-slider");
+        const zoomLabel = document.getElementById("zoom-val-label");
+        function setZoom(val) {
+          zoomLevel = parseFloat(val) || 1.0;
+          if (zoomSlider) zoomSlider.value = String(zoomLevel);
+          if (zoomLabel) zoomLabel.textContent = zoomLevel.toFixed(1) + "x";
+          document.querySelectorAll(".zoom-preset-btn").forEach(function (b) {
+            b.classList.toggle("active", Math.abs(parseFloat(b.getAttribute("data-zoom")) - zoomLevel) < 0.05);
+          });
+        }
+        zoomSlider.addEventListener("input", function () {
+          setZoom(zoomSlider.value);
+        });
+        document.querySelectorAll(".zoom-preset-btn").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            ensureAudioContext();
+            playTickSound();
+            setZoom(btn.getAttribute("data-zoom"));
+          });
+        });
+
+        // 카메라 <-> 데모 전환
+        document.getElementById("btn-toggle-cam-demo").addEventListener("click", function () {
+          ensureAudioContext();
+          playTickSound();
+          startCameraOrDemo(!isCameraActive);
+        });
+
+        // 촬영 완료 -> 4문답 이동
+        document.getElementById("btn-capture-next").addEventListener("click", function () {
+          ensureAudioContext();
+          playThudSound();
+          showToast("관상 기운 갈무리를 마쳤습니다. (사진·영상 미저장)");
+          switchScreen("questions");
+        });
+
+        // 4문답 조합 결과 보기
+        document.getElementById("btn-submit-answers").addEventListener("click", function () {
+          ensureAudioContext();
+          playThudSound();
+          const idx = computeCharacterIndexFromAnswers();
+          switchScreen("result");
+          displayCharacterResult(idx);
+        });
+
+        // 16관상 랜덤 뽑기
+        document.getElementById("btn-random-pick").addEventListener("click", function () {
+          ensureAudioContext();
+          playThudSound();
+          const randIdx = Math.floor(Math.random() * CHARACTERS.length);
+          switchScreen("result");
+          displayCharacterResult(randIdx);
+          showToast("운명의 주사위로 " + CHARACTERS[randIdx].name + "을(를) 뽑았습니다!");
+        });
+
+        // 결과 화면 컨트롤
+        document.getElementById("select-character").addEventListener("change", function (e) {
+          ensureAudioContext();
+          const idx = parseInt(e.target.value, 10) || 0;
+          displayCharacterResult(idx);
+        });
+
+        document.getElementById("btn-skip-typing").addEventListener("click", function () {
+          ensureAudioContext();
+          finishTypingImmediately();
+        });
+
+        document.getElementById("btn-replay-typing").addEventListener("click", function () {
+          ensureAudioContext();
+          if (currentReadingData) startTypewriterEffect(currentReadingData);
+        });
+
+        document.getElementById("btn-reroll-random").addEventListener("click", function () {
+          ensureAudioContext();
+          const randIdx = Math.floor(Math.random() * CHARACTERS.length);
+          displayCharacterResult(randIdx);
+          showToast("새로운 관상 캐릭터(" + CHARACTERS[randIdx].name + ")를 뽑았습니다.");
+        });
+
+        // 내보내기 4종
+        document.getElementById("btn-export-copy").addEventListener("click", copyReadingText);
+        document.getElementById("btn-export-print").addEventListener("click", printOrSavePdf);
+        document.getElementById("btn-export-share").addEventListener("click", shareReadingText);
+        document.getElementById("btn-export-mailto").addEventListener("click", sendReadingMailto);
+
+        // 제미나이(Gemini) 앱 연동 이벤트 및 프롬프트 실시간 업데이트
+        const topicInputEl = document.getElementById("input-user-topic");
+        if (topicInputEl) {
+          topicInputEl.addEventListener("input", updateGeminiAppPromptPreview);
+        }
+        document.getElementById("btn-open-gemini-app").addEventListener("click", function () {
+          copyPromptAndOpenGeminiApp(true);
+        });
+        document.getElementById("btn-copy-gemini-prompt").addEventListener("click", function () {
+          copyPromptAndOpenGeminiApp(false);
+        });
+        document.getElementById("btn-apply-gemini-response").addEventListener("click", applyPastedGeminiResponse);
+
+        // 고급 설정: Gemini API 직접 호출 실행
+        document.getElementById("btn-run-gemini").addEventListener("click", runGeminiReading);
+        updateGeminiAppPromptPreview();
+
+        // 이전/처음으로 이동
+        document.getElementById("btn-back-questions").addEventListener("click", function () {
+          switchScreen("questions");
+        });
+        document.getElementById("btn-restart-all").addEventListener("click", function () {
+          switchScreen("start");
+        });
+
+        // 4단계 도움말 모달 열기/닫기
+        const helpModal = document.getElementById("modal-api-help");
+        function openHelpModal() {
+          ensureAudioContext();
+          playTickSound();
+          helpModal.classList.add("open");
+        }
+        function closeHelpModal() {
+          helpModal.classList.remove("open");
+        }
+        document.getElementById("btn-open-help-top").addEventListener("click", openHelpModal);
+        document.getElementById("btn-open-help-modal").addEventListener("click", openHelpModal);
+        document.getElementById("btn-open-gemini-app-guide").addEventListener("click", openHelpModal);
+        document.getElementById("btn-close-help-modal").addEventListener("click", closeHelpModal);
+        helpModal.addEventListener("click", function (e) {
+          if (e.target === helpModal) closeHelpModal();
+        });
+
+        // OG 1200x630 미리보기 모달 열기/다운로드/닫기
+        const ogModal = document.getElementById("modal-og-preview");
+        document.getElementById("btn-open-og-modal").addEventListener("click", function () {
+          renderOgPreviewCanvas();
+          ogModal.classList.add("open");
+        });
+        document.getElementById("btn-close-og-modal").addEventListener("click", function () {
+          ogModal.classList.remove("open");
+        });
+        ogModal.addEventListener("click", function (e) {
+          if (e.target === ogModal) ogModal.classList.remove("open");
+        });
+        document.getElementById("btn-download-og").addEventListener("click", function () {
+          renderOgPreviewCanvas();
+          const ogCanvas = document.getElementById("og-canvas");
+          const link = document.createElement("a");
+          link.download = "og-preview-1200x630.png";
+          link.href = ogCanvas.toDataURL("image/png");
+          link.click();
+          showToast("1200×630 OG 미리보기 이미지를 저장했습니다.");
+        });
+      }
+
+      // 벡터 유적 탈출 완주 축하 띠
+      (function () {
+        var b = document.getElementById("vr-badge");
+        if (!b || !VR_COOKIE) return;
+        b.hidden = false;
+        b.textContent = "🏅 " + (VR_COOKIE.name ? VR_COOKIE.name + " 탐험가님, " : "") + "벡터 유적 탈출 완주를 축하해요! 쿠키 선물로 재미 삼아 관상을 받아 보세요. (사진은 이 기기 밖으로 나가지 않아요)";
+      })();
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initEvents);
+      } else {
+        initEvents();
+      }
+    })();
+  </script>
+</body>
+</html>
