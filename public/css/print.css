@@ -207,3 +207,7 @@ mjx-container {
 .fa-cols .pr-text, .fa-cols .bogi-line { font-size: 10pt; }
 .pc-fig { text-align: center; margin-top: 4px; }
 .pc-fig svg, .pc-fig img { width: 48mm; max-width: 100%; height: auto; }
+
+/* 풀이 기록·오답 정리: 2단 편집 안의 상태 줄 */
+.pr-status-line { margin: 0 0 4px; font-size: 9pt; font-weight: 700; color: #0f766e; }
+.fa-cols .pr-answer, .fa-cols .pr-hint, .fa-cols .pr-wrongs { font-size: 9.5pt; }

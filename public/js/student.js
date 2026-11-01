@@ -1668,11 +1668,18 @@ function printReview(all = false) {
     if (!need) return "";
     const d = m?.diff ?? S.diff ?? "mid";
     const v = p.diffs?.[d] ?? p;
+    const opts = v.answer?.options ?? [];
+    const optHtml = v.answer?.kind === "choice" ? `<p class="fa-opts">${opts.map((o) => fmt(o)).join("&emsp;")}</p>`
+      : v.answer?.kind === "multi" ? `<p class="fa-opts">${opts.map((o, k) => `(${k + 1}) ${fmt(`[${o}]`)}`).join("&emsp;")}</p>` : "";
+    const conds = (reviewConds?.[p.id]?.[d] ?? []).map((c) => `<p class="pr-text"><b>조건 ${c.label}</b> ${fmt(c.text)}</p>`).join("");
+    const fig = figureHtml(p, d);
     return `
-      <section class="pr-item">
-        <h3>${i + 1}. ${p.icon} ${p.relic} <small>${DIFF_NAME[d] ?? ""} · ${p.level}</small> <span class="pr-status">${status}${m?.timeMs ? ` · ⏱ ${durText(m.timeMs)}` : ""}</span></h3>
-        <div class="pr-text">${boxedText(v.text ?? p.text)}</div>
-        ${wrongs ? `<p class="pr-wrongs"><b>내가 낸 답:</b> ${wrongs}</p>` : ""}
+      <section class="pr-item fa-item">
+        <h3>${i + 1}. ${p.icon} ${p.relic} <small>${DIFF_NAME[d] ?? ""}</small></h3>
+        <p class="pr-status-line">${status}${m?.timeMs ? ` · ⏱ ${durText(m.timeMs)}` : ""}${m?.coopWith ? ` · 🤝 ${esc(m.coopWith)}` : ""}</p>
+        <div class="pr-text">${boxedText(v.text ?? p.text)}</div>${conds}${optHtml}
+        ${fig ? `<div class="fa-fig">${fig}</div>` : ""}
+        ${wrongs ? `<p class="pr-wrongs"><b>내가 낸 답:</b> ${esc(wrongs)}</p>` : ""}
         <p class="pr-answer"><b>정답:</b> ${fmt(reviewByDiff?.[p.id]?.[d] ?? reviewAnswers?.[p.id] ?? "탐험이 끝나면 공개돼요")}</p>
         <p class="pr-hint"><b>풀이</b>: ${fmt(v.hint ?? p.hint)}</p>
       </section>`;
@@ -1680,7 +1687,7 @@ function printReview(all = false) {
   openPrint(`
     <header class="pr-head">
       <h1>벡터 유적 탈출 · ${all ? "나의 풀이 기록" : "나의 오답 정리"}</h1>
-      <p>${S.name ?? ""} · ${new Date().toLocaleDateString("ko-KR")} · 맞힌 문제 ${PROBLEMS.filter((p) => solved(p.id)).length}/${PROBLEMS.length}</p>
+      <p>${esc(S.name ?? "")} · ${new Date().toLocaleDateString("ko-KR")} · 맞힌 문제 ${PROBLEMS.filter((p) => solved(p.id)).length}/${PROBLEMS.length}</p>
     </header>
-    ${rows || (all ? "<p>아직 푼 문제가 없어요.</p>" : "<p>틀린 문제가 없어요! 모든 문제를 한 번에 맞혔어요. 🎉</p>")}`, all ? "나의 풀이 기록" : "나의 오답 정리");
+    ${rows ? `<div class="fa-cols">${rows}</div>` : all ? "<p>아직 푼 문제가 없어요.</p>" : "<p>틀린 문제가 없어요! 모든 문제를 한 번에 맞혔어요. 🎉</p>"}`, all ? "나의 풀이 기록" : "나의 오답 정리");
 }
