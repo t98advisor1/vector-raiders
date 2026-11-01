@@ -5,24 +5,44 @@ import { settings, updateSettings, onSettings } from "./settings.js";
 
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
-const BPM = 136;
-const STEP = 60 / BPM / 4; // 16분음표
-// 진행 Am – F – C – G (한 마디씩, 4마디 반복)
-const CHORDS = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
-const ROOTS = [45, 41, 36, 43];
-const LEAD = [
-  [69, null, 72, null, 76, null, 74, 72, 71, null, 72, null, 69, null, null, null],
-  [65, null, 69, null, 72, null, 74, 72, 69, null, 67, null, 65, null, null, null],
-  [64, null, 67, null, 72, null, 71, 72, 74, null, 76, null, 72, null, null, null],
-  [71, null, 74, null, 79, null, 77, 76, 74, null, 71, null, 74, null, 76, null],
+// 기승전결: 방이 바뀔 때마다 다음 장으로 넘어간다. 탈출하면 '맺음' 장이 흐른다.
+// 각 장은 16마디이며 [본 구간 8마디 → 변주 4마디 → 쉼 2마디 → 고조 2마디]로 돌아 단조롭지 않다.
+const N = null;
+const CHAPTERS = [
+  { name: "기", bpm: 92, // 도입: 조용하고 신비롭게, 유적에 들어선다
+    chords: [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]], roots: [45, 41, 43, 40],
+    lead: [[76, N, N, N, 74, N, 72, N, 71, N, N, N, N, N, N, N], [72, N, N, N, 69, N, 67, N, 65, N, N, N, N, N, N, N],
+      [71, N, N, N, 72, N, 74, N, 67, N, N, N, N, N, N, N], [68, N, N, N, 71, N, N, N, 64, N, N, N, N, N, N, N]],
+    kick: [0], snare: [], hat: 4, bass: 8, arp: 2, pad: 0.05 },
+  { name: "승", bpm: 112, // 전개: 발걸음이 빨라진다
+    chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], roots: [45, 41, 36, 43],
+    lead: [[69, N, 72, N, 76, N, 74, 72, 71, N, 72, N, 69, N, N, N], [65, N, 69, N, 72, N, 74, 72, 69, N, 67, N, 65, N, N, N],
+      [64, N, 67, N, 72, N, 71, 72, 74, N, 76, N, 72, N, N, N], [71, N, 74, N, 79, N, 77, 76, 74, N, 71, N, 74, N, 76, N]],
+    kick: [0, 8], snare: [4, 12], hat: 2, bass: 2, arp: 1, pad: 0.03 },
+  { name: "전", bpm: 128, // 긴장: 단조가 짙어지고 엇박이 생긴다
+    chords: [[50, 53, 57], [46, 50, 53], [48, 52, 55], [52, 56, 59]], roots: [38, 34, 36, 40],
+    lead: [[74, N, 77, 74, 81, N, 79, 77, 76, N, 74, N, 72, 74, N, N], [74, N, 70, N, 77, N, 74, N, 70, 72, 74, N, 77, N, N, N],
+      [76, N, 79, 76, 84, N, 83, 81, 79, N, 76, N, 72, N, 76, N], [80, N, 76, N, 83, N, 80, N, 76, N, 74, N, 71, N, 68, N]],
+    kick: [0, 3, 8, 11], snare: [4, 12], hat: 1, bass: 1, arp: 1, pad: 0.035 },
+  { name: "결", bpm: 136, // 해결: 장조로 밝게 풀리며 제단에 다가간다
+    chords: [[48, 52, 55], [55, 59, 62], [57, 60, 64], [53, 57, 60]], roots: [36, 43, 45, 41],
+    lead: [[72, N, 76, N, 79, N, 84, N, 83, N, 79, N, 76, N, N, N], [74, N, 79, N, 83, N, 86, 84, 83, N, 79, N, 74, N, N, N],
+      [76, N, 81, N, 84, N, 83, 81, 79, N, 76, N, 72, N, N, N], [77, N, 81, N, 84, N, 86, N, 88, N, 86, N, 84, N, N, N]],
+    kick: [0, 8, 14], snare: [4, 12], hat: 1, bass: 2, arp: 1, pad: 0.03, crash: true },
+  { name: "맺음", bpm: 84, // 탈출 후: 느리고 따뜻하게 마무리
+    chords: [[48, 52, 55, 59], [53, 57, 60, 64], [45, 48, 52, 55], [55, 59, 62, 65]], roots: [36, 41, 33, 43],
+    lead: [[79, N, N, N, 76, N, N, N, 72, N, N, N, N, N, N, N], [77, N, N, N, 76, N, N, N, 72, N, N, N, N, N, N, N],
+      [76, N, N, N, 72, N, N, N, 69, N, N, N, N, N, N, N], [74, N, N, N, 71, N, 74, N, 72, N, N, N, N, N, N, N]],
+    kick: [], snare: [], hat: 0, bass: 8, arp: 2, pad: 0.06 },
 ];
+const BARS = 16; // 한 장의 길이(마디)
 const MUSIC_VOL = 0.3, DUCK_VOL = 0.1, MASTER_VOL = 0.6;
 
 class Sound {
   constructor() {
     this.ctx = null;
     this.ducked = false;
-    this.intensity = 0; // 0~3: 방이 바뀔수록 악기가 늘어난다
+    this.intensity = 0; // 0~4: 기·승·전·결·맺음 중 지금 장
     onSettings(() => this.applyVolumes());
   }
 
@@ -58,7 +78,8 @@ class Sound {
   // 🔊 버튼·M 키: 하나라도 켜져 있으면 모두 끄고, 모두 꺼져 있으면 모두 켠다.
   toggle() { const on = this.muted; updateSettings({ music: on, sfx: on }); }
   onChange(f) { onSettings(() => f(this.muted)); }
-  setIntensity(level) { this.intensity = Math.max(0, Math.min(3, level)); }
+  setIntensity(level) { if (!this.ended) this.intensity = Math.max(0, Math.min(3, level)); }
+  ending() { this.ended = true; this.intensity = 4; } // 탈출한 뒤의 맺음 음악 (방을 옮겨도 그대로)
   setDuck(on) { this.ducked = on; this.applyVolumes(); }
 
   // ---------- 기본 부품 ----------
@@ -100,6 +121,7 @@ class Sound {
   noise(t, dur, out, { type = "highpass", freq = 1000, peak = 0.3, sweep, q = 1 } = {}) {
     const src = this.ctx.createBufferSource();
     src.buffer = this.noiseBuf;
+    src.loop = true; // 1초보다 긴 소리(고조 구간)도 끊기지 않게
     const f = this.ctx.createBiquadFilter();
     f.type = type;
     f.frequency.setValueAtTime(freq, t);
@@ -116,34 +138,54 @@ class Sound {
   schedule() {
     if (!settings.music) { this.next = this.ctx.currentTime + 0.1; return; } // 꺼져 있으면 쉬었다가 다시 켤 때 이어서
     while (this.next < this.ctx.currentTime + 0.12) {
-      this.playStep(this.step, this.next);
-      this.next += STEP;
-      this.step = (this.step + 1) % 64;
+      // 장이 바뀌면 마디 첫머리에서 넘어가 박이 어긋나지 않게 한다
+      if (this.step % 16 === 0 && this.chapter !== this.intensity) {
+        if (this.chapter !== undefined) this.step = 0;
+        this.chapter = this.intensity;
+      }
+      const ch = CHAPTERS[this.chapter ?? 0];
+      this.playStep(this.step, this.next, ch);
+      this.next += 60 / ch.bpm / 4; // 16분음표, 장마다 빠르기가 다르다
+      this.step = (this.step + 1) % (BARS * 16);
     }
   }
 
-  playStep(s, t) {
-    const bar = Math.floor(s / 16), i = s % 16, lvl = this.intensity, out = this.music;
+  playStep(s, t, C) {
+    const bar = Math.floor(s / 16), i = s % 16, out = this.music, step = 60 / C.bpm / 4;
+    const k = bar % 4;
+    const part = bar < 8 ? "main" : bar < 12 ? "vary" : bar < 14 ? "rest" : "build";
+    const chord = C.chords[k], root = C.roots[k];
+    // 바탕 화음(패드): 마디 첫머리에 길게 깔아 공간감을 준다
+    if (i === 0) for (const n of chord) this.osc("triangle", midi(n), t, step * 15, out, { peak: C.pad * (part === "rest" ? 1.6 : 1), attack: step * 3, filter: 1400 });
+    if (part === "rest") { // 쉼: 북·베이스를 빼고 숨을 고른다
+      if (i === 0 || i === 8) this.osc("sine", midi(chord[2] + 24), t, step * 6, out, { peak: 0.035, attack: 0.02 });
+      return;
+    }
+    const build = part === "build", vary = part === "vary";
     // 북
-    if (i % 8 === 0 || (lvl >= 1 && (i === 11 || i === 14))) this.osc("sine", 150, t, 0.25, out, { peak: 0.9, slide: 42 });
-    if (i === 4 || i === 12) {
-      this.noise(t, 0.14, out, { freq: 1300, peak: 0.35 });
-      this.osc("triangle", 190, t, 0.08, out, { peak: 0.2 });
+    if (C.kick.includes(i) || (build && bar === 15 && i % 2 === 0)) this.osc("sine", 150, t, 0.25, out, { peak: 0.85, slide: 42 });
+    if (C.snare.includes(i) || (build && bar === 15 && i >= 8)) {
+      this.noise(t, 0.14, out, { freq: 1300, peak: build ? 0.18 + (i / 16) * 0.2 : 0.32 });
+      this.osc("triangle", 190, t, 0.08, out, { peak: 0.18 });
     }
-    if (i % 2 === 0 || lvl >= 1) this.noise(t, 0.035, out, { freq: 7500, peak: i % 4 === 2 ? 0.16 : 0.08 });
-    // 베이스: 8분음표로 밀어붙이기
-    if (i % 2 === 0) this.osc("sawtooth", midi(ROOTS[bar] + (i % 4 === 2 ? 12 : 0)), t, STEP * 1.6, out, { peak: 0.22, filter: 520, q: 6 });
-    // 아르페지오
-    const ch = CHORDS[bar];
-    this.osc("square", midi(ch[i % 3] + 12 * (Math.floor(i / 3) % 2)), t, 0.11, out, { peak: lvl >= 1 ? 0.07 : 0.045, filter: 2400 });
-    // 멜로디 (세 번째 방부터)
-    if (lvl >= 2 && LEAD[bar][i] !== null) {
-      for (const d of [-7, 7]) this.osc("sawtooth", midi(LEAD[bar][i]), t, STEP * 2.6, out, { peak: 0.06, attack: 0.01, filter: 3200, detune: d });
+    if (C.hat && i % C.hat === 0) this.noise(t, 0.035, out, { freq: 7500, peak: i % 4 === 2 ? 0.14 : 0.07 });
+    // 베이스
+    if (i % C.bass === 0) this.osc("sawtooth", midi(root + (vary && i % 4 === 2 ? 12 : 0)), t, step * Math.min(C.bass, 4) * 0.9, out, { peak: 0.2, filter: 520, q: 6 });
+    // 아르페지오: 변주 구간에서는 거꾸로 내려온다
+    if (i % C.arp === 0) {
+      const j = vary ? 2 - (i % 3) : i % 3;
+      this.osc("square", midi(chord[j] + 12 * (Math.floor(i / 3) % 2)), t, 0.11, out, { peak: 0.045, filter: 2400 });
     }
-    // 4마디 끝마다 북 채우기
-    if (bar === 3 && i >= 12) this.osc("sine", 140 - (i - 12) * 18, t, 0.18, out, { peak: 0.5, slide: 70 });
-    // 제단: 마디 첫 박에 심벌
-    if (lvl >= 3 && i === 0) this.noise(t, 1.1, out, { freq: 5000, peak: 0.12 });
+    // 멜로디: 본 구간 뒤쪽 4마디와 변주 구간(한 옥타브 위)에서만 나온다
+    const note = C.lead[k][i];
+    if (note !== null && (bar >= 4 || this.chapter >= 3) && !build) {
+      const n = note + (vary ? 12 : 0);
+      for (const d of [-7, 7]) this.osc("sawtooth", midi(n), t, step * 2.6, out, { peak: vary ? 0.04 : 0.055, attack: 0.01, filter: 3200, detune: d });
+    }
+    // 고조: 올라가는 바람 소리
+    if (build && i === 0 && bar === 14) this.noise(t, step * 32, out, { type: "bandpass", freq: 300, sweep: 6000, peak: 0.12, q: 1.5 });
+    // 결: 장 첫 마디마다 심벌
+    if (C.crash && i === 0 && bar % 4 === 0) this.noise(t, 1.1, out, { freq: 5000, peak: 0.1 });
   }
 
   // ---------- 효과음 ----------

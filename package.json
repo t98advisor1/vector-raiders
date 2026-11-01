@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "deploy": "wrangler deploy",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "vendor": "node scripts/vendor.mjs"
   },
   "devDependencies": {

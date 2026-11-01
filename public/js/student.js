@@ -3,7 +3,7 @@ const load = store;
 import { fmt, watchMath, splitBogi, bogiHtml, boxedText } from "./mathtext.js";
 import { openPrintDoc } from "./printdoc.js";
 import { LAB_LEVELS } from "./lab.js";
-import { PROBLEMS, DIFFICULTY, UNITS, loadSet, figureHtml, mountCardFigure, SET } from "./problems.js";
+import { PROBLEMS, DIFFICULTY, UNITS, loadSet, figureHtml, mountCardFigure, cardFigureHtml, SET } from "./problems.js";
 import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
 import { MATHEMATICIANS, mathematicianCard } from "./mathematicians.js";
 import { renderClassBar } from "./classbar.js";
@@ -29,6 +29,7 @@ const CLOSE_REASON = {
   4006: "선생님이 새 수업을 시작했어요. 이름을 확인하고 다시 들어와 주세요.",
   4007: "선생님이 수업에서 내보냈어요. 선생님께 문의해 주세요.",
   4008: "이 채널은 지금 사용 기간이 아니에요. 선생님께 알려 주세요.",
+  4009: "고른 팀이 가득 찼어요(8명). 다른 팀을 골라 주세요.",
 };
 
 let cid = store("vr-cid");
@@ -179,6 +180,7 @@ function showWizardStep(step) {
   if (badge && steps.includes(step)) badge.textContent = `${steps.indexOf(step) + 1}단계 / ${steps.length}`;
   sound.sfx("open");
   if (step === "launch") $("#join-name").focus();
+  if (step === "unit" && S.pendingMode === "practice") loadPracticeSets();
 
   // 단계별 제목 타자 효과 모션
   const stepEl = $(`#step-${step}`);
@@ -264,6 +266,8 @@ S.unit = store("vr-unit") || "3-1";
 if (UNITS.find((u) => u.id === S.unit)?.soon) S.unit = "3-1"; // 아직 문항 세트가 없는 단원은 3-1로
 function selectUnit(u) {
   S.unit = u;
+  S.practiceSet = null; // 기본 단원 카드를 고르면 채널 세트 선택은 푼다
+  document.querySelectorAll(".ps-item").forEach((b) => b.classList.remove("on"));
   store("vr-unit", u);
   document.querySelectorAll(".wizard-item[data-unit]").forEach((b) => {
     b.classList.toggle("on", b.dataset.unit === u);
@@ -278,6 +282,36 @@ document.querySelectorAll(".wizard-item[data-unit]").forEach((b) => {
   };
 });
 selectUnit(S.unit);
+
+// 연습 모드 세트 목록: 고른 채널의 '지금 수업 세트'와 그 채널에서 쓸 수 있는 세트(다른 교과 포함)
+S.practiceSet = store("vr-practice-set") || null;
+async function loadPracticeSets() {
+  const box = $("#practice-set-list");
+  $("#practice-ch").value = S.ch;
+  try {
+    const r = await (await fetch(`/api/practice-sets?ch=${encodeURIComponent(S.ch)}`)).json();
+    const builtin = new Set(["geo-3-1", "geo-3-2", "geo-3-3"]);
+    const list = [r.current, ...r.sets.filter((x) => x.id !== r.current?.id && (x.uploaded || !builtin.has(x.id)))].filter(Boolean);
+    box.innerHTML = list.map((x, k) => `<button type="button" class="wizard-item ps-item" data-set="${esc(x.id)}">
+      <span class="item-title">${k === 0 ? "🏫 지금 수업 세트 · " : "📄 "}${esc(x.title)}</span>
+      <span class="item-desc">${k === 0 ? `${r.ch}채널에서 선생님이 고른 세트` : x.uploaded ? "선생님이 올린 세트" : "기본 세트"}</span></button>`).join("")
+      || `<small class="muted">이 채널에 연습할 세트가 없어요.</small>`;
+    box.querySelectorAll(".ps-item").forEach((b) => {
+      b.classList.toggle("on", b.dataset.set === S.practiceSet);
+      b.onclick = () => {
+        S.practiceSet = b.dataset.set;
+        store("vr-practice-set", S.practiceSet);
+        document.querySelectorAll(".wizard-item[data-unit]").forEach((x) => x.classList.remove("on"));
+        box.querySelectorAll(".ps-item").forEach((x) => x.classList.toggle("on", x === b));
+        sound.sfx("open");
+        setTimeout(() => showWizardStep("launch"), 180);
+      };
+    });
+  } catch {
+    box.innerHTML = `<small class="muted">세트 목록을 불러오지 못했어요. 위의 기본 유적으로 연습할 수 있어요.</small>`;
+  }
+}
+$("#practice-ch").onchange = (e) => { S.ch = e.target.value; store("vr-ch", S.ch); S.practiceSet = null; loadPracticeSets(); };
 
 // 4단계 난이도 버튼 클릭
 S.diff = store("vr-diff") || "mid";
@@ -400,7 +434,7 @@ function join(name, mode) {
   S.mode = mode;
   showJoinError("");
   const query = mode === "practice" ? `?mode=practice&cid=${cid}` : `?ch=${S.ch}`;
-  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, team: S.team || undefined, unit: S.unit, diff: S.diff }), onMessage, onStatus, query);
+  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, team: S.team || undefined, unit: S.unit, diff: S.diff, setId: mode === "practice" ? S.practiceSet ?? undefined : undefined, ch: S.ch }), onMessage, onStatus, query);
 }
 
 // 연습 모드 '처음부터 다시' 뒤에는 새로고침하고 자동으로 다시 들어온다.
@@ -449,6 +483,7 @@ function onMessage(msg) {
     $("#me-chip").textContent = `👤 ${msg.name}`;
     $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : `🏫 수업 참여 · ${S.ch}채널`;
     $("#restart-btn").hidden = S.mode !== "practice";
+    $("#exit-btn").hidden = S.mode !== "class";
     if (!S.game) startWorld();
     S.game.setMe(msg.n, msg.name);
     if (msg.pos) { S.game.me.x = msg.pos.x; S.game.me.y = msg.pos.y; } // 새로고침해도 하던 자리에서
@@ -492,7 +527,10 @@ function onMessage(msg) {
     reviewByDiff = msg.byDiff ?? null;
     reviewConds = msg.conditions ?? null;
     document.querySelectorAll(".needs-answers").forEach((b) => { b.disabled = false; });
-    toast("📄 정답표를 받았어요. 결과 화면에서 형성평가 답지와 오답 정리를 인쇄할 수 있어요.", "ok");
+    if (!msg.early || iEscaped() || S.cls?.stage === "done") toast("📄 정답표를 받았어요. 결과 화면에서 형성평가 답지와 오답 정리를 인쇄할 수 있어요.", "ok");
+  } else if (msg.type === "reflectionSaved") {
+    markReward("feel");
+    toast("✍️ 소감을 선생님께 보냈어요.", "ok");
   } else if (msg.type === "error") {
     if ($("#game").hidden) showJoinError(msg.message);
     else toast(msg.message);
@@ -927,6 +965,7 @@ function announceProgress(before, now) {
   const wasDone = PROBLEMS.every((p) => before.probs[p.id]?.solved);
   if (S.mode === "class" && S.cls?.stage !== "done" && !wasDone && iEscaped()) {
     toast("🏁 모든 방을 탈출했어요! 내가 푼 문제를 PDF로 출력할 수 있어요.", "ok");
+    sound.ending();
     setTimeout(() => { closeModal(); showSummary(); }, 1800);
   }
   for (const id of Object.keys(DOORS)) {
@@ -1002,6 +1041,8 @@ window.addEventListener("keydown", (e) => {
   }
 });
 $("#sound-btn").onclick = () => sound.toggle();
+$("#exit-btn").onclick = () => showExit();
+
 $("#restart-btn").onclick = () => {
   if (confirm("연습 기록을 모두 지우고 처음부터 다시 할까요?")) S.net.send({ type: "restart" });
 };
@@ -1584,6 +1625,18 @@ function showSummary() {
           <button id="mine-btn" class="btn primary needs-answers" type="button" ${wait}>🗂️ 나의 풀이 기록</button>
           <button id="print-btn" class="btn needs-answers" type="button" ${wait}>📄 나의 오답 정리</button>
         </div>
+      </div>
+      <div class="reward-box">
+        <b>🍪 완주 선물 받기</b>
+        <small>탐험 소감을 쓰고 위의 자료 4가지(문제지·답지·풀이 기록·오답 정리)를 모두 받으면 깜짝 선물이 열려요.</small>
+        <textarea id="feel-text" maxlength="400" rows="3" placeholder="예: 협업 문제에서 친구와 조건을 나눠 풀면서 벡터의 내적이 무엇인지 알게 됐어요.">${esc(rewardState().feelText ?? "")}</textarea>
+        <button id="feel-send" class="btn" type="button">✍️ 소감 보내기</button>
+        <ul class="reward-check">${REWARD_STEPS.map(([k, t]) => `<li data-k="${k}">${t}</li>`).join("")}</ul>
+        <div id="cookie-box" class="cookie-box" hidden>
+          <p><b>🎁 쿠키 선물이 열렸어요!</b><br>끝까지 탐험한 여러분에게 드리는 작은 선물, 조선 수묵화 풍 <b>관상 연구소</b>예요.
+          재미로만 보는 놀이이고, 카메라 영상은 이 기기 밖으로 나가지 않아요. 카메라 없이 그림 모드로도 할 수 있어요.</p>
+          <a class="btn primary" href="/gwansang" target="_blank" rel="noopener">🖌️ 관상 연구소 열기</a>
+        </div>
       </div>` : ""}
     </div>`;
   const ul = document.createElement("ul");
@@ -1596,11 +1649,103 @@ function showSummary() {
   }
   $(".done", body).appendChild(ul);
   if (canPrint) {
-    $("#print-btn", body).onclick = () => printReview(false);
-    $("#mine-btn", body).onclick = () => printReview(true);
-    $("#fa-sheet-btn", body).onclick = () => printAssessment("sheet");
-    $("#fa-answer-btn", body).onclick = () => printAssessment("answer");
+    $("#print-btn", body).onclick = () => { if (printReview(false)) markReward("review"); };
+    $("#mine-btn", body).onclick = () => { if (printReview(true)) markReward("mine"); };
+    $("#fa-sheet-btn", body).onclick = () => { if (printAssessment("sheet")) markReward("sheet"); };
+    $("#fa-answer-btn", body).onclick = () => { if (printAssessment("answer")) markReward("answer"); };
+    $("#feel-send", body).onclick = () => {
+      const text = $("#feel-text", body).value.trim();
+      if (text.length < 5) return toast("소감을 다섯 글자 이상 써 주세요.");
+      saveReward({ ...rewardState(), feelText: text });
+      S.net?.send({ type: "reflection", text });
+    };
+    sound.ending(); // 탐험을 마친 뒤의 맺음 음악
+    renderReward();
   }
+}
+
+// ---------- 완주 선물(쿠키): 소감 + 형성평가 자료 4가지를 모두 받으면 관상 연구소가 열린다 ----------
+const REWARD_STEPS = [["feel", "✍️ 소감 쓰기"], ["sheet", "📝 형성평가 문제지"], ["answer", "✅ 형성평가 답지"], ["mine", "🗂️ 나의 풀이 기록"], ["review", "📄 나의 오답 정리"]];
+const rewardKey = () => `vr-reward-${S.ch}-${SET?.id ?? ""}-${S.name ?? ""}`;
+function rewardState() { try { return JSON.parse(localStorage.getItem(rewardKey()) ?? "{}") ?? {}; } catch { return {}; } }
+function saveReward(r) { try { localStorage.setItem(rewardKey(), JSON.stringify(r)); } catch {} }
+function markReward(k) {
+  const r = rewardState();
+  if (!r[k]) { r[k] = true; saveReward(r); }
+  renderReward();
+}
+function renderReward() {
+  const r = rewardState();
+  document.querySelectorAll(".reward-check li").forEach((li) => li.classList.toggle("ok", !!r[li.dataset.k]));
+  const box = $("#cookie-box");
+  if (!box) return;
+  const all = REWARD_STEPS.every(([k]) => r[k]);
+  if (all && box.hidden) {
+    box.hidden = false;
+    sound.sfx("relic");
+    // 관상 연구소 페이지가 확인하는 표시 (같은 사이트, 이 기기에만 저장)
+    try {
+      localStorage.setItem("vr-cookie", JSON.stringify({
+        name: S.name ?? "", set: SET?.meta?.제목 ?? "", solved: PROBLEMS.filter((p) => solved(p.id)).length,
+        total: PROBLEMS.length, feel: (r.feelText ?? "").slice(0, 120), at: Date.now(),
+      }));
+    } catch {}
+  }
+}
+
+// ---------- 🚪 중간에 나가기: 다 못 끝내도 지금까지 한 만큼 학습 자료를 출력해 간다 ----------
+function showExit() {
+  if (S.mode !== "class") return;
+  if (S.cls?.stage === "done" || iEscaped()) return showSummary();
+  S.net?.send({ type: "review", partial: true }); // 내가 푼 문제의 정답·풀이만 받는다
+  const body = openModal(false);
+  const mine = PROBLEMS.filter((p) => solved(p.id)).length;
+  const tried = PROBLEMS.filter((p) => solved(p.id) || S.me?.probs[p.id]?.tries).length;
+  body.innerHTML = `
+    <div class="done">
+      <h2>🚪 중간에 나가기</h2>
+      <p>지금까지 연 상자 <b>${mine}</b> / ${PROBLEMS.length} · 도전한 문제 <b>${tried}</b>개 · 학습한 카드 <b>${(S.me?.concepts ?? []).length}</b>장</p>
+      <p class="muted">다 못 끝내도 괜찮아요. 지금까지 한 만큼 학습 자료를 출력해 가세요. 인쇄 창에서 'PDF로 저장'을 고르면 파일로 받아요.</p>
+      <div class="print-box">
+        <b>📦 지금까지의 학습 자료</b>
+        <small>풀이 기록에는 내가 푼 문제의 정답과 풀이만 들어가요. 못 푼 문제는 탐험이 끝나면 공개돼요.</small>
+        <div class="summary-actions">
+          <button id="ex-cards" class="btn primary" type="button">📚 내가 만난 핵심 카드</button>
+          <button id="ex-sheet" class="btn primary" type="button">📝 문제지 (그림 포함)</button>
+          <button id="ex-mine" class="btn needs-answers" type="button" ${reviewByDiff ? "" : "disabled"}>🗂️ 지금까지의 풀이 기록</button>
+        </div>
+      </div>
+      <div class="summary-actions">
+        <button id="ex-back" class="btn" type="button">← 계속 탐험하기</button>
+        <button id="ex-leave" class="btn danger" type="button">🚪 게임에서 나가기</button>
+      </div>
+      <p class="muted small">나가도 기록은 선생님 화면에 남아요. 같은 기기·브라우저로 다시 들어오면 이어서 할 수 있어요.</p>
+    </div>`;
+  $("#ex-cards", body).onclick = () => printMyCards();
+  $("#ex-sheet", body).onclick = () => printAssessment("sheet");
+  $("#ex-mine", body).onclick = () => printReview(true);
+  $("#ex-back", body).onclick = closeModal;
+  $("#ex-leave", body).onclick = () => {
+    if (!confirm("게임에서 나갈까요? 출력할 자료는 먼저 받아 두세요.")) return;
+    try { sessionStorage.removeItem("vr-autojoin"); } catch {}
+    location.href = location.pathname; // 첫 화면으로
+  };
+}
+
+// 내가 학습했거나 도전한 문제와 연결된 핵심 카드를 그림과 함께 출력한다
+function printMyCards() {
+  const cards = SET?.cards ?? [];
+  const learned = new Set(S.me?.concepts ?? []);
+  const touched = new Set(PROBLEMS.filter((p) => solved(p.id) || S.me?.probs[p.id]?.tries).map((p) => p.concept));
+  let list = cards.filter((c) => learned.has(`card${c.tablet}`) || touched.has(c.title));
+  const note = list.length ? `내가 학습했거나 도전한 문제와 연결된 카드 ${list.length}장` : "아직 학습한 카드가 없어 전체 카드를 담았어요";
+  if (!list.length) list = cards;
+  if (!list.length) return toast("이 문항 세트에는 핵심 카드가 없어요.");
+  openPrint(`
+    <header class="pr-head fa-head"><h1>${fmt(SET?.meta?.제목 ?? "벡터 유적 탈출")} · 나의 핵심 카드</h1>
+      <p>${esc(S.name ?? "")} · ${new Date().toLocaleDateString("ko-KR")} · ${note}</p></header>
+    <div class="card-grid">${list.map((c) => `
+      <section class="print-card"><h3>📚 ${c.tablet}. ${fmt(c.title)}</h3><p class="pc-sum">${fmt(c.summary)}</p><ul>${c.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul>${(() => { const f = cardFigureHtml(c); return f ? `<div class="pc-fig">${f}</div>` : ""; })()}</section>`).join("")}</div>`, "나의 핵심 카드");
 }
 
 // 오답 정리: 내가 틀리거나 못 푼 문제를 문제·내가 낸 오답·정답·풀이로 정리해 A4 인쇄 창에 채운다.
@@ -1662,11 +1807,12 @@ function printAssessment(kind) {
   openPrint(`
     <header class="pr-head fa-head">
       <h1>벡터 유적 탈출 · 형성평가 ${isAnswer ? "<span class=\"fa-tag ans\">답지</span>" : "<span class=\"fa-tag\">문제지</span>"}</h1>
-      <p>${unit ? `기하 ${unit.name} · ` : ""}${new Date().toLocaleDateString("ko-KR")} · ${S.ch}채널</p>
+      <p>${SET?.meta?.제목 ? `${fmt(SET.meta.제목)} · ` : unit ? `기하 ${unit.name} · ` : ""}${new Date().toLocaleDateString("ko-KR")} · ${S.ch}채널</p>
       <p class="fa-name">이름: <b>${esc(S.name ?? "")}</b> &emsp; ${isAnswer ? "" : `점수: ________ / ${PROBLEMS.length}`}</p>
     </header>
     ${isAnswer ? "" : `<p class="fa-guide">탐험에서 만난 문제를 다시 풀어 보세요. 풀이 과정을 적고 '답' 칸에 답을 쓰세요.</p>`}
     <div class="fa-cols">${items}</div>`);
+  return true;
 }
 
 function printReview(all = false) {
@@ -1702,4 +1848,5 @@ function printReview(all = false) {
       <p>${esc(S.name ?? "")} · ${new Date().toLocaleDateString("ko-KR")} · 맞힌 문제 ${PROBLEMS.filter((p) => solved(p.id)).length}/${PROBLEMS.length}</p>
     </header>
     ${rows ? `<div class="fa-cols">${rows}</div>` : all ? "<p>아직 푼 문제가 없어요.</p>" : "<p>틀린 문제가 없어요! 모든 문제를 한 번에 맞혔어요. 🎉</p>"}`, all ? "나의 풀이 기록" : "나의 오답 정리");
+  return true;
 }
