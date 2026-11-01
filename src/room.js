@@ -44,7 +44,7 @@ const PROBLEM_IDS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"];
 const LEVELS = ["low", "mid", "high"];
 // 문 번호 → 그 문을 여는 상자 (public/js/game.js의 DOORS와 같다)
 const DOOR_KEYS = { 1: ["p1", "p2", "p3"], 2: ["p4", "p5"], 3: ["p6", "p7"] };
-const TEAM_DOOR_RATIO = 2 / 3; // 같은 팀의 2/3 이상이 문을 열면 그 팀 모두에게 열린다
+const TEAM_DOOR_RATIO = 1 / 2; // 같은 팀의 절반 이상이 문을 열면 그 팀 모두에게 열린다 (다른 팀에는 열리지 않는다)
 const COOP_REACH = 4; // 협업 상자: 같은 팀원이 이만큼(칸) 가까이 있어야 짝이 된다
 const COOP_WAIT_MS = 2 * 60 * 1000;
 // 개념 학습 점수를 줄 수 있는 카드: 문항(p1~p9), 벡터 점프(l1~l5), 핵심 카드(card1~), 비석, 수학자 카드
@@ -310,7 +310,7 @@ export class Room extends DurableObject {
     this.send(ws, { type: "coop", pid, waiting: true });
   }
 
-  // 팀 문 열림: 팀원(2명 이상) 중 2/3 이상이 그 문의 열쇠를 모두 모으면 팀 전체에게 열린다
+  // 팀 문 열림: 팀원(2명 이상) 중 절반 이상이 그 문의 열쇠를 모두 모으면 팀 전체에게 열린다
   teamDoors() {
     const out = {};
     for (const team of TEAMS) {

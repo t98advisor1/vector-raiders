@@ -62,7 +62,7 @@ const doorKeyCount = (doorId) => {
   return Math.min(need.length, solvedCount + bonus);
 };
 
-// 문: 내 열쇠를 다 모았거나, 수업에서 같은 팀의 2/3 이상이 이 문을 열었으면 열린다
+// 문: 내 열쇠를 다 모았거나, 수업에서 같은 팀의 절반 이상이 이 문을 열었으면 열린다 (같은 팀에게만)
 const teamDoor = (id) => S.mode === "class" ? S.cls?.teamDoors?.[S.team]?.[id] ?? null : null;
 const doorOpen = (id) => doorKeyCount(id) >= (DOORS[id]?.length ?? 1) || !!teamDoor(id)?.open;
 const altarLit = () => !!S.cls && PROBLEMS.every((p) => S.cls.relics[p.id]?.unlocked);
@@ -469,6 +469,7 @@ function onMessage(msg) {
     if (msg.teamCounts) updateTeamCounts(msg.teamCounts);
     S.game?.setRoster(msg.players ?? []);
     announceRelics(before, msg);
+    announceTeamDoors(before, msg);
     if (!before || before.stage !== msg.stage) onStage(msg.stage);
     updateHud();
   } else if (msg.type === "pos") {
@@ -895,6 +896,18 @@ function onStage(stage) {
   }
   if (stage === "play") { toast("탐험 시작! 상자를 열어 열쇠 조각을 모으세요.", "ok"); sound.sfx("start"); }
   if (stage === "done") { banner.textContent = "탐험이 끝났어요. 수고했어요!"; showSummary(); }
+}
+
+// 팀원 절반 이상이 문을 열어 내 문도 열렸을 때 알려 준다 (내 열쇠로 연 문은 announceProgress가 알린다)
+function announceTeamDoors(before, now) {
+  if (!before || S.mode !== "class" || !S.team) return;
+  for (const id of Object.keys(DOORS)) {
+    const was = before.teamDoors?.[S.team]?.[id]?.open, is = now.teamDoors?.[S.team]?.[id];
+    if (!was && is?.open && doorKeyCount(id) < DOORS[id].length) {
+      toast(`🚪 팀원 ${is.opened}명이 ${ROOMS[Number(id) - 1].name}의 문을 열었어요! 우리 팀은 함께 다음 방으로 갈 수 있어요.`, "ok");
+      sound.sfx("door");
+    }
+  }
 }
 
 // 수업에서 내가 모든 방(상자 전부)을 탈출했는가

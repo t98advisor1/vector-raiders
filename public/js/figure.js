@@ -228,7 +228,25 @@ function mount(ui, fig) {
   draw();
 
   // ---------- 저절로 움직이기: 학생이 만지면 멈춘다 ----------
-  if (ui.autoplay) {
+  // md의 재생= 이 있으면 그대로 부드럽게 움직인다 (모션그래픽). 재생=없음이면 움직이지 않는다.
+  if (ui.autoplay && fig.play.length && !fig.playOff) {
+    const t0 = performance.now(), yaw0 = yaw;
+    const id = setInterval(() => {
+      if (!ui.board.isConnected) return clearInterval(id);
+      const t = (performance.now() - t0) / 1000;
+      for (const p of fig.play) {
+        if (p.name === "회전") { yaw = yaw0 + (2 * Math.PI * t) / p.sec; continue; }
+        const el = sliderEls.find((e) => e.s.name === p.name);
+        if (!el) continue;
+        const ph = (t / p.sec) % 2, tri = ph <= 1 ? ph : 2 - ph; // 최소 → 최대 → 최소
+        state[p.name] = el.s.min + (el.s.max - el.s.min) * tri;
+        el.input.value = state[p.name];
+      }
+      draw();
+    }, 50);
+    const stop = () => clearInterval(id);
+    for (const ev of ["pointerdown", "keydown"]) { ui.board.addEventListener(ev, stop, { once: true }); ui.ctrl.addEventListener(ev, stop, { once: true }); }
+  } else if (ui.autoplay && !fig.playOff) {
     let t = 0;
     const id = setInterval(() => {
       if (!ui.board.isConnected) return clearInterval(id);

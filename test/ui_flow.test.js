@@ -91,3 +91,13 @@ test("그림: 칸은 그림 줄·내장 도구·안전한 이미지 주소만 �
   const set = parseSet(md);
   assert.equal(set.cards.find((c) => c.title === "벡터의 뜻과 크기")?.figure, "평면 a=3,4 끌기=a 보기=|a|");
 });
+
+test("팀 문은 같은 팀 절반 이상이 열면 열리고, 그림의 재생=은 슬라이더나 회전만 받는다", async () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.match(room, /const TEAM_DOOR_RATIO = 1 \/ 2;/);
+  const { checkFigure } = await import("../public/js/figcore.js");
+  assert.equal(checkFigure("평면 a=1,1 슬라이더=t,0,1,0.1 재생=t,4"), null);
+  assert.equal(checkFigure("공간 직육면체=2,2,2 재생=회전,8"), null);
+  assert.match(checkFigure("평면 a=1,1 재생=회전,8") ?? "", /공간/);
+  assert.match(checkFigure("평면 a=1,1 재생=k,3") ?? "", /슬라이더/);
+});
