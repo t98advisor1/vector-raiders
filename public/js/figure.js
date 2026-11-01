@@ -42,6 +42,8 @@ function mount(ui, fig) {
     R = fig.range?.[0] ?? Math.max(3, ...pts.map((v) => Math.max(...v.map(Math.abs)))) * 1.15;
   } else if (fig.range?.length === 4) {
     xr = [fig.range[0], fig.range[1]]; yr = [fig.range[2], fig.range[3]];
+  } else if (fig.curves.length) {
+    xr = [-5, 5]; yr = [-5, 5]; // 그래프는 범위=xmin,xmax,ymin,ymax로 정해 주는 것이 좋다
   } else {
     const xs = [0, ...pts.map((v) => v[0])], ys = [0, ...pts.map((v) => v[1])];
     xr = [Math.floor(Math.min(...xs)) - 1, Math.ceil(Math.max(...xs)) + 1];
@@ -121,6 +123,21 @@ function mount(ui, fig) {
       const span = (is3 ? R * 1.6 : Math.max(xr[1] - xr[0], yr[1] - yr[0])) / Math.hypot(...u);
       bd.line(P(p0.map((c, i) => c - span * u[i])), P(p0.map((c, i) => c + span * u[i])), { color: C.target, width: 1.8, dash: "6 4" });
     }
+    // 곡선: y = f(x) 그래프 (평면)
+    const CURVE_COLORS = [C.a, C.b, C.sum, C.target];
+    fig.curves.forEach((src, k) => {
+      const n = 240, step = (xr[1] - xr[0]) / n, span = yr[1] - yr[0];
+      let prev = null;
+      for (let i = 0; i <= n; i++) {
+        const x = xr[0] + i * step;
+        let y;
+        try { y = evalExpr(src, { ...env, x }); } catch { y = NaN; }
+        const ok = typeof y === "number" && Number.isFinite(y) && Math.abs(y) < 1e6;
+        // 점근선처럼 값이 크게 튀는 곳은 잇지 않는다
+        if (ok && prev && Math.abs(y - prev[1]) < span * 2) bd.line(prev, [x, y], { color: CURVE_COLORS[k % CURVE_COLORS.length], width: 2.4 });
+        prev = ok ? [x, y] : null;
+      }
+    });
     // 자취
     for (const [name, list] of Object.entries(trails)) {
       if (isVec(env[name])) { list.push(env[name]); if (list.length > 120) list.shift(); }

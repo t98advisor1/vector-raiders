@@ -16,6 +16,12 @@ export default {
       return env.ROOM.get(env.ROOM.idFromName("stats:global")).fetch(request);
     }
 
+    // 교사가 올린 그림 파일 (문항·카드의 '그림: /img/…')
+    const img = /^\/img\/([a-z0-9]{6,40}\.(png|jpe?g|gif|webp))$/i.exec(url.pathname);
+    if (img && request.method === "GET") {
+      return env.ROOM.get(env.ROOM.idFromName("admin:global")).fetch(`https://admin/admin/img?id=${img[1]}`);
+    }
+
     if (url.pathname !== "/ws") return new Response("not found", { status: 404 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
 

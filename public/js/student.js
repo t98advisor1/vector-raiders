@@ -3,7 +3,7 @@ const load = store;
 import { fmt, watchMath, splitBogi, bogiHtml, boxedText } from "./mathtext.js";
 import { openPrintDoc } from "./printdoc.js";
 import { LAB_LEVELS } from "./lab.js";
-import { PROBLEMS, DIFFICULTY, UNITS, loadSet, figureHtml, SET } from "./problems.js";
+import { PROBLEMS, DIFFICULTY, UNITS, loadSet, figureHtml, mountCardFigure, SET } from "./problems.js";
 import { conceptCard, CONCEPTS, mountConceptWidget } from "./concepts.js";
 import { MATHEMATICIANS, mathematicianCard } from "./mathematicians.js";
 import { renderClassBar } from "./classbar.js";
@@ -1204,11 +1204,13 @@ function showSetCard(card, next, kind = "tablet") {
       <div class="concept-head"><span class="concept-badge">📚 핵심 카드 ${card.tablet}</span><h2>${fmt(card.title)}</h2></div>
       <p class="concept-tagline">${fmt(card.summary)}</p>
       <ul class="concept-points">${card.points.map((t) => `<li>${fmt(t)}</li>`).join("")}</ul>
+      <div class="tool card-fig" hidden></div>
     </div>
     <div class="concept-actions">
       <button class="btn" type="button" id="concept-done">💡 학습 완료 +50</button>
       <button class="btn primary big" type="button" id="concept-go">${goLabel}</button>
     </div>`;
+  if (card.figure && mountCardFigure(card, $(".card-fig", body))) $(".card-fig", body).hidden = false;
   sound.sfx("open");
   $("#concept-done", body).onclick = () => { awardConcept(key); toast("💡 개념 학습 +50점! 팀 점수에도 더해졌어요.", "ok"); sound.sfx("found"); next(); };
   $("#concept-go", body).onclick = () => { awardConcept(key); next(); };
@@ -1301,7 +1303,7 @@ function openProblemBody(pid) {
       <p class="p-text"></p>
       ${bogiHtml(splitBogi(diffSpec.text).lines)}
       <div class="coop-conds" hidden></div>
-      <div class="tool" ${diffSpec.fig?.has ? "" : "hidden"}>
+      <div class="tool" ${diffSpec.fig?.has || diffSpec.fig?.image ? "" : "hidden"}>
         <div class="tool-help">🔍 ${fmt(diffSpec.howto ?? p.toolHelp)}</div>
         <div class="board-wrap"></div>
         <div class="tool-info"></div>
@@ -1312,6 +1314,7 @@ function openProblemBody(pid) {
       <div class="hint" hidden></div>`;
 
     if (diffSpec.fig?.has) diffSpec.fig.fn({ board: $(".board-wrap", body), info: $(".tool-info", body), ctrl: $(".tool-ctrl", body), autoplay: true });
+    else if (diffSpec.fig?.image) $(".board-wrap", body).innerHTML = `<img class="prob-img" src="${diffSpec.fig.image}" alt="문제 그림">`;
     typeText($(".p-text", body), splitBogi(diffSpec.text).stem);
     S.net?.send({ type: "open", pid, diff: curDiff }); // 풀이 시간 기록 시작 (처음 연 때만 서버가 적는다)
     const mine = S.me?.probs[pid];

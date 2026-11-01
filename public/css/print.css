@@ -205,3 +205,5 @@ mjx-container {
 .fa-cols .fa-blank span { width: 70%; }
 .fa-cols .fa-item h3 { font-size: 10.5pt; }
 .fa-cols .pr-text, .fa-cols .bogi-line { font-size: 10pt; }
+.pc-fig { text-align: center; margin-top: 4px; }
+.pc-fig svg, .pc-fig img { width: 48mm; max-width: 100%; height: auto; }
