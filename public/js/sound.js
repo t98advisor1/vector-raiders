@@ -36,6 +36,21 @@ const CHAPTERS = [
     kick: [], snare: [], hat: 0, bass: 8, arp: 2, pad: 0.06 },
 ];
 const BARS = 16; // 한 장의 길이(마디)
+
+// 예전 배경음악: 첫 화면과 대기 시간에 흐른다. 탐험이 시작되면 기승전결 음악으로 넘어간다.
+// 진행 Am – F – C – G (한 마디씩, 4마디 반복)
+const CLASSIC = {
+  bpm: 136,
+  chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]],
+  roots: [45, 41, 36, 43],
+  lead: [
+    [69, N, 72, N, 76, N, 74, 72, 71, N, 72, N, 69, N, N, N],
+    [65, N, 69, N, 72, N, 74, 72, 69, N, 67, N, 65, N, N, N],
+    [64, N, 67, N, 72, N, 71, 72, 74, N, 76, N, 72, N, N, N],
+    [71, N, 74, N, 79, N, 77, 76, 74, N, 71, N, 74, N, 76, N],
+  ],
+};
+const SWITCH_FADE = 0.6; // 음악을 바꿀 때 줄였다 키우는 시간(초)
 const MUSIC_VOL = 0.3, DUCK_VOL = 0.1, MASTER_VOL = 0.6;
 
 class Sound {
@@ -43,6 +58,9 @@ class Sound {
     this.ctx = null;
     this.ducked = false;
     this.intensity = 0; // 0~4: 기·승·전·결·맺음 중 지금 장
+    this.track = "classic"; // "classic"(예전 음악: 첫 화면·대기) → "story"(기승전결: 탐험 중)
+    this.nextTrack = null;
+    this.fading = false;
     onSettings(() => this.applyVolumes());
   }
 
@@ -63,6 +81,7 @@ class Sound {
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
     this.noiseBuf = buf;
+    if (this.nextTrack) { this.track = this.nextTrack; this.nextTrack = null; } // 소리를 켜기 전에 정해졌으면 바로 그 음악으로
     this.step = 0;
     this.next = ctx.currentTime + 0.1;
     this.timer = setInterval(() => this.schedule(), 25);
@@ -72,15 +91,24 @@ class Sound {
   applyVolumes() {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
-    this.music.gain.setTargetAtTime(settings.music ? (this.ducked ? DUCK_VOL : MUSIC_VOL) : 0, now, 0.1);
+    this.music.gain.setTargetAtTime(settings.music && !this.fading ? (this.ducked ? DUCK_VOL : MUSIC_VOL) : 0, now, 0.1);
     this.fx.gain.setTargetAtTime(settings.sfx ? 0.75 : 0, now, 0.05);
   }
   // 🔊 버튼·M 키: 하나라도 켜져 있으면 모두 끄고, 모두 꺼져 있으면 모두 켠다.
   toggle() { const on = this.muted; updateSettings({ music: on, sfx: on }); }
   onChange(f) { onSettings(() => f(this.muted)); }
   setIntensity(level) { if (!this.ended) this.intensity = Math.max(0, Math.min(3, level)); }
-  ending() { this.ended = true; this.intensity = 4; } // 탈출한 뒤의 맺음 음악 (방을 옮겨도 그대로)
+  ending() { this.ended = true; this.intensity = 4; this.setTrack("story"); } // 탈출한 뒤의 맺음 음악 (방을 옮겨도 그대로)
   setDuck(on) { this.ducked = on; this.applyVolumes(); }
+  // 배경음악 바꾸기: 소리를 잠깐 줄였다가 다음 마디 첫머리에서 새 음악으로 넘어간다
+  setTrack(name) {
+    if (name !== "classic" && name !== "story") return;
+    if ((this.nextTrack ?? this.track) === name) return;
+    this.nextTrack = name;
+    if (!this.ctx) return;
+    this.fading = true;
+    this.applyVolumes();
+  }
 
   // ---------- 기본 부품 ----------
   gain(v, to) {
@@ -138,6 +166,25 @@ class Sound {
   schedule() {
     if (!settings.music) { this.next = this.ctx.currentTime + 0.1; return; } // 꺼져 있으면 쉬었다가 다시 켤 때 이어서
     while (this.next < this.ctx.currentTime + 0.12) {
+      if (this.nextTrack && this.step % 16 === 0) {
+        this.fadeAt ??= this.ctx.currentTime + SWITCH_FADE; // 먼저 소리가 줄어든 뒤, 마디 첫머리에서 바꾼다
+        if (this.next >= this.fadeAt) {
+          this.track = this.nextTrack;
+          this.nextTrack = null;
+          this.fadeAt = undefined;
+          this.step = 0;
+          this.chapter = undefined;
+          this.cycle = 0;
+          this.fading = false;
+          this.music.gain.setTargetAtTime(settings.music ? (this.ducked ? DUCK_VOL : MUSIC_VOL) : 0, this.next, 0.25);
+        }
+      }
+      if (this.track === "classic") {
+        this.playClassic(this.step % 64, this.next);
+        this.next += 60 / CLASSIC.bpm / 4;
+        this.step = (this.step + 1) % 64;
+        continue;
+      }
       // 장이 바뀌면 마디 첫머리에서 넘어가 박이 어긋나지 않게 한다
       if (this.step % 16 === 0 && this.chapter !== this.intensity) {
         if (this.chapter !== undefined) this.step = 0;
@@ -150,6 +197,26 @@ class Sound {
       this.step = (this.step + 1) % (BARS * 16);
       if (this.step === 0) this.cycle = (this.cycle ?? 0) + 1; // 한 장을 한 바퀴 돌 때마다 조금씩 바꾼다
     }
+  }
+
+  // 예전 음악: 방이 바뀔수록 악기가 늘어나던 반복곡 (대기 중에는 intensity 0)
+  playClassic(s, t) {
+    const C = CLASSIC, step = 60 / C.bpm / 4;
+    const bar = Math.floor(s / 16), i = s % 16, lvl = this.intensity, out = this.music;
+    if (i % 8 === 0 || (lvl >= 1 && (i === 11 || i === 14))) this.osc("sine", 150, t, 0.25, out, { peak: 0.9, slide: 42 });
+    if (i === 4 || i === 12) {
+      this.noise(t, 0.14, out, { freq: 1300, peak: 0.35 });
+      this.osc("triangle", 190, t, 0.08, out, { peak: 0.2 });
+    }
+    if (i % 2 === 0 || lvl >= 1) this.noise(t, 0.035, out, { freq: 7500, peak: i % 4 === 2 ? 0.16 : 0.08 });
+    if (i % 2 === 0) this.osc("sawtooth", midi(C.roots[bar] + (i % 4 === 2 ? 12 : 0)), t, step * 1.6, out, { peak: 0.22, filter: 520, q: 6 });
+    const ch = C.chords[bar];
+    this.osc("square", midi(ch[i % 3] + 12 * (Math.floor(i / 3) % 2)), t, 0.11, out, { peak: lvl >= 1 ? 0.07 : 0.045, filter: 2400 });
+    if (lvl >= 2 && C.lead[bar][i] !== null) {
+      for (const d of [-7, 7]) this.osc("sawtooth", midi(C.lead[bar][i]), t, step * 2.6, out, { peak: 0.06, attack: 0.01, filter: 3200, detune: d });
+    }
+    if (bar === 3 && i >= 12) this.osc("sine", 140 - (i - 12) * 18, t, 0.18, out, { peak: 0.5, slide: 70 });
+    if (lvl >= 3 && i === 0) this.noise(t, 1.1, out, { freq: 5000, peak: 0.12 });
   }
 
   playStep(s, t, C) {

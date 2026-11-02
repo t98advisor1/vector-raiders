@@ -16,20 +16,27 @@ import { settings, updateSettings, onSettings } from "./settings.js";
 const $ = (s, root = document) => root.querySelector(s);
 const STAGE_NAME = { lobby: "대기 중", play: "탐험 중", done: "탐험 끝" };
 // 팀전: 팀 이름·색은 서버(src/room.js)와 짝을 이룬다.
-const TEAMS = { A: { name: "A팀", color: "#ef4444" }, B: { name: "B팀", color: "#3b82f6" }, C: { name: "C팀", color: "#22c55e" }, D: { name: "D팀", color: "#a855f7" } };
-// 수업 채널: URL의 ?ch=1~7. 없으면 입장 화면에서 고르고, 그것도 없으면 1채널.
-const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
+const TEAMS = { A: { name: "A팀", color: "#ef4444" }, B: { name: "B팀", color: "#3b82f6" }, C: { name: "C팀", color: "#22c55e" } };
+// 수업 채널: 팀전 1~6(?ch=1~6), 개인전 1~6(?ch=s1~s6). 없으면 입장 화면에서 고르고, 그것도 없으면 팀전 1채널.
+const TEAM_CHANNELS = ["1", "2", "3", "4", "5", "6"];
+const SOLO_CHANNELS = ["s1", "s2", "s3", "s4", "s5", "s6"];
+const CHANNELS = [...TEAM_CHANNELS, ...SOLO_CHANNELS];
+const isSoloCh = (ch) => SOLO_CHANNELS.includes(ch);
+const chLabel = (ch) => (isSoloCh(ch) ? `개인전 ${ch.slice(1)}채널` : `팀전 ${ch}채널`);
+const ROOM_MINUTES = 60; // 모든 방은 열린 뒤 60분이 지나면 끝나고 기록이 초기화된다 (서버 src/room.js)
 const urlCh = new URLSearchParams(location.search).get("ch");
 const CH = CHANNELS.includes(urlCh) ? urlCh : null;
 const CLOSE_REASON = {
   4000: "지난 수업 기록이 정리되었어요. 다시 들어와 주세요.",
   4001: "이름을 확인해 주세요.",
-  4002: "유적 인원이 가득 찼어요. 선생님께 알려 주세요.",
+  4002: "방 인원이 가득 찼어요. 다른 채널을 골라 주세요.",
   4005: "다른 창에서 같은 이름으로 들어와서 이 창의 연결을 끊었어요.",
   4006: "선생님이 새 수업을 시작했어요. 이름을 확인하고 다시 들어와 주세요.",
   4007: "선생님이 수업에서 내보냈어요. 선생님께 문의해 주세요.",
   4008: "이 채널은 지금 사용 기간이 아니에요. 선생님께 알려 주세요.",
   4009: "고른 팀이 가득 찼어요(8명). 다른 팀을 골라 주세요.",
+  4010: "⏰ 방이 열린 지 60분이 지나 모두 나가게 되었어요. 기록은 초기화되었어요. 다시 들어오면 새로 시작해요.",
+  4011: "같은 닉네임을 이미 다른 친구가 쓰고 있어요. 다른 닉네임으로 들어와 주세요.",
 };
 
 let cid = store("vr-cid");
@@ -175,11 +182,20 @@ function showWizardStep(step) {
   $("#step-unit").hidden = step !== "unit";
   $("#step-launch").hidden = step !== "launch";
   // 단계 표시: 수업 참가는 채널→팀→유적→이름 4단계, 연습 모드는 유적→이름 2단계
-  const steps = S.pendingMode === "practice" ? ["unit", "launch"] : ["ch", "team", "launch"]; // 수업 참가는 선생님이 채널 단원을 정한다
+  const steps = S.pendingMode === "practice" ? ["unit", "launch"] : isSoloCh(S.ch) ? ["ch", "launch"] : ["ch", "team", "launch"]; // 수업 참가는 선생님이 채널 단원을 정한다
   const badge = $(`#step-${step}`)?.querySelector(".step-badge");
   if (badge && steps.includes(step)) badge.textContent = `${steps.indexOf(step) + 1}단계 / ${steps.length}`;
   sound.sfx("open");
-  if (step === "launch") $("#join-name").focus();
+  if (step === "launch") {
+    // 닉네임은 수업 참가(팀전·개인전)에서만 쓴다. 연습 모드는 혼자 하므로 이름만.
+    const cls = S.pendingMode !== "practice";
+    $("#nick-label").hidden = !cls;
+    $("#join-nick").required = cls;
+    $("#launch-note").textContent = cls
+      ? `${chLabel(S.ch)} · ⏰ 방은 열린 뒤 ${ROOM_MINUTES}분이 지나면 모두 나가게 되고 기록이 초기화돼요.${isSoloCh(S.ch) ? " 먼저 들어온 친구가 방장이 되어 시작해요. 8명이 차면 관람으로 들어가요." : ""}`
+      : `⏰ 연습 유적도 열린 뒤 ${ROOM_MINUTES}분이 지나면 기록이 초기화돼요.`;
+    $("#join-name").focus();
+  }
   if (step === "unit" && S.pendingMode === "practice") loadPracticeSets();
 
   // 단계별 제목 타자 효과 모션
@@ -205,12 +221,12 @@ document.querySelectorAll(".mcard[data-mode]").forEach((b) => {
 });
 
 $("#step-ch-back").onclick = () => showScreen("menu");
-$("#step-ch-next").onclick = () => showWizardStep("team");
+$("#step-ch-next").onclick = () => showWizardStep(isSoloCh(S.ch) ? "launch" : "team");
 $("#step-team-back").onclick = () => showWizardStep("ch");
 $("#step-team-next").onclick = () => showWizardStep("launch");
 $("#step-unit-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "menu" : "team");
 $("#step-unit-next").onclick = () => showWizardStep("launch");
-$("#step-launch-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "unit" : "team");
+$("#step-launch-back").onclick = () => showWizardStep(S.pendingMode === "practice" ? "unit" : isSoloCh(S.ch) ? "ch" : "team");
 
 // 1단계 채널 카드 클릭 시 선택 & 2단계(팀 선택)로 자동 진행
 document.querySelectorAll(".ch-card-btn[data-ch]").forEach((b) => {
@@ -220,12 +236,12 @@ document.querySelectorAll(".ch-card-btn[data-ch]").forEach((b) => {
     store("vr-ch", S.ch);
     document.querySelectorAll(".ch-card-btn[data-ch]").forEach((o) => o.classList.toggle("on", o === b));
     sound.sfx("open");
-    setTimeout(() => showWizardStep("team"), 180);
+    setTimeout(() => showWizardStep(isSoloCh(S.ch) ? "launch" : "team"), 180);
   };
 });
 
 // 2단계 팀 카드 클릭 시 선택 & 3단계(단원 선택)로 자동 진행
-S.team = store("vr-team") || "A";
+S.team = TEAMS[store("vr-team")] ? store("vr-team") : "A";
 function selectTeam(team) {
   S.team = team;
   store("vr-team", team);
@@ -244,7 +260,7 @@ selectTeam(S.team);
 function updateTeamCounts(counts) {
   if (!counts) return;
   const max = counts.max ?? 8;
-  for (const team of ["A", "B", "C", "D"]) {
+  for (const team of Object.keys(TEAMS)) {
     const cnt = counts[team] ?? 0;
     const el = $(`#cnt-${team}`);
     const btn = document.querySelector(`.team-card-btn[data-team="${team}"]`);
@@ -254,7 +270,7 @@ function updateTeamCounts(counts) {
       btn.disabled = full;
       btn.classList.toggle("full", full);
       if (full && S.team === team) {
-        const available = ["A", "B", "C", "D"].find((t) => (counts[t] ?? 0) < max);
+        const available = Object.keys(TEAMS).find((t) => (counts[t] ?? 0) < max);
         if (available) selectTeam(available);
       }
     }
@@ -328,10 +344,13 @@ document.querySelectorAll(".diff-btn[data-diff]").forEach((b) => {
 // 4단계 폼 제출
 const session = store("vr-session");
 $("#join-name").value = session?.name ?? "";
+$("#join-nick").value = session?.nick ?? "";
 $("#step-launch").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = $("#join-name").value.trim();
   if (!name) return showJoinError("이름을 입력해 주세요.");
+  S.nick = $("#join-nick").value.trim();
+  if (S.pendingMode !== "practice" && !S.nick) return showJoinError("닉네임을 입력해 주세요. 랭킹에는 닉네임이 보여요.");
   sound.start();
   const mode = S.pendingMode === "practice" ? "practice" : "class";
   join(name, mode);
@@ -433,8 +452,10 @@ function join(name, mode) {
   S.name = name;
   S.mode = mode;
   showJoinError("");
+  S.kind = mode === "practice" ? "practice" : isSoloCh(S.ch) ? "solo" : "team";
+  S.spectator = false;
   const query = mode === "practice" ? `?mode=practice&cid=${cid}` : `?ch=${S.ch}`;
-  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, team: S.team || undefined, unit: S.unit, diff: S.diff, setId: mode === "practice" ? S.practiceSet ?? undefined : undefined, ch: S.ch }), onMessage, onStatus, query);
+  S.net = connect(() => ({ type: "hello", role: "student", cid, name: S.name, nick: S.nick || undefined, team: S.kind === "team" ? S.team : undefined, unit: S.unit, diff: S.diff, setId: mode === "practice" ? S.practiceSet ?? undefined : undefined, ch: S.ch }), onMessage, onStatus, query);
 }
 
 // 연습 모드 '처음부터 다시' 뒤에는 새로고침하고 자동으로 다시 들어온다.
@@ -461,6 +482,7 @@ function onStatus(kind, code) {
   $("#conn").hidden = kind !== "retry";
   if (kind === "final") {
     closeModal();
+    sound.setTrack("classic");
     $("#game").hidden = true;
     $("#join").hidden = false;
     intro.play();
@@ -476,16 +498,21 @@ function onMessage(msg) {
   }
   if (msg.type === "coop") return onCoop(msg);
   if (msg.type === "joined") {
-    store("vr-session", { name: msg.name });
+    S.spectator = msg.role === "spectator";
+    store("vr-session", { name: S.name ?? msg.name, nick: S.nick ?? msg.nick });
+    if (S.spectator) S.me = { probs: {}, lab: [], concepts: [], activity: {} }; // 관람: 내 기록 없이 둘러보기만
     $("#join").hidden = true;
     intro.pause(); // 첫 화면 연출을 멈춰 크롬북 자원을 게임에 돌린다
     $("#game").hidden = false;
-    $("#me-chip").textContent = `👤 ${msg.name}`;
-    $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : `🏫 수업 참여 · ${S.ch}채널`;
+    $("#me-chip").textContent = S.spectator ? `👀 관람 중 · ${msg.nick ?? msg.name}` : `👤 ${msg.nick ?? msg.name}`;
+    $("#mode-chip").textContent = S.mode === "practice" ? "🎯 혼자 연습" : `${S.kind === "solo" ? "🏆" : "🏫"} ${chLabel(S.ch)}`;
     $("#restart-btn").hidden = S.mode !== "practice";
-    $("#exit-btn").hidden = false; // 수업: 중간 출력 / 연습: 탈출했으면 결과 창(완주 선물)
+    $("#exit-btn").hidden = S.spectator; // 수업: 중간 출력 / 연습: 탈출했으면 결과 창(완주 선물)
+    toast(S.spectator
+      ? "👀 8명이 모두 차서 관람으로 들어왔어요. 지도를 돌아다니며 친구들의 탐험을 볼 수 있어요."
+      : `⏰ 이 방은 열린 뒤 ${ROOM_MINUTES}분이 지나면 모두 나가게 되고 기록이 초기화돼요.`, "ok");
     if (!S.game) startWorld();
-    S.game.setMe(msg.n, msg.name);
+    S.game.setMe(msg.n, msg.nick ?? msg.name); // 관람은 n이 없어 내 캐릭터가 그려지지 않는다
     if (msg.pos) { S.game.me.x = msg.pos.x; S.game.me.y = msg.pos.y; } // 새로고침해도 하던 자리에서
     S.game.forceSend();
     // 지도는 마지막으로 켜고 끈 상태를 기억한다. 처음에는 컴퓨터에서 켜고, 휴대폰·태블릿에서는 조작 버튼을 가리지 않게 꺼 둔다.
@@ -493,6 +520,7 @@ function onMessage(msg) {
     setMap(savedMap === "on" ? true : savedMap === "off" ? false : !(document.body.classList.contains("touch-device") || window.innerWidth <= 768));
     $("#world").focus();
   } else if (msg.type === "me") {
+    if (S.spectator) return;
     const before = S.me;
     S.me = msg.me;
     announceProgress(before, S.me);
@@ -506,11 +534,14 @@ function onMessage(msg) {
     announceRelics(before, msg);
     announceTeamDoors(before, msg);
     if (!before || before.stage !== msg.stage) onStage(msg.stage);
+    else if (msg.stage === "lobby" && (before.host !== msg.host || before.online !== msg.online)) renderLobbyBanner();
     updateHud();
   } else if (msg.type === "pos") {
     S.game?.setOthers(msg.list);
   } else if (msg.type === "chat") {
     addChat(msg);
+  } else if (msg.type === "expired") {
+    toast(msg.message ?? "60분이 지나 방이 끝났어요.");
   } else if (msg.type === "kicked") {
     alert(msg.reason ?? "선생님에 의해 퇴장되었어요.");
   } else if (msg.type === "result") {
@@ -538,14 +569,14 @@ function onMessage(msg) {
 }
 
 const hooks = {
-  isDoorOpen: doorOpen,
-  isLabDone: labDone,
+  isDoorOpen: (id) => S.spectator || doorOpen(id),
+  isLabDone: (lab) => S.spectator || labDone(lab),
   isSolved: solved,
   teamOf,
   relics: () => PROBLEMS.map((p) => !!S.cls?.relics[p.id]?.unlocked),
   hasState: () => !!S.me && !!S.cls,
   paused: () => !!S.modal,
-  onMove: (x, y, room) => S.net?.send({ type: "pos", x, y, room }) ?? false,
+  onMove: (x, y, room) => (S.spectator ? true : S.net?.send({ type: "pos", x, y, room }) ?? false),
   onInteract,
   onShoot: () => { S.world?.shoot(); sound.sfx("shoot"); },
   // 표적 10발 완성: 그 구역의 핵심 개념 카드가 자동으로 열리고, 이어 기하 수학자 카드가 해금된다!
@@ -786,7 +817,10 @@ function updateHud() {
   }
   if (S.cls) {
     $("#stage-chip").textContent = STAGE_NAME[S.cls.stage] ?? "";
-    $("#online-chip").textContent = `👥 ${S.cls.online}명 접속`;
+    $("#online-chip").textContent = S.cls.kind === "solo"
+      ? `👥 ${S.cls.online}/${S.cls.maxPlayers}명 · 👀 관람 ${S.cls.spectators}명`
+      : `👥 ${S.cls.online}명 접속`;
+    renderTimer();
     renderTeamChip();
     renderTeamRanking();
     renderRanking();
@@ -794,6 +828,26 @@ function updateHud() {
   }
 }
 setInterval(updateHud, 500); // 방 이름은 움직일 때 바뀐다
+
+// 남은 시간: 방이 열린 뒤 60분. 10분·5분·1분 남으면 알린다.
+const warned = new Set();
+function renderTimer() {
+  const chip = $("#timer-chip");
+  const end = S.cls?.endsAt;
+  chip.hidden = !end;
+  if (!end) { warned.clear(); return; }
+  const left = Math.max(0, end - Date.now());
+  const m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
+  chip.textContent = `⏰ ${m}:${String(sec).padStart(2, "0")} 남음`;
+  chip.classList.toggle("warn", left <= 5 * 60000);
+  chip.title = `방이 열린 뒤 ${ROOM_MINUTES}분이 지나면 모두 나가게 되고 기록이 초기화돼요.`;
+  for (const k of [10, 5, 1]) {
+    if (left <= k * 60000 && left > (k - 1) * 60000 - 1 && !warned.has(`${end}:${k}`)) {
+      warned.add(`${end}:${k}`);
+      toast(`⏰ ${k}분 남았어요! ${k}분 뒤에는 모두 방에서 나가게 되고 기록이 초기화돼요.`, "ok");
+    }
+  }
+}
 
 // 팀전: 내 팀 뱃지(상단바)와 팀 랭킹(오른쪽 위) — 팀 컬러 바와 순위 메달로 크고 직관적으로
 function renderTeamChip() {
@@ -929,20 +983,39 @@ function pumpFound() {
   }
 }
 
+// 배경음악: 첫 화면·대기 중에는 예전 음악, 탐험이 시작되면 기승전결 음악으로 넘어간다
 function onStage(stage) {
   const banner = $("#banner");
   banner.hidden = stage === "play";
-  if (stage === "lobby") {
-    banner.textContent = "선생님이 탐험을 시작하면 상자를 열 수 있어요. 지금은 주변을 둘러보세요! ";
+  sound.setTrack(stage === "lobby" ? "classic" : "story");
+  if (stage === "lobby") renderLobbyBanner();
+  if (stage === "play") { toast(S.spectator ? "▶ 게임이 시작됐어요. 친구들의 탐험을 지켜봐요!" : "탐험 시작! 상자를 열어 열쇠 조각을 모으세요.", "ok"); sound.sfx("start"); }
+  if (stage === "done") { banner.textContent = "탐험이 끝났어요. 수고했어요!"; showSummary(); }
+}
+
+function renderLobbyBanner() {
+  const banner = $("#banner");
+  banner.replaceChildren();
+  const button = (text, onclick, cls = "btn") => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "btn";
-    b.textContent = "🔑 선생님: 탐험 시작";
-    b.onclick = askStart;
+    b.className = cls;
+    b.textContent = text;
+    b.onclick = onclick;
     banner.appendChild(b);
+  };
+  if (S.cls?.kind === "solo") {
+    // 개인전: 먼저 들어온 학생이 방장. 방장 화면에만 시작 버튼이 나온다.
+    const host = (S.cls.players ?? []).find(([n]) => n === S.cls.host)?.[1];
+    const meHost = !S.spectator && S.cls.host !== null && S.cls.host === S.game?.me.n;
+    banner.append(meHost
+      ? `👑 내가 방장이에요! 친구들이 다 모이면 시작해요 (${S.cls.online}/${S.cls.maxPlayers}명). `
+      : `👑 방장 ${host ?? "–"}님이 시작하면 상자를 열 수 있어요. 지금은 주변을 둘러보세요! `);
+    if (meHost) button("▶ 게임 시작 (방장)", () => S.net?.send({ type: "hostStart" }), "btn primary");
+    return;
   }
-  if (stage === "play") { toast("탐험 시작! 상자를 열어 열쇠 조각을 모으세요.", "ok"); sound.sfx("start"); }
-  if (stage === "done") { banner.textContent = "탐험이 끝났어요. 수고했어요!"; showSummary(); }
+  banner.append("선생님이 탐험을 시작하면 상자를 열 수 있어요. 지금은 주변을 둘러보세요! ");
+  button("🔑 선생님: 탐험 시작", askStart);
 }
 
 // 팀원 절반 이상이 문을 열어 내 문도 열렸을 때 알려 준다 (내 열쇠로 연 문은 announceProgress가 알린다)
@@ -1144,6 +1217,7 @@ function drawMinimap() {
 }
 
 function onInteract(target) {
+  if (S.spectator) return toast("👀 관람 중에는 상자를 열 수 없어요. 친구들의 탐험을 지켜봐 주세요.");
   const stage = S.cls?.stage;
   if (target.kind === "door") {
     const need = DOORS[target.id];
@@ -1840,7 +1914,7 @@ function printAssessment(kind) {
   openPrint(`
     <header class="pr-head fa-head">
       <h1>벡터 유적 탈출 · 형성평가 ${isAnswer ? "<span class=\"fa-tag ans\">답지</span>" : "<span class=\"fa-tag\">문제지</span>"}</h1>
-      <p>${SET?.meta?.제목 ? `${fmt(SET.meta.제목)} · ` : unit ? `기하 ${unit.name} · ` : ""}${new Date().toLocaleDateString("ko-KR")} · ${S.ch}채널</p>
+      <p>${SET?.meta?.제목 ? `${fmt(SET.meta.제목)} · ` : unit ? `기하 ${unit.name} · ` : ""}${new Date().toLocaleDateString("ko-KR")} · ${chLabel(S.ch)}</p>
       <p class="fa-name">이름: <b>${esc(S.name ?? "")}</b> &emsp; ${isAnswer ? "" : `점수: ________ / ${PROBLEMS.length}`}</p>
     </header>
     ${isAnswer ? "" : `<p class="fa-guide">탐험에서 만난 문제를 다시 풀어 보세요. 풀이 과정을 적고 '답' 칸에 답을 쓰세요.</p>`}

@@ -8,16 +8,19 @@ import { renderClassBar } from "./classbar.js";
 import { ROOMS, BRIDGES, roomAt } from "./game.js";
 
 const $ = (s) => document.querySelector(s);
-// 수업 채널 1~7: 채널마다 완전히 분리된 수업 유적(Durable Object class:1~7)이다.
-const CHANNELS = ["1", "2", "3", "4", "5", "6", "7"];
+// 수업 채널: 팀전 1~6, 개인전 s1~s6. 채널마다 완전히 분리된 수업 유적(Durable Object class:…)이다.
+// 개인전 채널은 학생 방장이 시작하고, 교사 화면에서는 전체 관리자만 볼 수 있다.
+const CHANNELS = ["1", "2", "3", "4", "5", "6", "s1", "s2", "s3", "s4", "s5", "s6"];
+const isSoloCh = (ch) => String(ch).startsWith("s");
+const chLabel = (ch) => (isSoloCh(ch) ? `개인전 ${String(ch).slice(1)}채널` : `팀전 ${ch}채널`);
+// 학생 표시: 교사에게는 '닉네임 (이름)'
+const who = (st) => (st.nick && st.nick !== st.name ? `${st.nick} (${st.name})` : st.name);
 const STAGE_TEXT = { lobby: "⏸ 대기", play: "▶ 탐험 중", done: "■ 탐험 끝" };
 let net = null, last = null, answers = null, isMaster = false;
 const joinedCh = new Set(); // 이 비밀번호로 들어간 채널 (중간관리자는 자기 채널만)
 const failedCh = new Set(); // 이 비밀번호로 들어가지 못한 채널 (중간관리자에게 다른 채널은 당연히 실패)
 let loginError = "";
 const setByCh = {}; // 채널 → { set, answers } (채널마다 단원이 다를 수 있다)
-const setListByCh = {}; // 채널 → 그 채널에서 고를 수 있는 세트 목록 (중간관리자가 올린 세트는 그 채널에만)
-let allSetList = null; // 전체 관리자: 모든 채널의 올린 세트
 const conns = {}; // 채널 번호 → 연결 (5개 채널을 동시에 둘러본다)
 const pwByCh = {}; // 채널 번호 → 로그인 비밀번호 (joined 뒤 기억해 두기)
 const dashByCh = {}; // 채널 번호 → 마지막 받은 대시보드 (통합 뷰용)
@@ -57,10 +60,10 @@ $("#csv").onclick = () => { if (last) downloadCsv(last); };
 $("#chat-download").onclick = () => {
   if (!chatLog.length) return alert("아직 받은 채팅이 없어요. 수업이 시작되면 학생들의 채팅이 여기에 쌓여요.");
   const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const head = ["시각", "채널", "팀", "이름", "내용"];
+  const head = ["시각", "채널", "팀", "닉네임 (이름)", "내용"];
   const rows = chatLog.map((c) => [
     new Date(c.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-    `${c.ch}채널`, c.team ? `${c.team}팀` : "", c.name, c.text,
+    chLabel(c.ch), c.team ? `${c.team}팀` : "", c.realName && c.realName !== c.name ? `${c.name} (${c.realName})` : c.name, c.text,
   ]);
   const csv = "\ufeff" + [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n");
   const a = document.createElement("a");
@@ -137,7 +140,7 @@ function printAssessmentTeacher(kind, level) {
   showPrint(`
     <header class="pr-head fa-head">
       <h1>${fmt(SET?.meta?.제목 ?? "벡터 유적 탈출")} · 형성평가 ${isAnswer ? '<span class="fa-tag ans">답지</span>' : '<span class="fa-tag">문제지</span>'} <small>${level === "all" ? "하·중·상 전체" : `${LV[level]} 난이도`}</small></h1>
-      <p>${new Date().toLocaleDateString("ko-KR")} · ${activeCh}채널</p>
+      <p>${new Date().toLocaleDateString("ko-KR")} · ${chLabel(activeCh)}</p>
       ${isAnswer ? "" : '<p class="fa-name">이름: ____________ &emsp; 점수: ________</p>'}
     </header><div class="fa-cols">${items}</div>`, docTitle);
 }
@@ -196,7 +199,7 @@ function printSheet() {
         <p>상자 ${PROBLEMS.length}개 × 하·중·상 = ${PROBLEMS.length * 3}문항 · 접속 주소: ${location.origin}/?ch=${activeCh}</p>
       </div>
       <div class="tp-head-meta">
-        <div><b>채널:</b> ${activeCh}번 채널</div>
+        <div><b>채널:</b> ${chLabel(activeCh)}</div>
         <div><b>참여 학생:</b> ${last?.students?.length ?? 0}명</div>
         <div><b>일시:</b> ${new Date().toLocaleDateString("ko-KR")}</div>
       </div>
@@ -246,15 +249,12 @@ function onChannelMessage(ch, msg) {
       isMaster = true;
       $("#admin-panel").hidden = false;
       conns[ch]?.send({ type: "adminGet" });
-      conns[ch]?.send({ type: "setListGet" });
     }
-    if (!msg.master && msg.period) $(".admin-banner").dataset.period = `📅 ${ch}채널 사용 기간: ${msg.period}`;
+    if (!msg.master && msg.period) $(".admin-banner").dataset.period = `📅 ${chLabel(ch)} 사용 기간: ${msg.period}`;
     // 채널마다 단원(문항 세트)이 다를 수 있어서 채널별로 기억해 두고, 보고 있는 채널의 세트를 쓴다
     if (msg.set) setByCh[ch] = { set: msg.set, answers: msg.answers };
-    if (msg.sets) { setListByCh[ch] = msg.sets; if (ch === activeCh) fillSetSelect(msg.sets); }
-    if (ch === activeCh || !$("#uploaded-sets").children.length) renderUploaded();
-    if (ch === activeCh) { conns[ch]?.send({ type: "imageList" }); conns[ch]?.send({ type: "changeLogGet" }); }
-    $("#upload-scope").textContent = isMaster ? "· 전체 관리자: 모든 채널에서 고를 수 있어요" : `· ${ch}채널 전용: 이 채널에서만 보이고 바뀌어요`;
+    if (msg.sets) fillSetSelect(msg.sets);
+    if (ch === activeCh) conns[ch]?.send({ type: "changeLogGet" });
     if (msg.set && (ch === activeCh || !PROBLEMS.length)) { loadSet(msg.set); fillSetSelect(null, msg.set.id); }
     if (ch === activeCh || !answers) answers = msg.answers ?? null;
     $("#problems").replaceChildren(); // 정답을 받았으니 문제 카드를 새로 그린다
@@ -269,7 +269,7 @@ function onChannelMessage(ch, msg) {
     if (ch === activeCh) renderClassBar($("#class-bar"), msg, { showEnergy: true, showShelf: true });
   } else if (msg.type === "chat") {
     // 학생 채팅 누적 (모든 채널) — [💬 학생 채팅 기록 다운로드]로 내려받는다
-    chatLog.push({ at: Date.now(), ch, name: msg.name, team: msg.team, text: msg.text });
+    chatLog.push({ at: Date.now(), ch, name: msg.name, realName: msg.realName, team: msg.team, text: msg.text });
     if (chatLog.length > 3000) chatLog.splice(0, chatLog.length - 3000);
     $("#chat-download").textContent = `💬 학생 채팅 기록 다운로드 (${chatLog.length})`;
   } else if (msg.type === "set") {
@@ -282,14 +282,14 @@ function onChannelMessage(ch, msg) {
       buildAnswerSheet();
       fillSetSelect(null, msg.set.id);
     }
-  } else if (msg.type === "uploadResult") {
-    onUploadResult(msg, ch);
+  } else if (msg.type === "finalResult") {
+    // 팀전 채널이 60분이 지나 끝나면 서버가 끝나기 직전의 결과표를 보낸다 → 바로 CSV로 내려받는다
+    if (msg.dashboard?.students?.length) {
+      downloadCsv(msg.dashboard, { ch, at: msg.at, tag: "_60분종료" });
+      notice(`📥 ${chLabel(ch)}이 60분이 지나 끝났어요. 학생 ${msg.dashboard.students.length}명의 결과표(CSV)를 자동으로 내려받았어요.`);
+    }
   } else if (msg.type === "changeLog") {
     onChangeLog(msg, ch);
-  } else if (msg.type === "imageResult") {
-    if (ch === activeCh) onImageResult(msg);
-  } else if (msg.type === "setExample") {
-    download(msg.name ?? "문항세트_형식예시_geo-3-1.md", msg.md, "text/markdown");
   } else if (msg.type === "admin") {
     renderAdmin(msg);
   } else if (msg.type === "adminResult") {
@@ -334,7 +334,8 @@ function buildChannelTabs() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = `ch-tab${ch === activeCh ? " on" : ""}`;
-    b.textContent = `${ch}채널`;
+    b.textContent = chLabel(ch);
+    if (isSoloCh(ch)) b.classList.add("solo");
     b.onclick = () => switchChannel(ch);
     tabs.appendChild(b);
   }
@@ -348,9 +349,7 @@ function switchChannel(ch) {
   if (setByCh[ch]) {
     loadSet(setByCh[ch].set);
     answers = setByCh[ch].answers;
-    fillSetSelect(setListByCh[ch] ?? null, setByCh[ch].set.id);
-    renderUploaded();
-    conns[ch]?.send({ type: "imageList" });
+    fillSetSelect(null, setByCh[ch].set.id);
     conns[ch]?.send({ type: "changeLogGet" });
     $("#problems").replaceChildren();
     buildAnswerSheet();
@@ -379,12 +378,12 @@ function renderKpis(d) {
   const kv = $("#kpi-visitors");
   if (kv) kv.innerHTML = `<span class="kpi-icon">👁️</span><b>${v.today}<small>명</small></b><small>오늘 방문 (누적 ${v.total}명 · 접속 ${v.active}명)</small>`;
   $("#kpi-avg").innerHTML = `<span class="kpi-icon">📊</span><b>${avg}<small>점</small></b><small>평균 점수 · 정답률 ${acc === null ? "–" : `${acc}%`}</small>`;
-  $("#kpi-stage").innerHTML = `<span class="kpi-icon">🧭</span><b>${STAGE_TEXT[d.stage] ?? "–"}</b><small>${activeCh}채널 탐험 상태</small>`;
+  $("#kpi-stage").innerHTML = `<span class="kpi-icon">🧭</span><b>${STAGE_TEXT[d.stage] ?? "–"}</b><small>${chLabel(activeCh)} 탐험 상태${d.endsAt ? ` · ⏰ ${leftText(d.endsAt)}` : ""}</small>`;
   const teams = d.teams ?? [];
   const top = Math.max(1, ...teams.map((t) => t.score));
   const tb = $("#kpi-teams");
   tb.innerHTML = `<span class="kpi-icon">🚩</span><div class="kpi-team-bars">${
-    ["A", "B", "C", "D"].map((k) => {
+    ["A", "B", "C"].map((k) => {
       const t = teams.find((x) => x.team === k);
       const score = t?.score ?? 0;
       return `<div class="kpi-team-row"><span class="team-dot" style="background:${TEAM_COLORS[k]}"></span><i class="kpi-bar"><b style="width:${Math.round((score / top) * 100)}%;background:${TEAM_COLORS[k]}"></b></i><em>${score}</em></div>`;
@@ -404,12 +403,34 @@ function renderOverview() {
     card.type = "button";
     card.className = `ch-card${ch === activeCh ? " on" : ""}`;
     const top = d?.teams?.[0];
-    card.innerHTML = `<b>${ch}채널${ch === activeCh ? " · 보는 중" : ""}</b>
-      <small>${STAGE_TEXT[d?.stage] ?? "–"} · 접속 ${d?.students?.filter((s) => s.online).length ?? 0}명</small>
-      <small>${top ? `🥇 ${top.name} ${top.score}점` : "기록 없음"}</small>`;
+    card.innerHTML = `<b>${chLabel(ch)}${ch === activeCh ? " · 보는 중" : ""}</b>
+      <small>${STAGE_TEXT[d?.stage] ?? "–"} · 접속 ${d?.students?.filter((s) => s.online).length ?? 0}명${d?.spectators ? ` · 👀 ${d.spectators}` : ""}${d?.endsAt ? ` · ⏰ ${leftText(d.endsAt)}` : ""}</small>`;
+    card.classList.toggle("solo", isSoloCh(ch));
+    card.innerHTML += `
+      <small>${isSoloCh(ch) ? (d?.students?.[0] ? `🥇 ${who(d.students[0])} ${d.students[0].score}점` : "기록 없음") : top ? `🥇 ${top.name} ${top.score}점` : "기록 없음"}</small>`;
     card.onclick = () => switchChannel(ch);
     box.appendChild(card);
   }
+}
+
+// 남은 시간 글자: "42분 남음"
+function leftText(end) {
+  const m = Math.ceil(Math.max(0, end - Date.now()) / 60000);
+  return m > 0 ? `${m}분 남음` : "곧 종료";
+}
+
+// 화면 위쪽 알림 띠 (자동 다운로드 같은 일을 알린다)
+function notice(text) {
+  let el = $("#teacher-notice");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "teacher-notice";
+    el.className = "upload-result ok teacher-notice";
+    el.setAttribute("role", "status");
+    $("#dash").prepend(el);
+  }
+  el.textContent = text;
+  el.hidden = false;
 }
 
 function cell(tag, text, className) {
@@ -540,7 +561,7 @@ function renderDash(d) {
     const tr = document.createElement("tr");
     tr.appendChild(cell("td", ["🥇", "🥈", "🥉"][st.rank - 1] ?? String(st.rank)));
     const nameTd = cell("td", "", "name");
-    const nameBtn = cell("button", `${expanded.has(st.cid) ? "▾" : "▸"} ${st.name}`, "name-btn");
+    const nameBtn = cell("button", `${expanded.has(st.cid) ? "▾" : "▸"} ${who(st)}`, "name-btn");
     nameBtn.type = "button";
     if (st.team) {
       const dot = document.createElement("span");
@@ -573,7 +594,7 @@ function renderDash(d) {
     const kickBtn = cell("button", "강퇴", "btn danger kick-btn");
     kickBtn.type = "button";
     kickBtn.onclick = () => {
-      if (confirm(`${st.name} 학생을 유적에서 내보낼까요?`)) net?.send({ type: "kick", n: st.n });
+      if (confirm(`${who(st)} 학생을 유적에서 내보낼까요?`)) net?.send({ type: "kick", n: st.n });
     };
     kickTd.appendChild(kickBtn);
     tr.appendChild(kickTd);
@@ -618,9 +639,9 @@ function clock(ms) {
   return ms ? new Date(ms).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "–";
 }
 
-function downloadCsv(d) {
+function downloadCsv(d, { ch = activeCh, at = Date.now(), tag = "" } = {}) {
   const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
-  const head = ["순위", "이름", "팀", "점수", "들어온 시각", "탈출 시각", "벡터 점프", "활동 마일리지", "개념 학습", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.풀이시간(초)`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`), "탐험 소감"];
+  const head = ["순위", "이름", "닉네임", "팀", "점수", "들어온 시각", "탈출 시각", "벡터 점프", "활동 마일리지", "개념 학습", ...PROBLEMS.map((p, i) => `${i + 1}.${p.relic}`), ...PROBLEMS.map((p, i) => `${i + 1}.풀이시간(초)`), ...PROBLEMS.map((p, i) => `${i + 1}.오답`), "탐험 소감"];
   const rows = d.students.map((st) => {
     const marks = PROBLEMS.map((p) => {
       const r = st.probs[p.id];
@@ -633,12 +654,13 @@ function downloadCsv(d) {
     });
     const times = PROBLEMS.map((p) => (st.probs[p.id]?.timeMs ? Math.round(st.probs[p.id].timeMs / 1000) : ""));
     const wrongs = PROBLEMS.map((p) => (st.probs[p.id]?.wrongs ?? []).join(" / "));
-    return [st.rank, st.name, st.team ?? "", st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, st.mileage ?? 0, st.concepts ?? 0, ...marks, ...times, ...wrongs, st.reflection ?? ""];
+    return [st.rank, st.name, st.nick ?? "", st.team ?? "", st.score, clock(st.joinedAt), st.escapedAt ? clock(st.escapedAt) : "", `${st.lab}/${d.labLevels}`, st.mileage ?? 0, st.concepts ?? 0, ...marks, ...times, ...wrongs, st.reflection ?? ""];
   });
   const csv = "﻿" + [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  a.download = `벡터유적탈출_${new Date().toISOString().slice(0, 10)}.csv`;
+  const stamp = new Date(at + 9 * 3600 * 1000).toISOString().slice(0, 16).replace("T", "_").replace(":", "");
+  a.download = `벡터유적탈출_${chLabel(ch).replace(/\s/g, "")}_${stamp}${tag}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -698,7 +720,7 @@ function renderAdmin(msg) {
 }
 
 // ---------- 이 채널의 단원(문항 세트) ----------
-// 목록은 서버가 보내 준다: 기본 세트 + 전체 관리자가 올린 세트 [{ id, title, uploaded }]
+// 목록은 서버가 보내 준다: 기본 세트 [{ id, title }]
 let setList = [];
 const setTitle = (id) => setList.find((x) => x.id === id)?.title ?? id;
 function fillSetSelect(list, current) {
@@ -709,7 +731,7 @@ function fillSetSelect(list, current) {
   sel.replaceChildren(...setList.map((x) => {
     const o = document.createElement("option");
     o.value = x.id;
-    o.textContent = `${x.uploaded ? "📤 " : ""}${x.title}`;
+    o.textContent = x.title;
     o.selected = x.id === current;
     return o;
   }));
@@ -726,7 +748,7 @@ $("#set-select")?.addEventListener("change", (e) => {
   net?.send({ type: "setSet", setId: id });
 });
 
-// ---------- 문항 세트(md) 올리기: 중간관리자는 자기 채널 전용, 전체 관리자는 모든 채널 ----------
+// ---------- 파일 내려받기 ----------
 function download(name, text, type) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
@@ -736,70 +758,6 @@ function download(name, text, type) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-async function sendSetFile(check) {
-  const f = $("#set-file").files?.[0];
-  const box = $("#upload-result");
-  if (!f) { box.className = "upload-result bad"; box.textContent = "먼저 md 파일을 골라 주세요."; return; }
-  if (f.size > 200_000) { box.className = "upload-result bad"; box.textContent = "파일이 너무 커요 (200KB 이하)."; return; }
-  box.className = "upload-result"; box.textContent = "검사하는 중…";
-  net?.send({ type: "uploadSet", md: await f.text(), check });
-}
-// 그림 파일 올리기: base64로 보내고, 받은 주소를 '그림: /img/…' 줄로 보여 준다
-$("#img-upload").onclick = async () => {
-  const f = $("#img-file").files?.[0];
-  const box = $("#img-result");
-  if (!f) { box.className = "upload-result bad"; box.textContent = "먼저 그림 파일을 골라 주세요."; return; }
-  box.className = "upload-result"; box.textContent = "그림을 webp로 줄이는 중…";
-  const blob = await toWebp(f); // 학생 기기가 빨리 받도록 가장 가벼운 webp로 줄인다
-  if (blob.size > 700_000) { box.className = "upload-result bad"; box.textContent = `그림이 너무 커요 (${Math.round(blob.size / 1000)}KB). 700KB 이하로 줄여 주세요.`; return; }
-  const buf = new Uint8Array(await blob.arrayBuffer());
-  let bin = "";
-  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-  box.className = "upload-result"; box.textContent = blob !== f ? `webp로 줄였어요 (${Math.round(f.size / 1000)}KB → ${Math.round(blob.size / 1000)}KB). 올리는 중…` : "올리는 중…";
-  net?.send({ type: "uploadImage", name: f.name.replace(/\.\w+$/, blob !== f ? ".webp" : "$&"), data: btoa(bin) });
-};
-// png·jpg를 가로 1200px 이하 webp(품질 0.8)로 바꾼다. 움직이는 gif나, 바꿔도 더 커지면 원본 그대로.
-async function toWebp(f) {
-  if (!/^image\/(png|jpeg|webp)$/.test(f.type)) return f;
-  try {
-    const bmp = await createImageBitmap(f);
-    const k = Math.min(1, 1200 / bmp.width);
-    const c = document.createElement("canvas");
-    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-    const out = await new Promise((r) => c.toBlob(r, "image/webp", 0.8));
-    return out && out.type === "image/webp" && out.size < f.size ? out : f;
-  } catch { return f; }
-}
-function onImageResult(msg) {
-  const box = $("#img-result");
-  if (!msg.ok) { box.className = "upload-result bad"; box.textContent = `⚠️ ${msg.message}`; }
-  else if (msg.saved) {
-    box.className = "upload-result ok";
-    box.innerHTML = `✅ 올렸어요. md 파일에 이 줄을 붙여 넣으세요: <code>그림: ${msg.saved}</code> `;
-    const copy = document.createElement("button");
-    copy.type = "button"; copy.className = "btn"; copy.textContent = "📋 복사";
-    copy.onclick = () => navigator.clipboard?.writeText(`그림: ${msg.saved}`).then(() => { copy.textContent = "✅ 복사됨"; });
-    box.appendChild(copy);
-  } else if (msg.deleted) { box.className = "upload-result ok"; box.textContent = "🗑️ 그림을 지웠어요."; }
-  if (!msg.images) return;
-  const ul = $("#uploaded-imgs");
-  ul.replaceChildren(...msg.images.map((x) => {
-    const li = document.createElement("li");
-    li.innerHTML = `<img src="/img/${x.id}" alt="" class="img-thumb"> `;
-    li.append(`${x.name || x.id} · ${x.owner ? `${x.owner}채널 전용` : "모든 채널"} · 그림: /img/${x.id} `);
-    const copy = document.createElement("button");
-    copy.type = "button"; copy.className = "btn"; copy.textContent = "📋 복사";
-    copy.onclick = () => navigator.clipboard?.writeText(`그림: /img/${x.id}`).then(() => { copy.textContent = "✅ 복사됨"; });
-    const del = document.createElement("button");
-    del.type = "button"; del.className = "btn danger"; del.textContent = "지우기";
-    del.onclick = () => { if (confirm("이 그림을 지울까요? 이 그림을 쓰는 문항·카드에서는 그림이 보이지 않게 돼요.")) net?.send({ type: "deleteImage", id: x.id }); };
-    li.append(copy, del);
-    return li;
-  }));
-  if (!ul.children.length) ul.innerHTML = "<li class='muted'>아직 올린 그림이 없어요.</li>";
-}
-
 // ---------- 문항 변경 기록: 목록 + CSV ----------
 let changeEntries = [];
 const kst = (t) => new Date(t + 9 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 16);
@@ -834,57 +792,3 @@ $("#changelog-csv").onclick = () => {
   download(`문항변경기록_${isMaster ? "전체" : `${activeCh}채널`}_${kst(Date.now()).slice(0, 10)}.csv`, "\ufeff" + lines.join("\r\n"), "text/csv");
 };
 
-$("#set-check").onclick = () => sendSetFile(true);
-$("#set-upload").onclick = () => sendSetFile(false);
-$("#set-example").onclick = () => net?.send({ type: "setExample", kind: "math" });
-$("#set-example-other").onclick = () => net?.send({ type: "setExample", kind: "other" });
-
-function onUploadResult(msg, ch = activeCh) {
-  const box = $("#upload-result");
-  const sum = msg.summary ? `「${msg.summary.title}」 상자 ${msg.summary.boxes}개 · 문항 ${msg.summary.items}개 · 핵심 카드 ${msg.summary.cards}장 · 협업 상자 ${msg.summary.coop}개` : "";
-  if (!msg.ok) {
-    box.className = "upload-result bad";
-    box.innerHTML = `<b>⚠️ 고칠 곳이 있어요.</b>${sum ? `<br>${sum}` : ""}<ul>${msg.errors.map((e) => `<li>${e.replace(/[<>&]/g, "")}</li>`).join("")}</ul>`;
-  } else if (msg.checked) {
-    box.className = "upload-result ok"; box.textContent = `✅ 형식과 정답이 모두 괜찮아요. ${sum} — '검사 후 저장'을 누르면 저장돼요.`;
-  } else if (msg.saved) {
-    box.className = "upload-result ok";
-    box.textContent = msg.owner
-      ? `✅ ${msg.owner}채널 전용으로 저장했어요 (세트 이름: ${msg.id}). ${sum} — 다른 채널에는 보이지 않아요.`
-      : `✅ 저장했어요 (세트 이름: ${msg.id}). ${sum} — 모든 채널의 "이 채널 단원"에서 고를 수 있어요.`;
-  } else if (msg.deleted) {
-    box.className = "upload-result ok"; box.textContent = `🗑️ '${msg.deleted}' 세트를 지웠어요.`;
-  }
-  if (msg.allSets) allSetList = msg.allSets;
-  if (msg.sets) {
-    setListByCh[ch] = msg.sets;
-    if (ch === activeCh) fillSetSelect(msg.sets);
-    renderUploaded();
-  }
-  // 중간관리자: 저장한 세트를 지금 이 채널에 바로 적용할지 묻는다 (적용하면 새 수업으로 시작)
-  if (msg.saved && msg.owner && ch === activeCh) {
-    const n = last?.students?.length ?? 0;
-    if (confirm(`방금 올린 세트를 ${ch}채널에 지금 적용할까요?\n학생 ${n}명의 기록이 지워지고 새 수업으로 시작해요. 먼저 CSV를 내려받아 두세요.\n(나중에 '이 채널 단원'에서 골라도 돼요)`)) {
-      net?.send({ type: "setSet", setId: msg.id });
-    }
-  }
-}
-
-// 올린 세트 목록: 전체 관리자는 모든 채널의 세트, 중간관리자는 자기 채널 전용 세트만 (지우기 가능)
-function renderUploaded() {
-  const ul = $("#uploaded-sets");
-  if (!ul) return;
-  const list = isMaster ? (allSetList ?? setListByCh[activeCh] ?? []) : (setListByCh[activeCh] ?? []);
-  const mine = list.filter((x) => x.uploaded && (isMaster || x.owner === activeCh));
-  ul.replaceChildren(...mine.map((x) => {
-    const li = document.createElement("li");
-    li.textContent = `📤 ${x.title} (${x.id}) · ${x.owner ? `${x.owner}채널 전용` : "모든 채널"} · ${x.at ? new Date(x.at).toLocaleString("ko-KR") : ""} `;
-    const del = document.createElement("button");
-    del.type = "button"; del.className = "btn danger"; del.textContent = "지우기";
-    const conn = x.owner && conns[x.owner] ? conns[x.owner] : net;
-    del.onclick = () => { if (confirm(`'${x.title}' 세트를 지울까요? 이 세트를 쓰는 채널은 '새 수업 시작' 때 기본 세트로 돌아가요.`)) conn?.send({ type: "deleteSet", id: x.id }); };
-    li.appendChild(del);
-    return li;
-  }));
-  if (!ul.children.length) ul.innerHTML = `<li class='muted'>${isMaster ? "아직 올린 세트가 없어요." : `아직 ${activeCh}채널에 올린 세트가 없어요.`}</li>`;
-}

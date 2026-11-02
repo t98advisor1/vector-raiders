@@ -2,7 +2,6 @@
 import geo31 from "../content/sets/geo-3-1.md";
 import geo32 from "../content/sets/geo-3-2.md";
 import geo33 from "../content/sets/geo-3-3.md";
-import sciExample from "../content/examples/sci-motion.md";
 import { parseSet } from "./setfile.js";
 
 const RAW = { "geo-3-1": geo31, "geo-3-2": geo32, "geo-3-3": geo33 };
@@ -12,8 +11,6 @@ export const UNIT_SET = { "3-1": "geo-3-1", "3-2": "geo-3-2", "3-3": "geo-3-3" }
 export const SET_LIST = Object.keys(RAW);
 export const DEFAULT_SET = "geo-3-1";
 
-export const builtinRaw = (id) => RAW[id] ?? null; // 업로드 형식 예시로 내려 줄 원본 md
-export const EXAMPLES = { math: { name: "문항세트_형식예시_수학_geo-3-1.md", md: geo31 }, other: { name: "문항세트_형식예시_다른교과_과학.md", md: sciExample } };
 
 export function builtinSet(id) {
   if (!RAW[id]) return null;

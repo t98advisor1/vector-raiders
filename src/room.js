@@ -3,32 +3,15 @@
 // WebSocket Hibernation API를 써서 조용한 동안에는 비용이 들지 않게 한다.
 import { DurableObject } from "cloudflare:workers";
 import { gradeLevel, answerText } from "./answers.js";
-import { builtinSet, UNIT_SET, DEFAULT_SET, SET_LIST, EXAMPLES } from "./sets.js";
-import { parseSet, validateSet } from "./setfile.js";
+import { builtinSet, UNIT_SET, DEFAULT_SET, SET_LIST } from "./sets.js";
 import { samePassword, checkTeacherAccess, periodStatus, cleanPasswordList, cleanDate, todayKst, parseChannelPasswords } from "./passwords.js";
 import { SheetLog } from "./sheets.js";
 
 const STAGES = ["lobby", "play", "done"];
-const MAX_IMAGE = 700_000; // 그림 파일 한 장 최대 크기(바이트). 웹소켓 메시지 1MB 안에 들어가게
-
-// 올린 그림 파일 검사: base64를 풀어 파일 머리(매직 바이트)로 종류를 정한다. SVG는 받지 않는다(스크립트가 들 수 있어서).
-export function checkImage(b64) {
-  if (typeof b64 !== "string" || !/^[A-Za-z0-9+/]+=*$/.test(b64)) return { ok: false, message: "그림 파일을 읽을 수 없어요." };
-  const size = Math.floor((b64.length * 3) / 4) - (b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0);
-  if (size > MAX_IMAGE) return { ok: false, message: `그림이 너무 커요 (${Math.round(size / 1000)}KB). 700KB 이하로 줄여 주세요.` };
-  const h = atob(b64.slice(0, 24));
-  const at = (i) => h.charCodeAt(i);
-  if (at(0) === 0x89 && h.slice(1, 4) === "PNG") return { ok: true, ext: "png", mime: "image/png", size };
-  if (at(0) === 0xff && at(1) === 0xd8 && at(2) === 0xff) return { ok: true, ext: "jpg", mime: "image/jpeg", size };
-  if (h.slice(0, 4) === "GIF8") return { ok: true, ext: "gif", mime: "image/gif", size };
-  if (h.slice(0, 4) === "RIFF" && h.slice(8, 12) === "WEBP") return { ok: true, ext: "webp", mime: "image/webp", size };
-  return { ok: false, message: "png, jpg, gif, webp 그림만 올릴 수 있어요." };
-}
 const MAP_W = 74, MAP_H = 15, ROOM_COUNT = 4; // public/js/game.js의 지도 크기
 const POS_TICK_MS = 200; // 위치는 모아서 0.2초마다 한 번 보낸다
 const POS_IDLE_TICKS = 150; // 30초 동안 아무도 움직이지 않으면 타이머를 멈춘다
 const LAB_LEVELS = ["l1", "l2", "l3", "l4", "l5"];
-const MAX_STUDENTS = 32;
 const MAX_TEAM_SIZE = 8;
 const MAX_TRIES = 20;
 const UNLOCK_RATIO = 0.7;
@@ -49,18 +32,24 @@ const COOP_REACH = 4; // 협업 상자: 같은 팀원이 이만큼(칸) 가까�
 const COOP_WAIT_MS = 2 * 60 * 1000;
 // 개념 학습 점수를 줄 수 있는 카드: 문항(p1~p9), 벡터 점프(l1~l5), 핵심 카드(card1~), 비석, 수학자 카드
 const CONCEPT_KEY_RE = /^(p[1-9]|l[1-5]|card\d{1,2}|tab_[a-z0-9_]{1,20}|math_[a-z]{1,20})$/;
-// 팀전: 학생이 들어올 때마다 가장 사람이 적은 팀에 한 명씩 나눠 담는다.
-const TEAMS = ["A", "B", "C", "D"];
-const TEAM_NAMES = { A: "A팀", B: "B팀", C: "C팀", D: "D팀" };
+// 팀전 채널(1~6): 학생이 A·B·C 세 팀 중 하나를 고른다. 팀당 8명, 한 채널 24명까지.
+const TEAMS = ["A", "B", "C"];
+const TEAM_NAMES = { A: "A팀", B: "B팀", C: "C팀" };
+const MAX_STUDENTS = TEAMS.length * MAX_TEAM_SIZE;
+// 개인전 채널(s1~s6): 8명이 겨룬다. 먼저 들어온 학생이 방장이 되어 시작한다.
+// 8명이 차면 그다음 학생은 관람으로 들어온다. 관람을 합쳐 15명까지.
+const SOLO_PLAYERS = 8;
+const SOLO_PEOPLE = 15;
 const LAB_NAMES = { l1: "삼각형법", l2: "평행사변형법", l3: "실수배", l4: "길 찾기", l5: "길 찾기 2" };
 const STAGE_NAMES = { lobby: "대기", play: "탐험 시작", done: "탐험 끝" };
 const problemName = (pid) => `상자 ${pid.slice(1)}`;
-const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // 마지막 활동 뒤 24시간이 지나면 수업 기록을 지운다
-const TTL_REFRESH_MS = 60 * 60 * 1000; // 삭제 예약은 한 시간에 한 번만 뒤로 미룬다
+// 모든 방(팀전·개인전·연습)은 첫 학생이 들어온 때부터 60분 뒤에 끝난다. 모두 내보내고 기록을 초기화한다.
+// 팀전 채널은 끝나기 직전의 결과표를 교사 화면이 자동으로 내려받는다(교사 화면이 닫혀 있으면 다음에 열 때).
+export const ROOM_LIFE_MS = 60 * 60 * 1000;
+const RESULT_KEEP_MS = 24 * 60 * 60 * 1000; // 교사가 받지 못한 결과표를 보관하는 시간
 const MAX_MESSAGE = 2048;
-const MAX_UPLOAD_MESSAGE = 220_000; // 전체 관리자가 md 세트를 올릴 때만 (세트 파일은 200KB 이하)
 const ADMIN_ROOM = "admin:global"; // 전체 관리자가 바꾼 중간관리자(채널) 설정을 보관하는 Durable Object
-const CHANNEL_IDS = ["1", "2", "3", "4", "5", "6", "7"];
+const CHANNEL_IDS = ["1", "2", "3", "4", "5", "6"]; // 중간관리자 비밀번호·기간을 정하는 팀전 채널
 const PERIOD_TEXT = { notyet: "아직 사용 기간이 시작되지 않았어요", expired: "사용 기간이 끝났어요" };
 const periodLabel = (cfg) => (cfg?.from || cfg?.until ? `${cfg.from || "처음"} ~ ${cfg.until || "제한 없음"}` : "제한 없음");
 
@@ -78,6 +67,10 @@ const mileageOf = (a) =>
   Math.min(MILEAGE_CAP, Math.floor((a?.dist ?? 0) / 10) * 2 + Math.floor(a?.jumps ?? 0) + Math.floor((a?.shots ?? 0) / 5));
 
 // 비밀번호 비교: 길이가 같으면 글자마다 모두 비교한다.
+// 학생에게는 닉네임만, 교사에게는 '닉네임 (이름)'으로 보인다.
+const nickOf = (st) => st.nick || st.name;
+const tagOf = (st) => (st.nick && st.nick !== st.name ? `${st.nick} (${st.name})` : st.name);
+
 function cleanName(raw) {
   if (typeof raw !== "string") return "";
   return raw.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 12);
@@ -94,10 +87,10 @@ export class Room extends DurableObject {
     this.posDirty = false;
     this.posTimer = null;
     this.posIdle = 0;
-    this.ttlSetAt = 0;
     this.sheet = new SheetLog(env, () => this.sheetSummaries());
     ctx.blockConcurrencyWhile(async () => {
       this.data = (await ctx.storage.get("data")) ?? null;
+      this.channel = this.data?.ch; // 알람·잠든 뒤 깨어난 경우에는 요청 헤더가 없다
     });
   }
 
@@ -140,48 +133,7 @@ export class Room extends DurableObject {
     const url = new URL(request.url);
     // 중간관리자 설정 보관함(admin:global) 전용. worker.js는 /ws와 /api/stats만 넘기므로 밖에서는 부를 수 없다.
     if (url.pathname === "/admin/get") return Response.json((await this.ctx.storage.get("channels")) ?? {});
-    // 올린 문항 세트: 목록(setIndex)과 세트마다 원본 md(set:아이디)
-    if (url.pathname === "/admin/sets") return Response.json((await this.ctx.storage.get("setIndex")) ?? []);
-    if (url.pathname === "/admin/setmd") return Response.json({ md: (await this.ctx.storage.get(`set:${url.searchParams.get("id")}`)) ?? null });
-    if (url.pathname === "/admin/setput" && request.method === "POST") {
-      const { id, md, info } = await request.json();
-      const index = ((await this.ctx.storage.get("setIndex")) ?? []).filter((x) => x.id !== id);
-      index.push({ id, ...info });
-      await this.ctx.storage.put(`set:${id}`, md);
-      await this.ctx.storage.put("setIndex", index);
-      return Response.json(index);
-    }
-    if (url.pathname === "/admin/setdel" && request.method === "POST") {
-      const { id } = await request.json();
-      const index = ((await this.ctx.storage.get("setIndex")) ?? []).filter((x) => x.id !== id);
-      await this.ctx.storage.delete(`set:${id}`);
-      await this.ctx.storage.put("setIndex", index);
-      return Response.json(index);
-    }
-    // 올린 그림 파일: 목록(imgIndex)과 그림마다 { mime, data(base64) }
-    if (url.pathname === "/admin/imgs") return Response.json((await this.ctx.storage.get("imgIndex")) ?? []);
-    if (url.pathname === "/admin/img") {
-      const rec = await this.ctx.storage.get(`img:${url.searchParams.get("id")}`);
-      if (!rec) return new Response("not found", { status: 404 });
-      const bin = Uint8Array.from(atob(rec.data), (c) => c.charCodeAt(0));
-      return new Response(bin, { headers: { "Content-Type": rec.mime, "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" } });
-    }
-    if (url.pathname === "/admin/imgput" && request.method === "POST") {
-      const { id, mime, data, info } = await request.json();
-      const index = ((await this.ctx.storage.get("imgIndex")) ?? []).filter((x) => x.id !== id);
-      index.push({ id, ...info });
-      await this.ctx.storage.put(`img:${id}`, { mime, data });
-      await this.ctx.storage.put("imgIndex", index);
-      return Response.json(index);
-    }
-    if (url.pathname === "/admin/imgdel" && request.method === "POST") {
-      const { id } = await request.json();
-      const index = ((await this.ctx.storage.get("imgIndex")) ?? []).filter((x) => x.id !== id);
-      await this.ctx.storage.delete(`img:${id}`);
-      await this.ctx.storage.put("imgIndex", index);
-      return Response.json(index);
-    }
-    // 문항 변경 기록 (세트 올림·지움·채널 적용, 그림 올림·지움): 최근 500건
+    // 문항 변경 기록 (채널 단원 바꿈): 최근 500건
     if (url.pathname === "/admin/logs") return Response.json((await this.ctx.storage.get("changeLog")) ?? []);
     if (url.pathname === "/admin/logput" && request.method === "POST") {
       const entry = await request.json();
@@ -207,7 +159,7 @@ export class Room extends DurableObject {
     if (url.pathname === "/api/practice-sets") {
       // 연습 모드 세트 고르기: 이 채널이 지금 수업에 쓰는 세트와, 이 채널에서 볼 수 있는 세트 목록(정답 없이 제목만)
       this.channel = request.headers.get("X-Channel") ?? "1";
-      const sets = (await this.setList()).map(({ id, title, uploaded }) => ({ id, title, uploaded }));
+      const sets = this.setList();
       const cur = this.data?.setId ?? DEFAULT_SET;
       return Response.json({ ch: this.channel, current: sets.find((x) => x.id === cur) ?? sets[0], sets });
     }
@@ -223,43 +175,13 @@ export class Room extends DurableObject {
   }
 
   // ---------- 문항 세트 ----------
-  // 이 유적이 쓰는 세트. 수업 채널은 기본 세트, 연습은 학생이 고른 단원의 세트.
-  set() {
-    const id = this.data?.setId;
-    if (this.uploaded?.id === id) return this.uploaded;
-    return builtinSet(id) ?? builtinSet(DEFAULT_SET);
-  }
+  // 이 유적이 쓰는 세트. 수업 채널은 교사가 고른 단원, 연습은 학생이 고른 단원의 세트.
+  set() { return builtinSet(this.data?.setId) ?? builtinSet(DEFAULT_SET); }
 
-  // 올린 세트를 쓰는 유적이면 처음 한 번 보관함에서 md를 받아 읽어 둔다
-  async ensureSet() {
-    const id = this.data?.setId;
-    if (!id || builtinSet(id) || this.uploaded?.id === id) return;
-    try {
-      const { md } = await (await this.adminStub().fetch(`https://admin/admin/setmd?id=${encodeURIComponent(id)}`)).json();
-      if (md) this.uploaded = { id, ...validateSet(md, gradeLevel).set };
-    } catch {}
-  }
-
-  // 고를 수 있는 세트 목록: 기본 세트 + 올린 세트 [{ id, title, uploaded, owner }]
-  //   owner가 없으면 전체 관리자가 올린 세트(모든 채널), 있으면 그 채널 중간관리자가 올린 세트(그 채널만).
-  //   all=true는 전체 관리자의 관리 목록용(모든 채널의 세트).
-  async uploadedIndex() {
-    try { return await (await this.adminStub().fetch("https://admin/admin/sets")).json(); } catch { return []; }
-  }
-  async setList(all = false) {
-    const base = SET_LIST.map((id) => ({ id, title: builtinSet(id)?.meta?.제목 ?? id, uploaded: false }));
-    const ch = String(this.channel ?? "1");
-    const up = (await this.uploadedIndex()).filter((x) => all || !x.owner || x.owner === ch);
-    return [...base, ...up.map((x) => ({ id: x.id, title: x.title, uploaded: true, at: x.at, owner: x.owner ?? null }))];
-  }
-  // 연습에서 고른 세트가 그 채널에서 쓸 수 있는 세트인지 확인한다(다른 채널 전용 세트는 못 고른다)
-  async practiceSetId(msg) {
-    if (typeof msg.setId !== "string" || !msg.setId) return null;
-    if (builtinSet(msg.setId)) return msg.setId;
-    const ch = typeof msg.ch === "string" && CHANNEL_IDS.includes(msg.ch) ? msg.ch : "1";
-    const up = (await this.uploadedIndex()).find((x) => x.id === msg.setId);
-    return up && (!up.owner || up.owner === ch) ? up.id : null;
-  }
+  // 고를 수 있는 세트 목록 (기본 세트) [{ id, title }]
+  setList() { return SET_LIST.map((id) => ({ id, title: builtinSet(id)?.meta?.제목 ?? id })); }
+  // 연습에서 고른 세트가 있는 세트인지 확인한다
+  practiceSetId(msg) { return typeof msg.setId === "string" && builtinSet(msg.setId) ? msg.setId : null; }
   level(pid, diff) { return this.set().boxes[Number(pid.slice(1)) - 1]?.levels[diff] ?? null; }
 
   // 학생에게 보내는 세트: 정답을 빼고, 협업 문항의 조건 ㉠·㉡도 뺀다(짝이 되면 따로 보낸다).
@@ -320,7 +242,8 @@ export class Room extends DurableObject {
     // 이미 짝이 된 학생이 창을 닫았다가 다시 열면 같은 짝·같은 조건을 다시 보낸다
     const pair = c.pairs[key];
     if (pair?.includes(cid)) {
-      return this.send(ws, { type: "coop", pid, conditions: [conds[pair.indexOf(cid)] ?? conds[0]], partner: this.data.students[pair.find((x) => x !== cid)]?.name });
+      const mate = this.data.students[pair.find((x) => x !== cid)];
+      return this.send(ws, { type: "coop", pid, conditions: [conds[pair.indexOf(cid)] ?? conds[0]], partner: mate && nickOf(mate) });
     }
     const waiting = c.wait[key];
     const me = this.pos.get(cid);
@@ -331,9 +254,9 @@ export class Room extends DurableObject {
       c.pairs[key] = [waiting.cid, cid];
       await this.save();
       const mate = this.data.students[waiting.cid];
-      this.sendTo(waiting.cid, { type: "coop", pid, conditions: [conds[0]], partner: st.name });
-      this.send(ws, { type: "coop", pid, conditions: [conds[1] ?? conds[0]], partner: mate?.name });
-      this.log({ type: "협업 시작", name: `${mate?.name} & ${st.name}`, problem: problemName(pid) });
+      this.sendTo(waiting.cid, { type: "coop", pid, conditions: [conds[0]], partner: nickOf(st) });
+      this.send(ws, { type: "coop", pid, conditions: [conds[1] ?? conds[0]], partner: mate && nickOf(mate) });
+      this.log({ type: "협업 시작", name: `${mate && tagOf(mate)} & ${tagOf(st)}`, problem: problemName(pid) });
       return;
     }
     c.wait[key] = { cid, at: Date.now() };
@@ -399,20 +322,54 @@ export class Room extends DurableObject {
     try { return await (await this.adminStub().fetch("https://admin/admin/get")).json(); } catch { return {}; }
   }
 
+  // 알람은 두 가지: 방이 열린 지 60분(종료), 또는 종료 뒤 남겨 둔 결과표 정리
   async alarm() {
-    for (const ws of this.ctx.getWebSockets()) {
-      try { ws.close(4000, "room expired"); } catch {}
+    const end = this.endsAt;
+    if (end) {
+      if (Date.now() >= end - 1000) return this.expire();
+      return this.ctx.storage.setAlarm(end); // 일찍 깨어났으면 다시 맞춘다
     }
-    await this.ctx.storage.deleteAll();
-    this.data = null;
+    await this.ctx.storage.delete("lastResult");
+  }
+
+  // 방을 연다: 첫 학생이 들어온 때부터 60분을 잰다
+  async openRoom() {
+    if (this.data.openedAt) return;
+    this.data.openedAt = Date.now();
+    await this.save();
+    await this.ctx.storage.setAlarm(this.data.openedAt + ROOM_LIFE_MS);
+  }
+
+  get endsAt() { return this.data?.openedAt ? this.data.openedAt + ROOM_LIFE_MS : null; }
+
+  // 60분 종료: 모두 내보내고 기록을 초기화한다. 팀전 채널은 결과표를 교사 화면에 보낸다.
+  async expire() {
+    const sockets = this.ctx.getWebSockets();
+    const teachers = sockets.filter((ws) => ws.deserializeAttachment()?.role === "teacher");
+    if (!this.practice && !this.solo && Object.keys(this.data.students).length) {
+      const result = { type: "finalResult", ch: this.channel, at: Date.now(), openedAt: this.data.openedAt, setId: this.data.setId, dashboard: this.dashboard() };
+      for (const ws of teachers) this.send(ws, result);
+      await this.ctx.storage.put("lastResult", { ...result, delivered: teachers.length > 0 });
+    }
+    this.log({ type: "방 종료", name: "서버", detail: "60분이 지나 모두 내보내고 기록을 초기화했어요" });
+    for (const ws of sockets) {
+      if (ws.deserializeAttachment()?.role === "teacher") continue;
+      this.send(ws, { type: "expired", message: "60분이 지나 방이 끝났어요. 기록은 초기화되었어요." });
+      try { ws.close(4010, "room expired"); } catch {}
+    }
+    const { mode, ch, setId } = this.data;
+    this.data = freshData(mode);
+    Object.assign(this.data, { ch, setId });
+    this.pos.clear();
+    this.lastPos.clear();
+    await this.save();
+    await this.ctx.storage.setAlarm(Date.now() + RESULT_KEEP_MS);
+    if (!this.practice) this.sheet.newClass();
+    for (const ws of teachers) { this.send(ws, this.dashboard()); this.send(ws, this.classState()); }
   }
 
   async save() {
     await this.ctx.storage.put("data", this.data);
-    if (Date.now() - this.ttlSetAt > TTL_REFRESH_MS) {
-      this.ttlSetAt = Date.now();
-      await this.ctx.storage.setAlarm(Date.now() + ROOM_TTL_MS);
-    }
   }
 
   send(ws, msg) {
@@ -421,10 +378,10 @@ export class Room extends DurableObject {
 
   async webSocketMessage(ws, raw) {
     this.data ??= freshData(this.mode); // 기록이 지워진 뒤 처음 들어오면 새 유적을 연다
+    this.channel ??= this.data.ch ?? "1";
+    this.data.ch ??= this.channel;
     if (typeof raw !== "string") return;
-    const isTeacher = ws.deserializeAttachment()?.role === "teacher";
-    if (raw.length > (isTeacher ? MAX_UPLOAD_MESSAGE : MAX_MESSAGE)) return;
-    await this.ensureSet();
+    if (raw.length > MAX_MESSAGE) return;
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     const who = ws.deserializeAttachment() ?? { role: null };
@@ -433,6 +390,7 @@ export class Room extends DurableObject {
     if (msg.type === "start") return this.onStartCode(ws, msg);
     if (who.role === "teacher") return this.onTeacher(ws, msg);
     if (who.role === "student") return this.onStudent(ws, who.cid, msg);
+    // 관람(spectator)은 보기만 한다
   }
 
   async webSocketClose(ws, code) {
@@ -456,7 +414,7 @@ export class Room extends DurableObject {
     const stillHere = this.ctx.getWebSockets().some((o) => o !== ws && o.readyState === 1 && o.deserializeAttachment()?.cid === a.cid);
     if (stillHere) return;
     st.lastSeenAt = Date.now();
-    this.log({ type: "퇴장", name: st.name });
+    this.log({ type: "퇴장", name: tagOf(st) });
   }
 
   dropPosition(ws) {
@@ -490,6 +448,33 @@ export class Room extends DurableObject {
   }
 
   get practice() { return this.data?.mode === "practice"; }
+  // 개인전 채널(s1~s6)
+  get solo() { return !this.practice && String(this.channel ?? this.data?.ch ?? "").startsWith("s"); }
+
+  // 지금 접속한 학생·관람자 수 (exceptCid는 빼고)
+  peopleOnline(exceptCid) {
+    const set = new Set();
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment();
+      if ((a?.role === "student" || a?.role === "spectator") && ws.readyState === 1 && a.cid !== exceptCid) set.add(a.cid);
+    }
+    return set.size;
+  }
+  spectatorCount() {
+    let n = 0;
+    for (const ws of this.ctx.getWebSockets()) if (ws.deserializeAttachment()?.role === "spectator" && ws.readyState === 1) n++;
+    return n;
+  }
+
+  // 개인전 방장: 처음 들어온 학생. 방장이 나가 있으면 접속한 학생 중 가장 먼저 들어온 학생에게 넘긴다.
+  hostCid() {
+    if (!this.solo) return null;
+    const online = this.onlineCids();
+    if (this.data.host && (online.has(this.data.host) || !online.size)) return this.data.host;
+    const next = Object.entries(this.data.students).filter(([c]) => online.has(c)).sort((a, b) => a[1].joinedAt - b[1].joinedAt)[0]?.[0];
+    if (next) this.data.host = next;
+    return this.data.host ?? null;
+  }
 
   // 수업·연습 기록 중 수업 기록만 구글 시트로 보낸다.
   log(row) { if (!this.practice) this.sheet.event(row); }
@@ -531,17 +516,29 @@ export class Room extends DurableObject {
       }
       ws.serializeAttachment({ role: "teacher", master });
       this.data.setId ??= DEFAULT_SET;
-      this.send(ws, { type: "joined", role: "teacher", master, answers: this.answerTable(), set: this.teacherSet(), sets: await this.setList(), period: master ? null : periodLabel(cfg) });
+      this.send(ws, { type: "joined", role: "teacher", master, answers: this.answerTable(), set: this.teacherSet(), sets: this.setList(), period: master ? null : periodLabel(cfg) });
       this.send(ws, this.dashboard());
       this.send(ws, this.classState());
+      // 교사 화면이 닫혀 있는 동안 60분 종료된 팀전 결과표가 있으면 지금 보낸다
+      const last = await this.ctx.storage.get("lastResult");
+      if (last && !last.delivered) {
+        this.send(ws, last);
+        await this.ctx.storage.put("lastResult", { ...last, delivered: true });
+      }
       return;
     }
     if (msg.role === "student") {
       const cid = typeof msg.cid === "string" && /^[a-z0-9]{8,32}$/.test(msg.cid) ? msg.cid : null;
       const name = cleanName(msg.name);
+      // 닉네임: 랭킹·채팅·캐릭터 머리 위에 보인다. 연습 모드는 혼자 하므로 이름을 그대로 쓴다.
+      const nick = this.practice ? name : cleanName(msg.nick);
       if (!cid || !name) {
         this.send(ws, { type: "error", message: "이름을 입력해 주세요." });
         return ws.close(4001, "bad hello");
+      }
+      if (!nick) {
+        this.send(ws, { type: "error", message: "닉네임을 입력해 주세요. 랭킹에는 닉네임이 보여요." });
+        return ws.close(4001, "no nick");
       }
       // 수업 채널의 사용 기간 밖이면 들어올 수 없다 (연습 모드는 상관없다)
       if (!this.practice) {
@@ -552,16 +549,20 @@ export class Room extends DurableObject {
           return ws.close(4008, "out of period");
         }
       }
-      // 학생이 고른 팀(A~D). 대표님 지침에 따라 자동 배정은 빼고 반드시 A, B, C, D 중 선택
-      const chosenTeam = TEAMS.includes(msg.team) ? msg.team : null;
-      if (!chosenTeam && !this.practice) {
-        this.send(ws, { type: "error", message: "참여할 팀(A, B, C, D)을 골라 주세요." });
+      const teamMode = !this.practice && !this.solo;
+      let st = this.data.students[cid];
+      // 개인전: 8명이 차면 그다음부터는 관람으로 들어온다
+      if (this.solo && !st && Object.keys(this.data.students).length >= SOLO_PLAYERS) return this.joinSpectator(ws, cid, nick);
+      // 팀전: 학생이 고른 팀(A·B·C). 자동 배정은 하지 않는다.
+      const chosenTeam = teamMode && TEAMS.includes(msg.team) ? msg.team : null;
+      if (teamMode && !chosenTeam) {
+        this.send(ws, { type: "error", message: "참여할 팀(A, B, C)을 골라 주세요." });
         return ws.close(4001, "no team");
       }
       // 팀당 최대 정원 8명 제한 (기존 참가자 재접속이 아닌 신규 진입 시)
-      if (chosenTeam && !this.practice) {
+      if (chosenTeam) {
         const teamMembers = Object.entries(this.data.students).filter(([c, s]) => c !== cid && s.team === chosenTeam);
-        if (teamMembers.length >= MAX_TEAM_SIZE) {
+        if (teamMembers.length >= MAX_TEAM_SIZE && st?.team !== chosenTeam) {
           this.send(ws, { type: "error", message: `${TEAM_NAMES[chosenTeam]}은 최대 정원(8명)이 마감되었어요. 다른 팀을 골라 주세요.` });
           return ws.close(4009, "team full");
         }
@@ -571,45 +572,50 @@ export class Room extends DurableObject {
         this.data.owner ??= cid;
         if (this.data.owner !== cid) return ws.close(4003, "not your practice room");
       }
-      let st = this.data.students[cid];
+      // 닉네임은 한 방 안에서 겹치지 않게 한다 (랭킹에서 누가 누군지 알 수 있게)
+      const same = (s) => nickOf(s).toLowerCase() === nick.toLowerCase();
+      if (!this.practice && Object.entries(this.data.students).some(([c, s]) => c !== cid && same(s))) {
+        this.send(ws, { type: "error", message: `'${nick}' 닉네임을 이미 다른 친구가 쓰고 있어요. 다른 닉네임을 써 주세요.` });
+        return ws.close(4011, "nick taken");
+      }
       if (!st) {
-        if (Object.keys(this.data.students).length >= MAX_STUDENTS) {
-          this.send(ws, { type: "error", message: "방 인원이 가득 찼어요." });
+        if (teamMode && Object.keys(this.data.students).length >= MAX_STUDENTS) {
+          this.send(ws, { type: "error", message: `방 인원이 가득 찼어요 (최대 ${MAX_STUDENTS}명).` });
+          return ws.close(4002, "full");
+        }
+        if (this.solo && this.peopleOnline(cid) >= SOLO_PEOPLE) {
+          this.send(ws, { type: "error", message: `방 인원이 가득 찼어요 (관람 포함 최대 ${SOLO_PEOPLE}명).` });
           return ws.close(4002, "full");
         }
         // n: 지도 위 캐릭터 번호(색). 위치 메시지를 짧게 하려고 cid 대신 쓴다.
         // 강퇴된 번호가 나중에 다시 쓰이지 않게, 기존 번호 최댓값 다음부터 준다.
         const nextN = Object.values(this.data.students).reduce((m, s) => Math.max(m, s.n + 1), 0);
-        st = { n: nextN, name, team: chosenTeam ?? this.pickTeam(), joinedAt: Date.now(), lab: [], probs: {}, concepts: [], activity: { dist: 0, jumps: 0, shots: 0 } };
+        st = { n: nextN, name, nick, team: chosenTeam, joinedAt: Date.now(), lab: [], probs: {}, concepts: [], activity: { dist: 0, jumps: 0, shots: 0 } };
         this.data.students[cid] = st;
+        if (this.solo) this.data.host ??= cid; // 개인전: 처음 들어온 학생이 방장
       } else {
         st.name = name;
-        if (chosenTeam) st.team = chosenTeam; // 다시 들어올 때 팀을 다시 고렀으면 그 팀으로
+        st.nick = nick;
+        if (chosenTeam) st.team = chosenTeam; // 다시 들어올 때 팀을 다시 골랐으면 그 팀으로
       }
       // 같은 학생이 다른 탭으로 다시 들어오면 이전 연결을 닫는다.
-      for (const other of this.ctx.getWebSockets()) {
-        const a = other.deserializeAttachment();
-        if (other !== ws && a && a.role === "student" && a.cid === cid) {
-          try { other.close(4005, "replaced"); } catch {}
-        }
-      }
+      this.closeOtherTabs(ws, cid);
       ws.serializeAttachment({ role: "student", cid });
       st.lastSeenAt = Date.now();
       await this.save();
-      this.log({ type: "입장", name });
-      // 세트: 연습은 학생이 고른 단원, 수업 채널은 기본 세트 (나중에 교사가 채널별로 고른다)
+      await this.openRoom(); // 첫 학생이 들어오면 60분 시계가 돌기 시작한다
+      this.log({ type: "입장", name: tagOf(st) });
+      // 세트: 연습은 학생이 고른 단원, 수업 채널은 교사가 고른 단원
       // 연습에서 다른 단원을 고르면 그 단원 세트로 바꾸고, 상자 기록만 새로 시작한다(벡터 점프 기록은 그대로)
-      // 연습: 학생이 고른 세트(채널의 수업 세트나 그 채널에 올린 다른 교과 세트) → 없으면 고른 단원의 기본 세트
-      const wantSet = this.practice ? (await this.practiceSetId(msg)) ?? UNIT_SET[msg.unit] ?? DEFAULT_SET : this.data.setId ?? DEFAULT_SET;
+      const wantSet = this.practice ? this.practiceSetId(msg) ?? UNIT_SET[msg.unit] ?? DEFAULT_SET : this.data.setId ?? DEFAULT_SET;
       if (this.data.setId !== wantSet) {
         if (this.data.setId && this.practice) Object.assign(st, { probs: {}, concepts: [], escapedAt: undefined });
         this.data.setId = wantSet;
         this.data.unlocked = [];
         await this.save();
-        await this.ensureSet(); // 올린 세트면 md를 받아 읽는다
       }
       this.send(ws, { type: "set", set: this.publicSet() });
-      this.send(ws, { type: "joined", role: "student", name, n: st.n, pos: this.lastPos.get(cid) ?? null });
+      this.send(ws, { type: "joined", role: "student", name, nick, n: st.n, pos: this.lastPos.get(cid) ?? null });
       this.send(ws, { type: "me", me: st });
       this.send(ws, this.classState());
       this.scheduleBroadcast();
@@ -618,68 +624,37 @@ export class Room extends DurableObject {
     }
   }
 
+  // 같은 학생(cid)이 다른 탭으로 다시 들어오면 이전 연결을 닫는다.
+  closeOtherTabs(ws, cid) {
+    for (const other of this.ctx.getWebSockets()) {
+      const a = other.deserializeAttachment();
+      if (other !== ws && a && (a.role === "student" || a.role === "spectator") && a.cid === cid) {
+        try { other.close(4005, "replaced"); } catch {}
+      }
+    }
+  }
+
+  // 개인전 관람: 지도 위를 자유롭게 둘러보며 친구들의 진행과 랭킹을 본다. 점수·위치는 남지 않는다.
+  joinSpectator(ws, cid, nick) {
+    if (this.peopleOnline(cid) >= SOLO_PEOPLE) {
+      this.send(ws, { type: "error", message: `관람석도 가득 찼어요 (관람 포함 최대 ${SOLO_PEOPLE}명). 다른 개인전 채널을 골라 주세요.` });
+      return ws.close(4002, "full");
+    }
+    this.closeOtherTabs(ws, cid);
+    ws.serializeAttachment({ role: "spectator", cid, nick });
+    this.send(ws, { type: "set", set: this.publicSet() });
+    this.send(ws, { type: "joined", role: "spectator", name: nick, nick, n: null, pos: null });
+    this.send(ws, this.classState());
+    this.scheduleBroadcast();
+    this.markPositions();
+  }
+
   // 전체 관리자 전용: 중간관리자(채널) 비밀번호·사용 기간 보기와 바꾸기
   async onAdmin(ws, msg) {
     const master = !!ws.deserializeAttachment()?.master;
-    // 문항 세트 올리기·지우기는 중간관리자도 한다(자기 채널 전용). 나머지(채널 비밀번호·기간)는 전체 관리자만.
-    const SET_MSGS = ["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList", "changeLogGet"];
-    if (!master && !SET_MSGS.includes(msg.type)) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
-    const ch = String(this.channel ?? "1");
-    const who = master ? "전체 관리자" : `${ch}채널 교사`;
-    const lists = async () => ({ sets: await this.setList(), ...(master ? { allSets: await this.setList(true) } : {}) });
-    // ---------- 문항 세트 올리기·지우기·예시 ----------
-    if (msg.type === "setExample") { const ex = EXAMPLES[msg.kind] ?? EXAMPLES.math; return this.send(ws, { type: "setExample", md: ex.md, name: ex.name }); }
-    if (msg.type === "uploadSet") {
-      const r = validateSet(msg.md, gradeLevel);
-      if (r.ok && SET_LIST.includes(r.id)) r.errors.push(`'${r.id}'은(는) 기본 세트 이름이에요. 다른 이름을 써 주세요.`);
-      // 같은 이름의 세트가 다른 채널(또는 전체 관리자) 것이면 중간관리자는 덮어쓸 수 없다
-      const existing = r.ok ? (await this.uploadedIndex()).find((x) => x.id === r.id) : null;
-      if (existing && !master && (existing.owner ?? null) !== ch) r.errors.push(`'${r.id}'은(는) 다른 채널이나 전체 관리자가 이미 쓰는 세트 이름이에요. 파일 맨 위 '세트:' 이름을 바꿔 주세요.`);
-      if (!r.ok || r.errors.length) return this.send(ws, { type: "uploadResult", ok: false, errors: r.errors, summary: r.summary ?? null });
-      if (msg.check) return this.send(ws, { type: "uploadResult", ok: true, checked: true, summary: r.summary, id: r.id });
-      // 중간관리자가 올리면 그 채널 전용, 전체 관리자가 올리면 모든 채널(전체 관리자가 채널 세트를 고쳐 올리면 그 채널 전용 그대로)
-      const owner = master ? existing?.owner ?? null : ch;
-      await this.adminStub().fetch("https://admin/admin/setput", { method: "POST", body: JSON.stringify({ id: r.id, md: msg.md, info: { title: r.summary.title, at: Date.now(), owner } }) });
-      if (this.uploaded?.id === r.id) this.uploaded = { id: r.id, ...r.set }; // 이 채널이 쓰던 세트를 고쳐 올렸으면 바로 바꾼다
-      this.log({ type: "관리자", name: who, detail: `문항 세트 올림: ${r.id}${owner ? ` (${owner}채널 전용)` : " (모든 채널)"}` });
-      await this.recordChange(ws, { action: existing ? "세트 고쳐 올림" : "세트 올림", id: r.id, title: r.summary.title, scope: owner ? `${owner}채널 전용` : "모든 채널" });
-      return this.send(ws, { type: "uploadResult", ok: true, saved: true, summary: r.summary, id: r.id, owner, ...(await lists()) });
-    }
-    if (msg.type === "deleteSet" && typeof msg.id === "string" && !SET_LIST.includes(msg.id)) {
-      const existing = (await this.uploadedIndex()).find((x) => x.id === msg.id);
-      if (!existing) return this.send(ws, { type: "uploadResult", ok: true, ...(await lists()) });
-      if (!master && (existing.owner ?? null) !== ch) return this.send(ws, { type: "uploadResult", ok: false, errors: ["이 채널에서 올린 세트만 지울 수 있어요."] });
-      await this.adminStub().fetch("https://admin/admin/setdel", { method: "POST", body: JSON.stringify({ id: msg.id }) });
-      this.log({ type: "관리자", name: who, detail: `문항 세트 지움: ${msg.id}` });
-      await this.recordChange(ws, { action: "세트 지움", id: msg.id, title: existing.title ?? "", scope: existing.owner ? `${existing.owner}채널 전용` : "모든 채널" });
-      return this.send(ws, { type: "uploadResult", ok: true, deleted: msg.id, ...(await lists()) });
-    }
-    if (msg.type === "setListGet") return this.send(ws, { type: "uploadResult", ok: true, ...(await lists()) });
+    // 변경 기록 보기는 중간관리자도 한다(자기 채널). 나머지(채널 비밀번호·기간)는 전체 관리자만.
     if (msg.type === "changeLogGet") return this.send(ws, { type: "changeLog", entries: await this.changeLog(master) });
-    // ---------- 그림 파일(png·jpg·gif·webp) 올리기: 문항·카드의 '그림: /img/…'에 쓴다 ----------
-    const images = async () => {
-      let idx = [];
-      try { idx = await (await this.adminStub().fetch("https://admin/admin/imgs")).json(); } catch {}
-      return idx.filter((x) => master || !x.owner || x.owner === ch);
-    };
-    if (msg.type === "imageList") return this.send(ws, { type: "imageResult", ok: true, images: await images() });
-    if (msg.type === "uploadImage") {
-      const r = checkImage(msg.data);
-      if (!r.ok) return this.send(ws, { type: "imageResult", ok: false, message: r.message });
-      const id = `${[...crypto.getRandomValues(new Uint8Array(6))].map((b) => b.toString(16).padStart(2, "0")).join("")}.${r.ext}`;
-      const name = String(msg.name ?? "").replace(/[<>&"]/g, "").slice(0, 60);
-      await this.adminStub().fetch("https://admin/admin/imgput", { method: "POST", body: JSON.stringify({ id, mime: r.mime, data: msg.data, info: { name, at: Date.now(), owner: master ? null : ch, size: r.size } }) });
-      this.log({ type: "관리자", name: who, detail: `그림 올림: ${name} → /img/${id}` });
-      await this.recordChange(ws, { action: "그림 올림", id: `/img/${id}`, title: name, scope: master ? "모든 채널" : `${ch}채널 전용` });
-      return this.send(ws, { type: "imageResult", ok: true, saved: `/img/${id}`, images: await images() });
-    }
-    if (msg.type === "deleteImage" && typeof msg.id === "string") {
-      const rec = (await images()).find((x) => x.id === msg.id);
-      if (!rec) return this.send(ws, { type: "imageResult", ok: false, message: "이 채널에서 올린 그림만 지울 수 있어요." });
-      await this.adminStub().fetch("https://admin/admin/imgdel", { method: "POST", body: JSON.stringify({ id: msg.id }) });
-      await this.recordChange(ws, { action: "그림 지움", id: `/img/${msg.id}`, title: rec.name ?? "", scope: rec.owner ? `${rec.owner}채널 전용` : "모든 채널" });
-      return this.send(ws, { type: "imageResult", ok: true, deleted: msg.id, images: await images() });
-    }
+    if (!master) return this.send(ws, { type: "error", message: "전체 관리자만 바꿀 수 있어요." });
     if (msg.type === "adminSet") {
       const ch = String(msg.ch);
       if (!CHANNEL_IDS.includes(ch)) return;
@@ -719,7 +694,7 @@ export class Room extends DurableObject {
   }
 
   async onTeacher(ws, msg) {
-    if (["adminGet", "adminSet", "uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList", "changeLogGet"].includes(msg.type)) return this.onAdmin(ws, msg);
+    if (["adminGet", "adminSet", "changeLogGet"].includes(msg.type)) return this.onAdmin(ws, msg);
     if (msg.type === "stage" && STAGES.includes(msg.stage)) {
       this.data.stage = msg.stage;
       await this.save();
@@ -742,27 +717,27 @@ export class Room extends DurableObject {
       this.pos.delete(cid);
       this.lastPos.delete(cid);
       await this.save();
-      this.log({ type: "강퇴", name: st.name });
+      this.log({ type: "강퇴", name: tagOf(st) });
       this.scheduleBroadcast();
     }
-    if (msg.type === "setSet" && !(await this.setList()).some((x) => x.id === msg.setId)) return this.send(ws, { type: "error", message: "그런 문항 세트가 없어요." });
+    if (msg.type === "setSet" && !builtinSet(msg.setId)) return this.send(ws, { type: "error", message: "그런 문항 세트가 없어요." });
     if (msg.type === "reset" || msg.type === "setSet") {
       // 새 수업: 이전 반의 학생과 기록을 지우고, 접속한 학생은 다시 들어오게 한다.
       // 단원(문항 세트)을 바꿀 때도 기록이 섞이지 않게 새 수업으로 시작한다.
       const setId = msg.type === "setSet" ? msg.setId : this.data.setId;
       if (msg.type === "setSet" && setId !== this.data.setId) {
-        const title = (await this.setList()).find((x) => x.id === setId)?.title ?? "";
+        const title = builtinSet(setId)?.meta?.제목 ?? "";
         await this.recordChange(ws, { action: "채널 단원 바꿈", id: setId, title, scope: `${this.channel ?? "1"}채널`, from: this.data.setId ?? DEFAULT_SET });
       }
       this.data = freshData();
       this.data.setId = setId ?? DEFAULT_SET;
-      await this.ensureSet();
+      this.data.ch = this.channel;
       this.pos.clear();
       this.lastPos.clear();
       await this.save();
       this.sheet.newClass();
       for (const other of this.ctx.getWebSockets()) {
-        if (other.deserializeAttachment()?.role === "student") try { other.close(4006, "new class"); } catch {}
+        if (["student", "spectator"].includes(other.deserializeAttachment()?.role)) try { other.close(4006, "new class"); } catch {}
       }
       // 이 채널의 모든 교사 화면에 새 세트를 보낸다
       const setMsg = { type: "set", set: this.teacherSet(), answers: this.answerTable() };
@@ -797,10 +772,21 @@ export class Room extends DurableObject {
         st.lab.push(msg.level);
         st.lastAt = Date.now();
         await this.save();
-        this.log({ type: "벡터 점프", name: st.name, detail: LAB_NAMES[msg.level] });
+        this.log({ type: "벡터 점프", name: tagOf(st), detail: LAB_NAMES[msg.level] });
         this.scheduleBroadcast();
       }
       this.send(ws, { type: "me", me: st });
+      return;
+    }
+
+    if (msg.type === "hostStart") {
+      // 개인전: 방장이 '게임 시작'을 누르면 탐험이 시작된다
+      if (!this.solo || this.data.stage !== "lobby") return;
+      if (this.hostCid() !== cid) return this.send(ws, { type: "error", message: "방장만 게임을 시작할 수 있어요." });
+      this.data.stage = "play";
+      await this.save();
+      this.log({ type: "진행 단계", name: `방장 ${tagOf(st)}`, detail: STAGE_NAMES.play });
+      this.scheduleBroadcast();
       return;
     }
 
@@ -842,7 +828,13 @@ export class Room extends DurableObject {
       // 학생 간 실시간 채팅: 개행·제어 문자를 지우고 100자로 제한한 뒤 반 전체에 흘린다.
       const text = typeof msg.text === "string" ? msg.text.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 100) : "";
       if (!text) return;
-      return this.broadcast({ type: "chat", from: st.n, name: st.name, team: st.team ?? null, text });
+      const pub = JSON.stringify({ type: "chat", from: st.n, name: nickOf(st), team: st.team ?? null, text });
+      const forTeacher = JSON.stringify({ type: "chat", from: st.n, name: nickOf(st), realName: st.name, team: st.team ?? null, text });
+      for (const other of this.ctx.getWebSockets()) {
+        const role = other.deserializeAttachment()?.role;
+        if (role) try { other.send(role === "teacher" ? forTeacher : pub); } catch {}
+      }
+      return;
     }
 
     if (msg.type === "reflection") {
@@ -852,7 +844,7 @@ export class Room extends DurableObject {
       if (text.length < 5) return this.send(ws, { type: "error", message: "소감을 다섯 글자 이상 써 주세요." });
       st.reflection = text;
       await this.save();
-      this.log({ type: "소감", name: st.name, detail: text.slice(0, 60) });
+      this.log({ type: "소감", name: tagOf(st), detail: text.slice(0, 60) });
       this.scheduleBroadcast();
       return this.send(ws, { type: "reflectionSaved" });
     }
@@ -865,7 +857,7 @@ export class Room extends DurableObject {
         st.concepts.push(msg.key);
         st.lastAt = Date.now();
         await this.save();
-        this.log({ type: "개념 학습", name: st.name, detail: msg.key });
+        this.log({ type: "개념 학습", name: tagOf(st), detail: msg.key });
         this.scheduleBroadcast();
       }
       return this.send(ws, { type: "me", me: st });
@@ -898,7 +890,7 @@ export class Room extends DurableObject {
       if (!p.hinted && !p.solved) {
         p.hinted = true;
         await this.save();
-        this.log({ type: "힌트", name: st.name, problem: problemName(msg.pid) });
+        this.log({ type: "힌트", name: tagOf(st), problem: problemName(msg.pid) });
         this.scheduleBroadcast();
       }
       return;
@@ -932,18 +924,18 @@ export class Room extends DurableObject {
           if (pair?.includes(cid)) {
             const mateCid = pair.find((c) => c !== cid);
             const mate = this.data.students[mateCid];
-            p.coopWith = mate?.name ?? null;
+            p.coopWith = mate ? nickOf(mate) : null;
             if (mate) {
               const op = (mate.probs[msg.pid] ??= { tries: 0, solved: false, firstTry: false, wrongs: [] });
               if (!op.solved) {
-                Object.assign(op, { solved: true, diff: p.diff, firstTry: false, solvedAt: Date.now(), coopWith: st.name });
+                Object.assign(op, { solved: true, diff: p.diff, firstTry: false, solvedAt: Date.now(), coopWith: nickOf(st) });
                 if (op.openedAt) op.timeMs = op.solvedAt - op.openedAt;
                 mate.lastAt = op.solvedAt;
                 if (PROBLEM_IDS.every((k) => mate.probs[k]?.solved)) mate.escapedAt = op.solvedAt;
-                this.sendTo(mateCid, { type: "result", pid: msg.pid, ok: true, tries: op.tries, coopBy: st.name });
+                this.sendTo(mateCid, { type: "result", pid: msg.pid, ok: true, tries: op.tries, coopBy: nickOf(st) });
                 this.sendTo(mateCid, { type: "me", me: mate });
               }
-              this.log({ type: "협업 정답", name: `${st.name} & ${mate.name}`, problem: problemName(msg.pid) });
+              this.log({ type: "협업 정답", name: `${tagOf(st)} & ${tagOf(mate)}`, problem: problemName(msg.pid) });
             }
           } else p.soloCoop = true;
         }
@@ -953,22 +945,16 @@ export class Room extends DurableObject {
         p.wrongs.push(result.display);
       }
       await this.save();
-      this.log({ type: result.ok ? "정답" : "오답", name: st.name, problem: problemName(msg.pid), answer: result.display, result: result.ok ? "O" : "X", tries: p.tries });
-      if (result.ok && st.escapedAt === p.solvedAt) this.log({ type: "탈출", name: st.name, detail: "열쇠 조각 9개를 모두 모았어요" });
+      this.log({ type: result.ok ? "정답" : "오답", name: tagOf(st), problem: problemName(msg.pid), answer: result.display, result: result.ok ? "O" : "X", tries: p.tries });
+      if (result.ok && st.escapedAt === p.solvedAt) this.log({ type: "탈출", name: tagOf(st), detail: "열쇠 조각 9개를 모두 모았어요" });
       this.send(ws, { type: "result", pid: msg.pid, ok: result.ok, tries: p.tries });
       this.send(ws, { type: "me", me: st });
-      if (result.ok) this.broadcast({ type: "found", n: st.n, name: st.name, pid: msg.pid }); // 모두에게 "누가 유물을 발견했어요" 팝업
+      if (result.ok) this.broadcast({ type: "found", n: st.n, name: nickOf(st), pid: msg.pid }); // 모두에게 "누가 유물을 발견했어요" 팝업
       this.scheduleBroadcast();
     }
   }
 
   // 팀전: 팀별로 점수(문제 해결 + 첫 시도 보너스 + 벡터 점프)를 합산한다.
-  pickTeam() {
-    const count = {};
-    for (const st of Object.values(this.data.students)) count[st.team] = (count[st.team] ?? 0) + 1;
-    return TEAMS.reduce((best, t) => ((count[best] ?? 0) <= (count[t] ?? 0) ? best : t));
-  }
-
   teamScores() {
     const rows = this.ranking();
     return TEAMS.map((team) => {
@@ -1016,7 +1002,7 @@ export class Room extends DurableObject {
         const solveScore = probs.filter((p) => p.solved).reduce((s, p) => s + (p.soloCoop ? DIFF_POINTS.mid : DIFF_POINTS[p.diff] ?? SCORE.solve), 0);
         const mileage = mileageOf(st.activity);
         return {
-          cid, n: st.n, name: st.name, solved, first, lab: st.lab.length, concepts: st.concepts.length, mileage,
+          cid, n: st.n, name: nickOf(st), solved, first, lab: st.lab.length, concepts: st.concepts.length, mileage,
           score: solveScore + first * SCORE.firstTry + st.lab.length * SCORE.jump + st.concepts.length * SCORE.concept + mileage,
           lastAt: st.lastAt ?? Infinity, escapedAt: st.escapedAt ?? null,
         };
@@ -1032,7 +1018,7 @@ export class Room extends DurableObject {
     return this.ranking().map((r) => {
       const st = this.data.students[r.cid];
       return {
-        id: r.cid, rank: r.rank, name: st.name, score: r.score, solved: r.solved, lab: r.lab,
+        id: r.cid, rank: r.rank, name: tagOf(st), score: r.score, solved: r.solved, lab: r.lab,
         hints: Object.values(st.probs).filter((p) => p.hinted).length,
         firstJoin: iso(st.joinedAt), lastSeen: iso(online.has(r.cid) ? Date.now() : st.lastSeenAt), escapedAt: iso(st.escapedAt),
         online: online.has(r.cid),
@@ -1065,19 +1051,26 @@ export class Room extends DurableObject {
     for (const pid of PROBLEM_IDS) {
       relics[pid] = { solved: this.solvedCount(pid), need, unlocked: this.data.unlocked.includes(pid) };
     }
-    const teamCounts = { A: 0, B: 0, C: 0, D: 0, max: MAX_TEAM_SIZE };
+    const teamCounts = { A: 0, B: 0, C: 0, max: MAX_TEAM_SIZE };
     for (const st of students) {
       if (st.team && teamCounts[st.team] !== undefined) teamCounts[st.team]++;
     }
+    const hostCid = this.hostCid();
     return {
       type: "class",
       stage: this.data.stage,
+      kind: this.practice ? "practice" : this.solo ? "solo" : "team",
+      endsAt: this.endsAt, // 이 시각에 방이 끝나고 기록이 초기화된다
+      host: hostCid ? this.data.students[hostCid]?.n ?? null : null, // 개인전 방장(캐릭터 번호)
+      maxPlayers: this.solo ? SOLO_PLAYERS : MAX_STUDENTS,
+      maxPeople: this.solo ? SOLO_PEOPLE : null,
+      spectators: this.solo ? this.spectatorCount() : 0,
       total,
       online: this.onlineCids().size,
       energy: total ? labDone / (total * LAB_LEVELS.length) : 0,
       relics,
       teamDoors: this.practice ? {} : this.teamDoors(),
-      players: students.map((st) => [st.n, st.name, st.team ?? null]),
+      players: students.map((st) => [st.n, nickOf(st), st.team ?? null]),
       ranking: this.ranking().map(({ n, name, score, solved, escapedAt, cid, mileage, concepts }) => ({ n, name, score, solved, escaped: !!escapedAt, mileage, concepts, team: this.data.students[cid].team ?? null })),
       teams: this.teamScores(),
       teamCounts,
@@ -1090,7 +1083,7 @@ export class Room extends DurableObject {
     const students = this.ranking().map((r) => {
       const st = this.data.students[r.cid];
       return {
-        cid: r.cid, name: st.name, online: online.has(r.cid), lab: st.lab.length, probs: st.probs, team: st.team ?? null,
+        cid: r.cid, n: st.n, name: st.name, nick: nickOf(st), online: online.has(r.cid), lab: st.lab.length, probs: st.probs, team: st.team ?? null,
         joinedAt: st.joinedAt, escapedAt: st.escapedAt ?? null, rank: r.rank, score: r.score, mileage: r.mileage, concepts: r.concepts,
         room: this.pos.get(r.cid)?.room ?? null, reflection: st.reflection ?? "",
       };
@@ -1113,6 +1106,9 @@ export class Room extends DurableObject {
     return {
       type: "dashboard",
       stage: this.data.stage,
+      kind: this.practice ? "practice" : this.solo ? "solo" : "team",
+      endsAt: this.endsAt,
+      spectators: this.solo ? this.spectatorCount() : 0,
       labLevels: LAB_LEVELS.length,
       students,
       stats,

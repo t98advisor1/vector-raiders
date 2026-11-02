@@ -19,36 +19,26 @@ test("학생 화면(index.html)에 4단계 위저드와 지도보기 버튼이 �
   assert.match(html, /id="map-btn"[^>]*>🗺️<span class="lbl"> 지도보기<\/span>/, "지도보기 버튼 레이블 존재");
 });
 
-test("채널 선택 및 팀 선택 분리 버튼 7개 및 4개 팀 구성 검증", () => {
+test("팀전 6채널·개인전 6채널과 A·B·C 세 팀, 이름과 닉네임 입력", () => {
   const html = fs.readFileSync("public/index.html", "utf8");
-
-  // 7개 채널 카드 버튼
-  for (let ch = 1; ch <= 7; ch++) {
-    assert.equal(html.includes(`data-ch="${ch}"`), true, `${ch}채널 버튼 존재`);
+  for (let n = 1; n <= 6; n++) {
+    assert.equal(html.includes(`data-ch="${n}"`), true, `팀전 ${n}채널 버튼`);
+    assert.equal(html.includes(`data-ch="s${n}"`), true, `개인전 ${n}채널 버튼`);
   }
-
-  // 4개 팀 카드 버튼
-  for (const team of ["A", "B", "C", "D"]) {
-    assert.equal(html.includes(`data-team="${team}"`), true, `${team}팀 버튼 존재`);
-  }
-
-  // 2022 개정 기하 3개 단원
-  for (const unit of ["3-1", "3-2", "3-3"]) {
-    assert.equal(html.includes(`data-unit="${unit}"`), true, `${unit} 단원 버튼 존재`);
-  }
-
-  // 문제 창 3개 난이도 토글 버튼 (입장 단계 대신 문제 모달에서 직접 선택)
+  assert.equal(html.includes('data-ch="7"'), false, "7채널은 없다");
+  for (const team of ["A", "B", "C"]) assert.equal(html.includes(`data-team="${team}"`), true, `${team}팀 버튼`);
+  assert.equal(html.includes('data-team="D"'), false, "D팀은 없다");
+  assert.match(html, /id="join-nick"/);
+  for (const unit of ["3-1", "3-2", "3-3"]) assert.equal(html.includes(`data-unit="${unit}"`), true, `${unit} 단원 버튼`);
   const studentJs = fs.readFileSync("public/js/student.js", "utf8");
-  for (const diff of ["low", "mid", "high"]) {
-    assert.equal(studentJs.includes(`data-pdiff="${diff}"`), true, `${diff} 난이도 문제 선택 버튼 존재`);
-  }
-
-  // 캐러셀 설명서 슬라이드 4개
-  for (let s = 1; s <= 4; s++) {
-    assert.equal(html.includes(`data-slide="${s}"`), true, `${s}번 설명서 슬라이드 존재`);
-  }
+  for (const diff of ["low", "mid", "high"]) assert.equal(studentJs.includes(`data-pdiff="${diff}"`), true, `${diff} 난이도 버튼`);
+  for (let k = 1; k <= 4; k++) assert.equal(html.includes(`data-slide="${k}"`), true, `${k}번 설명서 슬라이드`);
+  const worker = fs.readFileSync("src/worker.js", "utf8");
+  assert.ok(worker.includes("const CH_RE = /^([1-6]|s[1-6])$/;"), "팀전 1~6·개인전 s1~s6 채널");
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.ok(room.includes(`const TEAMS = ["A", "B", "C"];`));
+  assert.ok(room.includes("const MAX_STUDENTS = TEAMS.length * MAX_TEAM_SIZE;")); // 팀전 24명
 });
-
 test("문장 속 수식에 역슬래시가 두 번 들어가 벡터 표시가 깨지지 않는다", async () => {
   // JS 문자열 "$\\VV{AB}$"는 TeX \VV{AB}가 되지만, "$\\\\VV{AB}$"는 줄바꿈(\\) + VVAB 글자로 깨진다.
   const { readdirSync } = await import("node:fs");
@@ -71,14 +61,18 @@ test("모든 방을 탈출한 학생은 탐험 중에도 자기 난이도 정답
   assert.match(stu, /S\.cls\?\.stage === "done" \|\| iEscaped\(\)/);
 });
 
-test("중간관리자가 올린 문항 세트는 그 채널에만 보이고, 그 채널 교사만 지운다", () => {
+test("파일 업로드 기능은 없다 (문항 세트 md·그림 파일)", () => {
+  const html = fs.readFileSync("public/teacher.html", "utf8");
+  assert.doesNotMatch(html, /type="file"/);
   const room = fs.readFileSync("src/room.js", "utf8");
-  assert.match(room, /filter\(\(x\) => all \|\| !x\.owner \|\| x\.owner === ch\)/);
-  assert.match(room, /const owner = master \? existing\?\.owner \?\? null : ch;/);
-  assert.match(room, /이 채널에서 올린 세트만 지울 수 있어요/);
-  assert.match(room, /SET_MSGS = \["uploadSet", "deleteSet", "setExample", "setListGet", "uploadImage", "deleteImage", "imageList", "changeLogGet"\]/);
+  assert.doesNotMatch(room, /uploadSet|uploadImage|checkImage|imgput|setput/);
+  const worker = fs.readFileSync("src/worker.js", "utf8");
+  assert.ok(!worker.includes("/img/"), "그림 파일 주소(/img/…)를 받지 않는다");
+  const t = fs.readFileSync("public/js/teacher.js", "utf8");
+  assert.doesNotMatch(t, /uploadSet|uploadImage|toWebp/);
+  const man = fs.readFileSync("public/js/manual.js", "utf8");
+  assert.doesNotMatch(man, /part: "make"/);
 });
-
 test("그림: 칸은 그림 줄·내장 도구·안전한 이미지 주소만 받고, 카드에도 그림을 붙인다", async () => {
   const { checkFigureSpec, parseSet } = await import("../src/setfile.js");
   assert.equal(checkFigureSpec("평면 범위=-3,3,-2,6 곡선=x^2-2*x;a*x 슬라이더=a,-2,2,0.5"), null);
@@ -138,19 +132,6 @@ test("미적분 그림 문법: f1·d1·int1, 접선, 넓이", async () => {
   assert.match(checkFigure("평면 곡선=x 접선=2,1") ?? "", /곡선 2/);
 });
 
-test("사용 설명서의 프롬프트 생성기는 단계·그림 종류에 맞는 규칙을 넣는다", async () => {
-  const { buildPrompt } = await import("../public/js/manual.js");
-  const p = buildPrompt({ subject: "미적분", unit: "미분", stage: "3", figs: ["graph", "motion"], kinds: ["num"], people: true });
-  assert.match(p, /접선=1,a/);
-  assert.match(p, /재생=t,4/);
-  assert.match(p, /인물 카드/);
-  const q = buildPrompt({ subject: "사회", unit: "지도", stage: "1", figs: ["image"], kinds: ["text"], images: "/img/abc123def456.png 지도" });
-  assert.match(q, /설계표/);
-  const r = buildPrompt({ subject: "영어", stage: "3", figs: ["none"], kinds: ["text", "choice"], math: "off" });
-  assert.match(r, /수식: 끔/);
-  assert.match(r, /단답형/);
-});
-
 test("사용 설명서가 쓰는 모의 진행 그림이 모두 있다", () => {
   const src = fs.readFileSync("public/js/manual.js", "utf8");
   const names = [...src.matchAll(/\["([a-z]-[a-z-]+)", "/g)].map((m) => m[1]);
@@ -162,7 +143,7 @@ test("협업 짝 정보는 저장소에 남고, 다시 열면 같은 조건을 �
   const room = fs.readFileSync("src/room.js", "utf8");
   assert.match(room, /this\.data\.coop \?\?= \{ wait: \{\}, pairs: \{\}, solo: \[\] \}/);
   assert.doesNotMatch(room, /this\.coop\b(?!Ready)/);
-  assert.match(room, /if \(pair\?\.includes\(cid\)\) \{\n\s*return this\.send\(ws, \{ type: "coop"/);
+  assert.match(room, /if \(pair\?\.includes\(cid\)\) \{\n\s*const mate = [^\n]+\n\s*return this\.send\(ws, \{ type: "coop"/);
   const css = fs.readFileSync("public/css/style.css", "utf8");
   assert.match(css, /\.chat-toggle, \.chat-panel \{ z-index: 60; \}/);
   const stu = fs.readFileSync("public/js/student.js", "utf8");
@@ -196,36 +177,59 @@ test("완주 선물: 소감과 형성평가 자료 4가지를 모두 받아야 �
   assert.match(room, /msg\.type === "reflection"/);
 });
 
-test("연습 모드는 채널의 수업 세트와 그 채널에서 쓸 수 있는 세트를 고를 수 있다", () => {
+test("연습 모드는 기본 세트 중에서 고른다", () => {
   const room = fs.readFileSync("src/room.js", "utf8");
-  assert.match(room, /async practiceSetId\(msg\)/);
-  assert.match(room, /up && \(!up\.owner \|\| up\.owner === ch\)/); // 다른 채널 전용 세트는 못 고른다
+  assert.ok(room.includes(`practiceSetId(msg) { return typeof msg.setId === "string" && builtinSet(msg.setId)`));
   const worker = fs.readFileSync("src/worker.js", "utf8");
-  assert.match(worker, /\/api\/practice-sets/);
+  assert.ok(worker.includes("/api/practice-sets"));
   const stu = fs.readFileSync("public/js/student.js", "utf8");
   assert.match(stu, /setId: mode === "practice"/);
 });
-
 test("교사용 형성평가 답지에도 문제와 그림이 들어간다", () => {
   const t = fs.readFileSync("public/js/teacher.js", "utf8");
   assert.match(t, /return `<section class="fa-item">\$\{head\}\$\{q\}<p class="pr-answer">/);
 });
 
-test("배경음악은 기·승·전·결·맺음 장으로 바뀌고 장마다 쉼과 고조 구간이 있다", () => {
+test("배경음악: 첫 화면·대기는 예전 음악, 탐험이 시작되면 기·승·전·결·맺음 음악", () => {
   const snd = fs.readFileSync("public/js/sound.js", "utf8");
   for (const n of ["기", "승", "전", "결", "맺음"]) assert.match(snd, new RegExp(`name: "${n}"`));
   assert.match(snd, /part === "rest"/);
-  assert.match(snd, /ending\(\)/);
+  assert.ok(snd.includes(`ending() { this.ended = true; this.intensity = 4; this.setTrack("story"); }`));
+  assert.ok(snd.includes(`this.track = "classic";`));
+  assert.ok(snd.includes("playClassic(s, t) {"));
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.ok(stu.includes(`sound.setTrack(stage === "lobby" ? "classic" : "story");`));
 });
 
-test("코드 그림 안내와 webp 압축", () => {
-  const man = fs.readFileSync("public/js/manual.js", "utf8");
-  assert.match(man, /코드 그림 올리는 법/);
-  assert.match(man, /webp 형식, 가로 1000px 이하, 200KB 이하/);
+test("모든 방은 60분 뒤 끝나고, 팀전 결과표만 교사에게 자동으로 간다", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  assert.ok(room.includes("export const ROOM_LIFE_MS = 60 * 60 * 1000;"));
+  assert.ok(room.includes("await this.openRoom(); // 첫 학생이 들어오면"));
+  assert.ok(room.includes(`if (!this.practice && !this.solo && Object.keys(this.data.students).length) {\n      const result = { type: "finalResult"`));
+  assert.ok(room.includes(`ws.close(4010, "room expired")`));
   const t = fs.readFileSync("public/js/teacher.js", "utf8");
-  assert.match(t, /c\.toBlob\(r, "image\/webp", 0\.8\)/);
+  assert.match(t, /msg\.type === "finalResult"[\s\S]{0,300}downloadCsv\(msg\.dashboard/);
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.ok(stu.includes("4010:"));
+  assert.ok(stu.includes("function renderTimer()"));
 });
 
+test("개인전: 8명, 관람 포함 15명, 먼저 들어온 학생이 방장", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  for (const s of ["const SOLO_PLAYERS = 8;", "const SOLO_PEOPLE = 15;", "if (this.solo) this.data.host ??= cid;",
+    `if (this.hostCid() !== cid) return this.send(ws, { type: "error", message: "방장만`, "return this.joinSpectator(ws, cid, nick)"]) {
+    assert.ok(room.includes(s), s);
+  }
+});
+
+test("랭킹·채팅은 닉네임, 교사 화면은 닉네임 (이름)", () => {
+  const room = fs.readFileSync("src/room.js", "utf8");
+  for (const s of ["players: students.map((st) => [st.n, nickOf(st), st.team ?? null])", "cid, n: st.n, name: nickOf(st), solved", "realName: st.name"]) {
+    assert.ok(room.includes(s), s);
+  }
+  const t = fs.readFileSync("public/js/teacher.js", "utf8");
+  assert.ok(t.includes("const who = (st) => (st.nick && st.nick !== st.name ? `${st.nick} (${st.name})` : st.name);"));
+});
 test("연습 모드도 모든 방을 탈출하면 결과 창이 열리고, 소감을 쓰면 관상 연구소가 열린다", () => {
   const stu = fs.readFileSync("public/js/student.js", "utf8");
   assert.match(stu, /S\.mode === "practice" && !wasDone && iEscaped\(\)/);

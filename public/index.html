@@ -91,59 +91,88 @@
       <!-- Step 1: 수업 채널 선택 팝업 -->
       <div id="step-ch" class="wizard-step">
         <div class="step-head">
-          <span class="step-badge">1단계 / 4</span>
+          <span class="step-badge">1단계 / 3</span>
           <h2 class="step-title">🌐 수업 채널을 골라주세요</h2>
-          <p class="muted small">선생님이 안내해 주신 채널 번호를 선택하세요</p>
+          <p class="muted small">선생님이 안내해 주신 채널을 선택하세요 · ⏰ 모든 방은 열린 뒤 60분이 지나면 끝나고 기록이 초기화돼요</p>
         </div>
-        <div class="ch-grid-large" role="group" aria-label="수업 채널 선택">
+        <h3 class="ch-group-title">🚩 팀전 채널 <small>A·B·C 세 팀이 함께 · 선생님이 시작 · 결과는 선생님께 자동 저장</small></h3>
+        <div class="ch-grid-large" role="group" aria-label="팀전 채널 선택">
           <button type="button" class="ch-card-btn on" data-ch="1">
-            <span class="ch-badge">채널 1</span>
-            <b>① 1채널</b>
-            <small>기하 탐험반</small>
+            <span class="ch-badge">팀전</span>
+            <b>① 팀전 1채널</b>
+            <small>A·B·C 세 팀 · 최대 24명</small>
           </button>
           <button type="button" class="ch-card-btn" data-ch="2">
-            <span class="ch-badge">채널 2</span>
-            <b>② 2채널</b>
-            <small>기하 탐험반</small>
+            <span class="ch-badge">팀전</span>
+            <b>② 팀전 2채널</b>
+            <small>A·B·C 세 팀 · 최대 24명</small>
           </button>
           <button type="button" class="ch-card-btn" data-ch="3">
-            <span class="ch-badge">채널 3</span>
-            <b>③ 3채널</b>
-            <small>기하 탐험반</small>
+            <span class="ch-badge">팀전</span>
+            <b>③ 팀전 3채널</b>
+            <small>A·B·C 세 팀 · 최대 24명</small>
           </button>
           <button type="button" class="ch-card-btn" data-ch="4">
-            <span class="ch-badge">채널 4</span>
-            <b>④ 4채널</b>
-            <small>기하 탐험반</small>
+            <span class="ch-badge">팀전</span>
+            <b>④ 팀전 4채널</b>
+            <small>A·B·C 세 팀 · 최대 24명</small>
           </button>
           <button type="button" class="ch-card-btn" data-ch="5">
-            <span class="ch-badge">채널 5</span>
-            <b>⑤ 5채널</b>
-            <small>기하 탐험반</small>
+            <span class="ch-badge">팀전</span>
+            <b>⑤ 팀전 5채널</b>
+            <small>A·B·C 세 팀 · 최대 24명</small>
           </button>
           <button type="button" class="ch-card-btn" data-ch="6">
-            <span class="ch-badge">채널 6</span>
-            <b>⑥ 6채널</b>
-            <small>기하 탐험반</small>
+            <span class="ch-badge">팀전</span>
+            <b>⑥ 팀전 6채널</b>
+            <small>A·B·C 세 팀 · 최대 24명</small>
           </button>
-          <button type="button" class="ch-card-btn" data-ch="7">
-            <span class="ch-badge">채널 7</span>
-            <b>⑦ 7채널</b>
-            <small>기하 탐험반</small>
+        </div>
+        <h3 class="ch-group-title">🏆 개인전 채널 <small>8명이 겨루기 · 먼저 들어온 친구가 방장이 되어 시작 · 8명이 차면 관람</small></h3>
+        <div class="ch-grid-large" role="group" aria-label="개인전 채널 선택">
+          <button type="button" class="ch-card-btn" data-ch="s1">
+            <span class="ch-badge">개인전</span>
+            <b>① 개인전 1채널</b>
+            <small>8명 경쟁 · 관람 포함 15명</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="s2">
+            <span class="ch-badge">개인전</span>
+            <b>② 개인전 2채널</b>
+            <small>8명 경쟁 · 관람 포함 15명</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="s3">
+            <span class="ch-badge">개인전</span>
+            <b>③ 개인전 3채널</b>
+            <small>8명 경쟁 · 관람 포함 15명</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="s4">
+            <span class="ch-badge">개인전</span>
+            <b>④ 개인전 4채널</b>
+            <small>8명 경쟁 · 관람 포함 15명</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="s5">
+            <span class="ch-badge">개인전</span>
+            <b>⑤ 개인전 5채널</b>
+            <small>8명 경쟁 · 관람 포함 15명</small>
+          </button>
+          <button type="button" class="ch-card-btn" data-ch="s6">
+            <span class="ch-badge">개인전</span>
+            <b>⑥ 개인전 6채널</b>
+            <small>8명 경쟁 · 관람 포함 15명</small>
           </button>
         </div>
         <div class="sheet-buttons">
           <button id="step-ch-back" class="btn" type="button">← 뒤로</button>
-          <button id="step-ch-next" class="btn primary big" type="button">다음: 팀 선택 ➔</button>
+          <button id="step-ch-next" class="btn primary big" type="button">다음 ➔</button>
         </div>
       </div>
 
       <!-- Step 2: 내 팀 선택 팝업 -->
       <div id="step-team" class="wizard-step" hidden>
         <div class="step-head">
-          <span class="step-badge">2단계 / 4</span>
+          <span class="step-badge">2단계 / 3</span>
           <h2 class="step-title">🚩 내 팀을 골라주세요</h2>
-          <p class="muted small">팀당 최대 8명까지 참가할 수 있어요</p>
+          <p class="muted small">A·B·C 세 팀, 팀당 최대 8명까지 참가할 수 있어요</p>
         </div>
         <div class="team-grid-large" role="group" aria-label="팀 선택">
           <button type="button" class="team-card-btn on" data-team="A">
@@ -160,11 +189,6 @@
             <span class="team-icon">🟢</span>
             <b>C팀</b>
             <span class="team-cnt" id="cnt-C">(0/8명)</span>
-          </button>
-          <button type="button" class="team-card-btn" data-team="D">
-            <span class="team-icon">🟣</span>
-            <b>D팀</b>
-            <span class="team-cnt" id="cnt-D">(0/8명)</span>
           </button>
         </div>
         <div class="sheet-buttons">
@@ -203,7 +227,7 @@
         <!-- 연습 모드: 채널의 수업 세트·다른 교과 세트도 연습할 수 있다 -->
         <div class="practice-sets">
           <div class="ps-head"><b>📚 우리 채널 세트로 연습하기</b>
-            <label>채널 <select id="practice-ch"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></label></div>
+            <label>팀전 채널 <select id="practice-ch"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label></div>
           <div id="practice-set-list" class="ps-list"><small class="muted">불러오는 중…</small></div>
         </div>
         <div class="sheet-buttons">
@@ -215,11 +239,13 @@
       <!-- Step 4: 탐험가 이름 입력 후 출발 -->
       <form id="step-launch" class="wizard-step" action="javascript:void(0);" autocomplete="off" hidden>
         <div class="step-head">
-          <span class="step-badge" id="step-launch-badge">4단계 / 4</span>
-          <h2 class="step-title">👤 탐험가 이름 입력</h2>
-          <p class="muted small">수업에서 사용할 내 이름을 적고 출발해 주세요</p>
+          <span class="step-badge" id="step-launch-badge">3단계 / 3</span>
+          <h2 class="step-title">👤 이름과 닉네임 입력</h2>
+          <p class="muted small">이름은 선생님만 보고, 친구들에게는 닉네임이 보여요</p>
         </div>
-        <label class="name-label">내 이름<input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
+        <label class="name-label">내 이름 <small class="muted">선생님 화면에만 보여요</small><input id="join-name" maxlength="12" placeholder="예: 5번 홍길동" required></label>
+        <label class="name-label" id="nick-label">닉네임 <small class="muted">랭킹·채팅·캐릭터 위에 보여요</small><input id="join-nick" maxlength="12" placeholder="예: 벡터왕"></label>
+        <p id="launch-note" class="launch-note" role="note"></p>
         <div class="sheet-buttons">
           <button id="step-launch-back" class="btn" type="button">← 이전</button>
           <button class="btn primary big launch-btn" type="submit">🚀 탐험 시작!</button>
@@ -329,6 +355,7 @@
       <div class="meta">
         <span id="stage-chip" class="chip"></span>
         <span id="online-chip" class="chip soft"></span>
+        <span id="timer-chip" class="chip soft timer-chip" hidden></span>
         <span id="mode-chip" class="chip soft"></span>
         <span id="me-chip" class="chip soft"></span>
         <span id="team-chip" class="chip soft" hidden></span>

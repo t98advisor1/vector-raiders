@@ -1,4 +1,4 @@
-// 전체 관리자가 올리는 md 세트 검사
+// 문항 세트 md 형식 검사 (content/sets의 기본 세트를 고칠 때 쓴다)
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
