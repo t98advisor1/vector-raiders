@@ -549,6 +549,7 @@ function onMessage(msg) {
   } else if (msg.type === "started") {
     toast("🔑 수업 탐험을 시작했어요!", "ok");
   } else if (msg.type === "restarted") {
+    store("vr-practice-round", (Number(store("vr-practice-round")) || 0) + 1); // 새 게임 → 선물도 새로 고른다
     try { sessionStorage.setItem("vr-autojoin", "practice"); } catch {}
     location.reload();
   } else if (msg.type === "found") {
@@ -1704,29 +1705,21 @@ function showSummary() {
           <button id="print-btn" class="btn needs-answers" type="button" ${wait}>📄 나의 오답 정리</button>
         </div>
       </div>
-      <div class="reward-box">
+      ${S.spectator ? "" : `<div class="reward-box">
         <b>🍪 완주 선물 받기</b>
-        <small>탐험 소감을 쓰고 위의 자료 4가지(문제지·답지·풀이 기록·오답 정리)를 모두 받으면 깜짝 선물이 열려요.</small>
+        <small>탐험 소감을 쓰고 위의 자료 4가지(문제지·답지·풀이 기록·오답 정리)를 모두 받으면 선물 두 가지 중 하나를 고를 수 있어요.</small>
         <textarea id="feel-text" maxlength="400" rows="3" placeholder="예: 협업 문제에서 친구와 조건을 나눠 풀면서 벡터의 내적이 무엇인지 알게 됐어요.">${esc(rewardState().feelText ?? "")}</textarea>
         <button id="feel-send" class="btn" type="button">✍️ 소감 보내기</button>
         <ul class="reward-check">${REWARD_STEPS.map(([k, t]) => `<li data-k="${k}">${t}</li>`).join("")}</ul>
-        <div id="cookie-box" class="cookie-box" hidden>
-          <p><b>🎁 쿠키 선물이 열렸어요!</b><br>끝까지 탐험한 여러분에게 드리는 작은 선물, 조선 수묵화 풍 <b>관상 연구소</b>예요.
-          재미로만 보는 놀이이고, 카메라 영상은 이 기기 밖으로 나가지 않아요. 카메라 없이 그림 모드로도 할 수 있어요.</p>
-          <a class="btn primary" href="/gwansang" target="_blank" rel="noopener">🖌️ 관상 연구소 열기</a>
-        </div>
-      </div>` : ""}
+        <div id="cookie-box" class="cookie-box" hidden></div>
+      </div>`}` : ""}
       ${S.mode === "practice" && iEscaped() ? `<div class="reward-box">
         <b>🍪 완주 선물 받기</b>
-        <small>연습 유적을 모두 탈출했어요! 탐험 소감을 쓰면 깜짝 선물이 열려요.</small>
+        <small>연습 유적을 모두 탈출했어요! 탐험 소감을 쓰면 선물 두 가지 중 하나를 고를 수 있어요.</small>
         <textarea id="feel-text" maxlength="400" rows="3" placeholder="예: 그림을 움직여 보니 벡터의 덧셈이 평행사변형으로 보였어요.">${esc(rewardState().feelText ?? "")}</textarea>
         <button id="feel-send" class="btn" type="button">✍️ 소감 쓰고 선물 열기</button>
         <ul class="reward-check"><li data-k="feel">✍️ 소감 쓰기</li></ul>
-        <div id="cookie-box" class="cookie-box" hidden>
-          <p><b>🎁 쿠키 선물이 열렸어요!</b><br>끝까지 탐험한 여러분에게 드리는 작은 선물, 조선 수묵화 풍 <b>관상 연구소</b>예요.
-          재미로만 보는 놀이이고, 카메라 영상은 이 기기 밖으로 나가지 않아요. 카메라 없이 그림 모드로도 할 수 있어요.</p>
-          <a class="btn primary" href="/gwansang" target="_blank" rel="noopener">🖌️ 관상 연구소 열기</a>
-        </div>
+        <div id="cookie-box" class="cookie-box" hidden></div>
       </div>` : ""}
     </div>`;
   const ul = document.createElement("ul");
@@ -1764,9 +1757,11 @@ function showSummary() {
   }
 }
 
-// ---------- 완주 선물(쿠키): 소감 + 형성평가 자료 4가지를 모두 받으면 관상 연구소가 열린다 ----------
+// ---------- 완주 선물(쿠키): 소감 + 형성평가 자료 4가지를 모두 받으면 선물 두 가지 중 하나를 고른다 ----------
 const REWARD_STEPS = [["feel", "✍️ 소감 쓰기"], ["sheet", "📝 형성평가 문제지"], ["answer", "✅ 형성평가 답지"], ["mine", "🗂️ 나의 풀이 기록"], ["review", "📄 나의 오답 정리"]];
-const rewardKey = () => `vr-reward-${S.mode}-${S.ch}-${SET?.id ?? ""}-${S.name ?? ""}`;
+// 게임 하나 = 방이 한 번 열린 동안(60분 뒤 초기화되면 새 게임). 연습은 '처음부터 다시'를 할 때마다 새 게임이다.
+const gameId = () => `${S.cls?.endsAt ?? ""}${S.mode === "practice" ? `-${Number(store("vr-practice-round")) || 0}` : ""}`;
+const rewardKey = () => `vr-reward-${S.mode}-${S.ch}-${SET?.id ?? ""}-${S.name ?? ""}-${gameId()}`;
 function rewardState() { try { return JSON.parse(localStorage.getItem(rewardKey()) ?? "{}") ?? {}; } catch { return {}; } }
 function saveReward(r) { try { localStorage.setItem(rewardKey(), JSON.stringify(r)); } catch {} }
 function markReward(k) {
@@ -1780,6 +1775,7 @@ function renderReward() {
   const box = $("#cookie-box");
   if (!box) return;
   const all = S.mode === "practice" ? !!r.feel : REWARD_STEPS.every(([k]) => r[k]);
+  if (all) renderGifts(box);
   if (all && box.hidden) {
     box.hidden = false;
     sound.sfx("relic");
@@ -1791,6 +1787,43 @@ function renderReward() {
       }));
     } catch {}
   }
+}
+
+// 완주 선물: 게임마다 둘 중 하나만 고른다. 지난 게임에서 고른 선물은 다음 게임에서 잠기고 다른 선물을 고른다.
+const GIFTS = {
+  gwansang: { icon: "🖌️", name: "관상 연구소", url: "https://kwansang.vercel.app/", desc: "조선 수묵화 풍으로 내 얼굴의 관상을 재미로 봐요." },
+  tarot: { icon: "🔮", name: "별빛 청춘 3D 타로", url: "https://starlight-tarot-3d.vercel.app/", desc: "3D 타로 카드를 뽑아 공부·진로 고민에 응원을 받아요." },
+};
+const lastGiftKey = () => `vr-gift-last-${S.name ?? ""}`; // 이 기기에서 이 학생이 마지막으로 고른 선물 { game, gift }
+function lockedGift() {
+  if (rewardState().gift) return null; // 이번 게임에서 이미 골랐다
+  const last = store(lastGiftKey());
+  return last && last.game !== rewardKey() && GIFTS[last.gift] ? last.gift : null;
+}
+let giftChoice = null; // 고르기 전에 눌러 본 선물
+function renderGifts(box) {
+  const picked = rewardState().gift;
+  const locked = lockedGift();
+  const head = picked
+    ? `<b>🎁 이번 게임의 선물: ${GIFTS[picked].name}</b><br><small>다음 게임에서는 다른 선물을 고를 수 있어요.</small>`
+    : `<b>🎁 선물이 열렸어요! 둘 중 하나만 고를 수 있어요.</b><br><small>${locked ? `지난 게임에서 ${GIFTS[locked].name}를 골랐으니 이번에는 다른 선물이에요.` : "한 번 고르면 이번 게임에서는 바꿀 수 없어요. 다음 게임에서 다른 선물을 고를 수 있어요."} 재미로만 보는 놀이이고, 새 창에서 열려요.</small>`;
+  box.innerHTML = `<p>${head}</p><div class="gift-grid">${Object.entries(GIFTS).map(([k, g]) => {
+    const off = picked ? picked !== k : locked === k;
+    const note = picked === k ? "✔ 내가 고른 선물" : picked ? "이번 게임에서는 닫혔어요" : locked === k ? "🔒 지난 게임에서 골랐어요" : giftChoice === k ? "아래 버튼을 누르면 이 선물로 정해져요" : "눌러서 고르기";
+    const open = picked === k || (!picked && giftChoice === k && !off);
+    return `<div class="gift-card${off ? " off" : ""}${open ? " on" : ""}">
+      <button type="button" class="gift-pick" data-gift="${k}" ${off || picked ? "disabled" : ""}><span class="gift-icon">${g.icon}</span><b>${g.name}</b><small>${g.desc}</small><em>${note}</em></button>
+      ${open ? `<a class="btn primary gift-open" data-gift="${k}" href="${g.url}" target="_blank" rel="noopener">${picked ? "🎁 다시 열기" : `🎁 ${g.name} 선물 받기`}</a>` : ""}
+    </div>`;
+  }).join("")}</div>`;
+  box.querySelectorAll(".gift-pick").forEach((b) => (b.onclick = () => { giftChoice = b.dataset.gift; renderGifts(box); }));
+  box.querySelectorAll(".gift-open").forEach((a) => (a.onclick = () => {
+    if (rewardState().gift) return; // 다시 열기
+    saveReward({ ...rewardState(), gift: a.dataset.gift });
+    store(lastGiftKey(), { game: rewardKey(), gift: a.dataset.gift });
+    giftChoice = null;
+    setTimeout(() => renderGifts(box), 0); // 링크가 새 창으로 열린 뒤 화면을 바꾼다
+  }));
 }
 
 // ---------- 🚪 중간에 나가기: 다 못 끝내도 지금까지 한 만큼 학습 자료를 출력해 간다 ----------

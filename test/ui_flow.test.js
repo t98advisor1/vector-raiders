@@ -162,7 +162,23 @@ test("중간에 나가기: 수업 중 내가 푼 문제의 정답만 받아 학�
   assert.match(html, /id="exit-btn"/);
 });
 
-test("완주 선물: 소감과 형성평가 자료 4가지를 모두 받아야 관상 연구소가 열린다", () => {
+test("완주 선물: 게임마다 관상·타로 중 하나만 고르고, 다음 게임에서는 지난번 선물이 잠긴다", () => {
+  const stu = fs.readFileSync("public/js/student.js", "utf8");
+  assert.ok(stu.includes('url: "https://kwansang.vercel.app/"') && stu.includes('url: "https://starlight-tarot-3d.vercel.app/"'));
+  // 게임 하나 = 방이 열린 동안(endsAt), 연습은 '처음부터 다시'마다 새 게임
+  assert.ok(stu.includes("const gameId = () => `${S.cls?.endsAt ?? \"\"}"));
+  assert.ok(stu.includes("-${gameId()}`;"));
+  assert.ok(stu.includes('store("vr-practice-round", (Number(store("vr-practice-round")) || 0) + 1)'));
+  // 이번 게임에서 고르면 다른 선물은 닫히고, 지난 게임의 선물은 잠긴다
+  assert.ok(stu.includes("const off = picked ? picked !== k : locked === k;"));
+  assert.ok(stu.includes("return last && last.game !== rewardKey() && GIFTS[last.gift] ? last.gift : null;"));
+  assert.ok(stu.includes("saveReward({ ...rewardState(), gift: a.dataset.gift });"));
+  assert.ok(stu.includes("store(lastGiftKey(), { game: rewardKey(), gift: a.dataset.gift });"));
+  assert.ok(stu.includes('target="_blank" rel="noopener"'));
+  assert.ok(stu.includes('${S.spectator ? "" : `<div class="reward-box">')); // 관람자는 선물 없음
+});
+
+test("완주 선물: 소감과 형성평가 자료 4가지를 모두 받아야 선물이 열린다", () => {
   const stu = fs.readFileSync("public/js/student.js", "utf8");
   for (const k of ["feel", "sheet", "answer", "mine", "review"]) assert.match(stu, new RegExp(`\\["${k}", `));
   assert.match(stu, /REWARD_STEPS\.every\(\(\[k\]\) => r\[k\]\)/);
@@ -230,7 +246,7 @@ test("랭킹·채팅은 닉네임, 교사 화면은 닉네임 (이름)", () => {
   const t = fs.readFileSync("public/js/teacher.js", "utf8");
   assert.ok(t.includes("const who = (st) => (st.nick && st.nick !== st.name ? `${st.nick} (${st.name})` : st.name);"));
 });
-test("연습 모드도 모든 방을 탈출하면 결과 창이 열리고, 소감을 쓰면 관상 연구소가 열린다", () => {
+test("연습 모드도 모든 방을 탈출하면 결과 창이 열리고, 소감을 쓰면 선물을 고를 수 있다", () => {
   const stu = fs.readFileSync("public/js/student.js", "utf8");
   assert.match(stu, /S\.mode === "practice" && !wasDone && iEscaped\(\)/);
   assert.match(stu, /S\.mode === "practice" \? !!r\.feel : REWARD_STEPS\.every/);
